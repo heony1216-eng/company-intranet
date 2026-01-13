@@ -1,15 +1,31 @@
 <!doctype html>
 <html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/company-intranet/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="사내 인트라넷 - 업무를 더 편리하게" />
-    <title>사내 인트라넷</title>
-    <script type="module" crossorigin src="/company-intranet/assets/index-C00Up6oO.js"></script>
-    <link rel="stylesheet" crossorigin href="/company-intranet/assets/index-Jzh3I8pf.css">
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/company-intranet/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="사내 인트라넷 - 업무를 더 편리하게" />
+  <title>사내 인트라넷</title>
+  <!-- GitHub Pages SPA 리다이렉트 처리 -->
+  <script type="text/javascript">
+    (function (l) {
+      if (l.search[1] === '/') {
+        var decoded = l.search.slice(1).split('&').map(function (s) {
+          return s.replace(/~and~/g, '&')
+        }).join('?');
+        window.history.replaceState(null, null,
+          l.pathname.slice(0, -1) + decoded + l.hash
+        );
+      }
+    }(window.location))
+  </script>
+  <script type="module" crossorigin src="/company-intranet/assets/index-rKLGxMKC.js"></script>
+  <link rel="stylesheet" crossorigin href="/company-intranet/assets/index-Jzh3I8pf.css">
+</head>
+
+<body>
+  <div id="root"></div>
+</body>
+
 </html>

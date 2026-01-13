@@ -10,7 +10,7 @@ const RegisterPage = () => {
         password: '',
         confirmPassword: '',
         name: '',
-        position: '',  // 직책
+        team: '',      // 팀명
         rank: ''       // 직급
     })
     const [loading, setLoading] = useState(false)
@@ -47,7 +47,7 @@ const RegisterPage = () => {
             id: formData.id,
             password: formData.password,
             name: formData.name,
-            position: formData.position,
+            team: formData.team,
             rank: formData.rank
         })
 
@@ -148,15 +148,15 @@ const RegisterPage = () => {
                                 />
                             </div>
 
-                            {/* Position (직책) */}
+                            {/* Team (팀명) */}
                             <div className="relative">
                                 <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-toss-gray-400" size={20} />
                                 <input
                                     type="text"
-                                    name="position"
-                                    value={formData.position}
+                                    name="team"
+                                    value={formData.team}
                                     onChange={handleChange}
-                                    placeholder="직책 (예: 개발팀장)"
+                                    placeholder="팀명 (예: 개발팀, 기획팀)"
                                     className={inputClasses}
                                 />
                             </div>
