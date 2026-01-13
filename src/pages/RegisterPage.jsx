@@ -6,7 +6,7 @@ import { Mail, Lock, User, Briefcase, Award, ArrowRight, ArrowLeft } from 'lucid
 
 const RegisterPage = () => {
     const [formData, setFormData] = useState({
-        email: '',
+        id: '',
         password: '',
         confirmPassword: '',
         name: '',
@@ -44,7 +44,7 @@ const RegisterPage = () => {
         }
 
         const { error } = await signUp({
-            email: formData.email,
+            id: formData.id,
             password: formData.password,
             name: formData.name,
             position: formData.position,
@@ -89,15 +89,15 @@ const RegisterPage = () => {
                         </div>
                     ) : (
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            {/* Email */}
+                            {/* ID */}
                             <div className="relative">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-toss-gray-400" size={20} />
+                                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-toss-gray-400" size={20} />
                                 <input
-                                    type="email"
-                                    name="email"
-                                    value={formData.email}
+                                    type="text"
+                                    name="id"
+                                    value={formData.id}
                                     onChange={handleChange}
-                                    placeholder="이메일 *"
+                                    placeholder="아이디 *"
                                     required
                                     className={inputClasses}
                                 />
@@ -132,7 +132,7 @@ const RegisterPage = () => {
                             </div>
 
                             {/* Divider */}
-                            <div className="border-t border-toss-gray-200 pt-4"/>
+                            <div className="border-t border-toss-gray-200 pt-4" />
 
                             {/* Name */}
                             <div className="relative">
@@ -187,8 +187,8 @@ const RegisterPage = () => {
                 </Card>
 
                 {/* Back to Login */}
-                <Link 
-                    to="/login" 
+                <Link
+                    to="/login"
                     className="flex items-center justify-center gap-2 text-sm text-toss-gray-500 hover:text-toss-blue transition-colors"
                 >
                     <ArrowLeft size={16} />
