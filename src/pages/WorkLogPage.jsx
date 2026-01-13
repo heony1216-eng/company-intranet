@@ -301,92 +301,107 @@ const WorkLogPage = () => {
                 </Button>
             </div>
 
-            {/* Worklog List */}
-            <div className="grid gap-4">
+            {/* Worklog List - Table View */}
+            <Card>
                 {loading ? (
-                    <Card>
-                        <div className="text-center text-toss-gray-500 py-8">
-                            로딩 중...
-                        </div>
-                    </Card>
+                    <div className="text-center text-toss-gray-500 py-8">
+                        로딩 중...
+                    </div>
                 ) : worklogs.length > 0 ? (
-                    worklogs.map((log) => (
-                        <Card
-                            key={log.id}
-                            className={`hover:shadow-toss-lg transition-shadow cursor-pointer ${
-                                isAdmin && !log.is_read ? 'bg-blue-50 border-2 border-blue-200' : ''
-                            }`}
-                            onClick={() => viewWorklogDetail(log)}
-                        >
-                            <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                        <span className="text-sm bg-toss-gray-100 text-toss-gray-600 px-3 py-1 rounded-full flex items-center gap-1">
-                                            <Calendar size={14} />
-                                            {formatDate(log.work_date)}
-                                        </span>
-                                        {isAdmin && log.user && (
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead className="bg-toss-gray-100 border-b border-toss-gray-200">
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">날짜</th>
+                                    {isAdmin && (
+                                        <>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">작성자</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">팀</th>
+                                        </>
+                                    )}
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">오전 업무</th>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">오후 업무</th>
+                                    <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700">구조현황</th>
+                                    <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700">파일</th>
+                                    <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700">상태</th>
+                                    <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700">관리</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-toss-gray-200">
+                                {worklogs.map((log) => (
+                                    <tr
+                                        key={log.id}
+                                        className={`hover:bg-toss-gray-50 cursor-pointer transition-colors ${
+                                            isAdmin && !log.is_read ? 'bg-blue-50' : ''
+                                        }`}
+                                        onClick={() => viewWorklogDetail(log)}
+                                    >
+                                        <td className="px-4 py-3 text-sm text-toss-gray-900 whitespace-nowrap">
+                                            <div className="flex items-center gap-2">
+                                                <Calendar size={14} className="text-toss-gray-400" />
+                                                {new Date(log.work_date).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}
+                                            </div>
+                                        </td>
+                                        {isAdmin && (
                                             <>
-                                                <span className="text-sm text-toss-gray-500">
-                                                    {log.user.name} · {log.user.team || '팀 미설정'}
-                                                </span>
-                                                {!log.is_read && (
-                                                    <span className="text-xs bg-red-500 text-white px-2 py-1 rounded-full font-medium">
-                                                        NEW
-                                                    </span>
-                                                )}
+                                                <td className="px-4 py-3 text-sm text-toss-gray-900">{log.user?.name || '-'}</td>
+                                                <td className="px-4 py-3 text-sm text-toss-gray-600">{log.user?.team || '-'}</td>
                                             </>
                                         )}
-                                    </div>
-
-                                    <div className="space-y-1">
-                                        {log.morning_work && (
-                                            <p className="text-sm text-toss-gray-700">
-                                                <span className="font-medium">오전:</span> {log.morning_work.substring(0, 50)}{log.morning_work.length > 50 ? '...' : ''}
-                                            </p>
-                                        )}
-                                        {log.afternoon_work && (
-                                            <p className="text-sm text-toss-gray-700">
-                                                <span className="font-medium">오후:</span> {log.afternoon_work.substring(0, 50)}{log.afternoon_work.length > 50 ? '...' : ''}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <div className="flex items-center gap-3 mt-2">
-                                        {log.file_urls && log.file_urls.length > 0 && (
-                                            <span className="inline-flex items-center gap-1 text-toss-gray-500 text-sm">
-                                                <File size={16} />
-                                                파일 {log.file_urls.length}개
-                                            </span>
-                                        )}
-                                        {log.rescue_situations && log.rescue_situations.length > 0 && (
-                                            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full text-sm font-medium">
-                                                구조현황 {log.rescue_situations.length}건
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {(profile?.user_id === log.user_id || isAdmin) && (
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); handleDelete(log.id); }}
-                                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl ml-4 transition-colors"
-                                        title="삭제"
-                                    >
-                                        <Trash2 size={18} />
-                                    </button>
-                                )}
-                            </div>
-                        </Card>
-                    ))
+                                        <td className="px-4 py-3 text-sm text-toss-gray-700 max-w-xs truncate">
+                                            {log.morning_work || '-'}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-toss-gray-700 max-w-xs truncate">
+                                            {log.afternoon_work || '-'}
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            {log.rescue_situations && log.rescue_situations.length > 0 ? (
+                                                <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-xs font-medium">
+                                                    {log.rescue_situations.length}건
+                                                </span>
+                                            ) : (
+                                                <span className="text-toss-gray-400 text-xs">-</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            {log.file_urls && log.file_urls.length > 0 ? (
+                                                <span className="inline-flex items-center gap-1 text-toss-gray-600 text-xs">
+                                                    <File size={14} />
+                                                    {log.file_urls.length}
+                                                </span>
+                                            ) : (
+                                                <span className="text-toss-gray-400 text-xs">-</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            {isAdmin && !log.is_read && (
+                                                <span className="inline-block bg-red-500 text-white px-2 py-1 rounded-full text-xs font-medium">
+                                                    NEW
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            {(profile?.user_id === log.user_id || isAdmin) && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleDelete(log.id); }}
+                                                    className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
+                                                    title="삭제"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 ) : (
-                    <Card>
-                        <div className="text-center text-toss-gray-500 py-8">
-                            등록된 업무일지가 없습니다
-                        </div>
-                    </Card>
+                    <div className="text-center text-toss-gray-500 py-8">
+                        등록된 업무일지가 없습니다
+                    </div>
                 )}
-            </div>
+            </Card>
 
             {/* Create Modal */}
             <Modal
