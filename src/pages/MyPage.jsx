@@ -10,7 +10,7 @@ const MyPage = () => {
     const [success, setSuccess] = useState(false)
     const [formData, setFormData] = useState({
         name: '',
-        position: '',
+        rank: '',
         team: ''
     })
 
@@ -19,7 +19,7 @@ const MyPage = () => {
         if (profile) {
             setFormData({
                 name: profile.name || '',
-                position: profile.position || '',
+                rank: profile.rank || '',
                 team: profile.team || ''
             })
         }
@@ -109,29 +109,29 @@ const MyPage = () => {
 
                     <div>
                         <label className="flex items-center gap-2 text-sm font-medium text-toss-gray-700 mb-2">
-                            <Briefcase size={16} />
-                            직책
-                        </label>
-                        <input
-                            type="text"
-                            value={formData.position}
-                            onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl text-toss-gray-900 focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
-                            placeholder="직책을 입력하세요 (예: 과장, 대리, 팀장)"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="flex items-center gap-2 text-sm font-medium text-toss-gray-700 mb-2">
                             <Users size={16} />
-                            소속팀
+                            팀명
                         </label>
                         <input
                             type="text"
                             value={formData.team}
                             onChange={(e) => setFormData({ ...formData, team: e.target.value })}
                             className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl text-toss-gray-900 focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
-                            placeholder="소속팀을 입력하세요 (예: 기획팀, 개발팀)"
+                            placeholder="팀명을 입력하세요 (예: 기획팀, 개발팀)"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="flex items-center gap-2 text-sm font-medium text-toss-gray-700 mb-2">
+                            <Briefcase size={16} />
+                            직급
+                        </label>
+                        <input
+                            type="text"
+                            value={formData.rank}
+                            onChange={(e) => setFormData({ ...formData, rank: e.target.value })}
+                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl text-toss-gray-900 focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
+                            placeholder="직급을 입력하세요 (예: 과장, 대리, 팀장)"
                         />
                     </div>
 
@@ -156,10 +156,7 @@ const MyPage = () => {
                         • 이름은 필수 항목입니다
                     </p>
                     <p className="text-sm text-toss-gray-600 leading-relaxed">
-                        • 직책과 소속팀은 선택 사항이며, 업무일지 작성 시 표시됩니다
-                    </p>
-                    <p className="text-sm text-toss-gray-600 leading-relaxed">
-                        • 이메일 주소는 변경할 수 없습니다
+                        • 팀명과 직급은 선택 사항이며, 업무일지 작성 시 표시됩니다
                     </p>
                 </div>
             </Card>
