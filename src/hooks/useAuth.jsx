@@ -61,8 +61,9 @@ export const AuthProvider = ({ children }) => {
         return { error }
     }
 
-    // Admin login with email/password
-    const signInWithPassword = async (email, password) => {
+    // Admin login with email/password (now using ID)
+    const signInWithPassword = async (id, password) => {
+        const email = `${id}@save365.kr`
         const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password
@@ -80,8 +81,9 @@ export const AuthProvider = ({ children }) => {
         return { error }
     }
 
-    // Sign up with email/password
-    const signUp = async ({ email, password, name, position, rank }) => {
+    // Sign up with email/password (now using ID)
+    const signUp = async ({ id, password, name, position, rank }) => {
+        const email = `${id}@save365.kr`
         const { data, error } = await supabase.auth.signUp({
             email,
             password,

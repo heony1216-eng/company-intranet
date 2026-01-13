@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { Button, Input, Card } from '../components/common'
-import { Mail, Lock, ArrowRight, UserPlus } from 'lucide-react'
+import { Mail, Lock, ArrowRight, UserPlus, User } from 'lucide-react'
 
 const LoginPage = () => {
     const [mode, setMode] = useState('user') // 'user' or 'admin'
-    const [email, setEmail] = useState('')
+    const [id, setId] = useState('')
     const [password, setPassword] = useState('')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
@@ -19,13 +19,13 @@ const LoginPage = () => {
         setLoading(true)
         setError('')
 
-        const { error } = await signInWithPassword(email, password)
+        const { error } = await signInWithPassword(id, password)
 
         if (error) {
             if (mode === 'admin') {
                 setError('아이디 또는 비밀번호가 올바르지 않습니다.')
             } else {
-                setError('이메일 또는 비밀번호가 올바르지 않습니다.')
+                setError('아이디 또는 비밀번호가 올바르지 않습니다.')
             }
         } else {
             navigate('/')
@@ -70,12 +70,12 @@ const LoginPage = () => {
 
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div className="relative">
-                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-toss-gray-400" size={20} />
+                            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-toss-gray-400" size={20} />
                             <input
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder={mode === 'admin' ? '관리자 이메일' : '이메일'}
+                                type="text"
+                                value={id}
+                                onChange={(e) => setId(e.target.value)}
+                                placeholder={mode === 'admin' ? '관리자 아이디' : '아이디'}
                                 required
                                 className="w-full pl-12 pr-4 py-3 bg-toss-gray-100 border-0 rounded-toss text-toss-gray-900 placeholder-toss-gray-500 focus:ring-2 focus:ring-toss-blue focus:bg-white transition-all"
                             />
@@ -130,4 +130,3 @@ const LoginPage = () => {
 }
 
 export default LoginPage
-
