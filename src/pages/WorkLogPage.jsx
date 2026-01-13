@@ -28,8 +28,11 @@ const WorkLogPage = () => {
         location: '',
         name: '',
         request_date: '',
-        status: ''
+        status: '',
+        details: ''  // 상세 진행상황
     }
+
+    const [selectedRescueIndex, setSelectedRescueIndex] = useState(null)
 
     useEffect(() => {
         fetchWorklogs()
@@ -477,7 +480,13 @@ const WorkLogPage = () => {
                                     </thead>
                                     <tbody>
                                         {formData.rescue_situations.map((row, index) => (
-                                            <tr key={index} className="border-t border-emerald-100">
+                                            <tr
+                                                key={index}
+                                                className={`border-t border-emerald-100 cursor-pointer transition-colors ${
+                                                    selectedRescueIndex === index ? 'bg-emerald-100' : 'hover:bg-emerald-50'
+                                                }`}
+                                                onClick={() => setSelectedRescueIndex(index)}
+                                            >
                                                 <td className="px-3 py-2">
                                                     <span className="text-sm font-medium">{row.number}</span>
                                                 </td>
@@ -485,7 +494,11 @@ const WorkLogPage = () => {
                                                     <input
                                                         type="text"
                                                         value={row.location}
-                                                        onChange={(e) => updateRescueRow(index, 'location', e.target.value)}
+                                                        onChange={(e) => {
+                                                            e.stopPropagation()
+                                                            updateRescueRow(index, 'location', e.target.value)
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
                                                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                                                         placeholder="체류지"
                                                     />
@@ -494,7 +507,11 @@ const WorkLogPage = () => {
                                                     <input
                                                         type="text"
                                                         value={row.name}
-                                                        onChange={(e) => updateRescueRow(index, 'name', e.target.value)}
+                                                        onChange={(e) => {
+                                                            e.stopPropagation()
+                                                            updateRescueRow(index, 'name', e.target.value)
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
                                                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                                                         placeholder="성명"
                                                     />
@@ -503,7 +520,11 @@ const WorkLogPage = () => {
                                                     <input
                                                         type="text"
                                                         value={row.request_date}
-                                                        onChange={(e) => updateRescueRow(index, 'request_date', e.target.value)}
+                                                        onChange={(e) => {
+                                                            e.stopPropagation()
+                                                            updateRescueRow(index, 'request_date', e.target.value)
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
                                                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                                                         placeholder="25.01.13"
                                                     />
@@ -512,14 +533,21 @@ const WorkLogPage = () => {
                                                     <input
                                                         type="text"
                                                         value={row.status}
-                                                        onChange={(e) => updateRescueRow(index, 'status', e.target.value)}
+                                                        onChange={(e) => {
+                                                            e.stopPropagation()
+                                                            updateRescueRow(index, 'status', e.target.value)
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
                                                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                                        placeholder="진행상황"
+                                                        placeholder="간략 상태"
                                                     />
                                                 </td>
                                                 <td className="px-3 py-2 text-center">
                                                     <button
-                                                        onClick={() => removeRescueRow(index)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            removeRescueRow(index)
+                                                        }}
                                                         className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors"
                                                     >
                                                         <X size={16} />
@@ -534,6 +562,24 @@ const WorkLogPage = () => {
                             <p className="text-sm text-emerald-700 text-center py-6">
                                 구조현황을 추가하려면 '추가' 버튼을 클릭하세요
                             </p>
+                        )}
+
+                        {/* 상세 구조진행상황 입력 영역 */}
+                        {selectedRescueIndex !== null && formData.rescue_situations[selectedRescueIndex] && (
+                            <div className="mt-4 p-4 bg-white rounded-xl border-2 border-emerald-200">
+                                <label className="block text-sm font-bold text-emerald-900 mb-2">
+                                    [{formData.rescue_situations[selectedRescueIndex].number}번] 상세 구조진행상황
+                                    {formData.rescue_situations[selectedRescueIndex].name &&
+                                        ` - ${formData.rescue_situations[selectedRescueIndex].name}`}
+                                </label>
+                                <textarea
+                                    value={formData.rescue_situations[selectedRescueIndex].details || ''}
+                                    onChange={(e) => updateRescueRow(selectedRescueIndex, 'details', e.target.value)}
+                                    rows={6}
+                                    className="w-full px-4 py-3 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none transition-all"
+                                    placeholder="상세한 구조진행상황을 입력하세요&#10;&#10;예시:&#10;- 1차 연락: 25.01.10 14:30 가족에게 연락&#10;- 2차 연락: 25.01.11 09:00 본인과 통화 완료&#10;- 귀국 일정: 25.01.15 예정&#10;- 비고: 건강상태 양호, 항공권 예매 완료"
+                                />
+                            </div>
                         )}
                     </div>
 
@@ -665,13 +711,27 @@ const WorkLogPage = () => {
                                         </thead>
                                         <tbody>
                                             {selectedWorklog.rescue_situations.map((situation, index) => (
-                                                <tr key={index} className="border-t border-emerald-100">
-                                                    <td className="px-3 py-2 text-sm">{situation.number}</td>
-                                                    <td className="px-3 py-2 text-sm">{situation.location}</td>
-                                                    <td className="px-3 py-2 text-sm font-medium">{situation.name}</td>
-                                                    <td className="px-3 py-2 text-sm">{situation.request_date}</td>
-                                                    <td className="px-3 py-2 text-sm">{situation.status}</td>
-                                                </tr>
+                                                <>
+                                                    <tr key={index} className="border-t border-emerald-100">
+                                                        <td className="px-3 py-2 text-sm">{situation.number}</td>
+                                                        <td className="px-3 py-2 text-sm">{situation.location}</td>
+                                                        <td className="px-3 py-2 text-sm font-medium">{situation.name}</td>
+                                                        <td className="px-3 py-2 text-sm">{situation.request_date}</td>
+                                                        <td className="px-3 py-2 text-sm">{situation.status}</td>
+                                                    </tr>
+                                                    {situation.details && (
+                                                        <tr key={`${index}-details`} className="bg-emerald-50">
+                                                            <td colSpan={5} className="px-3 py-3">
+                                                                <div className="text-xs text-emerald-800 font-medium mb-1">
+                                                                    상세 진행상황:
+                                                                </div>
+                                                                <div className="text-sm text-toss-gray-700 whitespace-pre-wrap bg-white p-3 rounded-lg border border-emerald-200">
+                                                                    {situation.details}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </>
                                             ))}
                                         </tbody>
                                     </table>
