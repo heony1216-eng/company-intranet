@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     // Sign up (direct DB insert)
-    const signUp = async ({ id, password, name, position, rank }) => {
+    const signUp = async ({ id, password, name, team, rank }) => {
         try {
             // Check if user_id already exists
             const { data: existing } = await supabase
@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }) => {
                     user_id: id,
                     password: password,
                     name: name,
-                    position: position,
+                    team: team,
                     rank: rank,
                     role: 'user',
                     created_at: new Date().toISOString()

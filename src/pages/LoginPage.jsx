@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { Button, Input, Card } from '../components/common'
@@ -8,11 +8,23 @@ const LoginPage = () => {
     const [mode, setMode] = useState('user') // 'user' or 'admin'
     const [id, setId] = useState('')
     const [password, setPassword] = useState('')
+    const [rememberMe, setRememberMe] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
 
     const { signInWithPassword } = useAuth()
     const navigate = useNavigate()
+
+    // Load saved credentials on mount
+    useEffect(() => {
+        const savedId = localStorage.getItem('savedId')
+        const savedPassword = localStorage.getItem('savedPassword')
+        if (savedId && savedPassword) {
+            setId(savedId)
+            setPassword(savedPassword)
+            setRememberMe(true)
+        }
+    }, [])
 
     const handleLogin = async (e) => {
         e.preventDefault()
@@ -24,6 +36,14 @@ const LoginPage = () => {
         if (error) {
             setError(error.message || '아이디 또는 비밀번호가 올바르지 않습니다.')
         } else {
+            // Save credentials if Remember Me is checked
+            if (rememberMe) {
+                localStorage.setItem('savedId', id)
+                localStorage.setItem('savedPassword', password)
+            } else {
+                localStorage.removeItem('savedId')
+                localStorage.removeItem('savedPassword')
+            }
             navigate('/')
         }
         setLoading(false)
@@ -87,6 +107,20 @@ const LoginPage = () => {
                                 required
                                 className="w-full pl-12 pr-4 py-3 bg-toss-gray-100 border-0 rounded-toss text-toss-gray-900 placeholder-toss-gray-500 focus:ring-2 focus:ring-toss-blue focus:bg-white transition-all"
                             />
+                        </div>
+
+                        {/* Remember Me */}
+                        <div className="flex items-center">
+                            <input
+                                type="checkbox"
+                                id="rememberMe"
+                                checked={rememberMe}
+                                onChange={(e) => setRememberMe(e.target.checked)}
+                                className="w-4 h-4 text-toss-blue bg-toss-gray-100 border-toss-gray-300 rounded focus:ring-toss-blue focus:ring-2"
+                            />
+                            <label htmlFor="rememberMe" className="ml-2 text-sm text-toss-gray-700 cursor-pointer">
+                                로그인 정보 저장
+                            </label>
                         </div>
 
                         {error && (
