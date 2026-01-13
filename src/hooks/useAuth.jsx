@@ -80,6 +80,22 @@ export const AuthProvider = ({ children }) => {
         return { error }
     }
 
+    // Sign up with email/password
+    const signUp = async ({ email, password, name, position, rank }) => {
+        const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: {
+                    name,
+                    position,
+                    rank
+                }
+            }
+        })
+        return { data, error }
+    }
+
     // Update profile
     const updateProfile = async (updates) => {
         const { data, error } = await supabase
@@ -101,6 +117,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         signInWithMagicLink,
         signInWithPassword,
+        signUp,
         signOut,
         updateProfile,
         isAdmin: profile?.role === 'admin'
