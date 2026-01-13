@@ -93,6 +93,10 @@ export const AuthProvider = ({ children }) => {
 
     // Update profile
     const updateProfile = async (updates) => {
+        if (!user || !user.user_id) {
+            return { data: null, error: { message: '로그인이 필요합니다.' } }
+        }
+
         const { data, error } = await supabase
             .from('users')
             .update(updates)
@@ -100,9 +104,10 @@ export const AuthProvider = ({ children }) => {
             .select()
             .single()
 
-        if (!error) {
+        if (!error && data) {
             const updatedUser = { ...user, ...data }
             localStorage.setItem('user', JSON.stringify(updatedUser))
+            setUser(updatedUser)
             setProfile(updatedUser)
         }
         return { data, error }

@@ -78,10 +78,7 @@ const WorkLogPage = () => {
         try {
             let query = supabase
                 .from('work_logs')
-                .select(`
-                    *,
-                    user:users!work_logs_user_id_fkey(name, team, rank)
-                `)
+                .select('*')
                 .order('work_date', { ascending: false })
 
             // Non-admin users can only see their own logs
@@ -89,10 +86,27 @@ const WorkLogPage = () => {
                 query = query.eq('user_id', profile.user_id)
             }
 
-            const { data, error } = await query
+            const { data: worklogsData, error: worklogsError } = await query
 
-            if (error) throw error
-            setWorklogs(data || [])
+            if (worklogsError) throw worklogsError
+
+            // Fetch user data separately
+            const { data: usersData, error: usersError } = await supabase
+                .from('users')
+                .select('user_id, name, team, rank')
+
+            if (usersError) throw usersError
+
+            // Manually join the data
+            const worklogsWithUsers = worklogsData.map(worklog => {
+                const user = usersData.find(u => u.user_id === worklog.user_id)
+                return {
+                    ...worklog,
+                    user: user || { name: '알 수 없음', team: '-', rank: '-' }
+                }
+            })
+
+            setWorklogs(worklogsWithUsers || [])
         } catch (error) {
             console.error('Error fetching worklogs:', error)
         } finally {
