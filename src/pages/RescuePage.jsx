@@ -43,20 +43,29 @@ const RescuePage = () => {
 
     const filterRescueByDate = () => {
         const filtered = rescueSituations.filter(rescue => {
-            if (!rescue.request_date) return false
-            // request_date 형식: "25.01.13" 또는 "2025.01.13" 등을 지원
-            const dateParts = rescue.request_date.split('.')
-            if (dateParts.length < 3) return false
+            // request_date가 있으면 그걸로 필터링
+            if (rescue.request_date) {
+                const dateParts = rescue.request_date.split('.')
+                if (dateParts.length >= 3) {
+                    let year = parseInt(dateParts[0])
+                    const month = parseInt(dateParts[1])
 
-            let year = parseInt(dateParts[0])
-            const month = parseInt(dateParts[1])
+                    if (year < 100) {
+                        year += 2000
+                    }
 
-            // 2자리 연도를 4자리로 변환
-            if (year < 100) {
-                year += 2000
+                    return year === selectedYear && month === selectedMonth
+                }
             }
 
-            return year === selectedYear && month === selectedMonth
+            // request_date가 없으면 created_at으로 필터링
+            if (rescue.created_at) {
+                const createdDate = new Date(rescue.created_at)
+                return createdDate.getFullYear() === selectedYear &&
+                       createdDate.getMonth() + 1 === selectedMonth
+            }
+
+            return false
         })
         setFilteredRescueSituations(filtered)
         setCurrentPage(1)
@@ -106,19 +115,42 @@ const RescuePage = () => {
         }
 
         try {
-            const { error } = await supabase.from('rescue_situations').insert({
+            console.log('=== 구조현황 저장 시작 ===')
+            console.log('profile:', profile)
+            console.log('profile.user_id:', profile.user_id, 'type:', typeof profile.user_id)
+            console.log('formData:', formData)
+
+            const insertData = {
                 ...formData,
                 user_id: profile.user_id
-            })
+            }
+            console.log('insertData:', insertData)
 
-            if (error) throw error
+            const { data, error } = await supabase
+                .from('rescue_situations')
+                .insert(insertData)
+                .select()
 
+            console.log('Insert result - data:', data)
+            console.log('Insert result - error:', error)
+
+            if (error) {
+                console.error('=== Rescue insert error ===')
+                console.error('Error code:', error.code)
+                console.error('Error message:', error.message)
+                console.error('Error details:', error.details)
+                console.error('Error hint:', error.hint)
+                throw error
+            }
+
+            console.log('=== 구조현황 저장 성공 ===')
             setIsModalOpen(false)
             resetForm()
             fetchRescueSituations()
             alert('구조현황이 저장되었습니다.')
         } catch (error) {
-            console.error('Error creating rescue situation:', error)
+            console.error('=== Error creating rescue situation ===')
+            console.error('Full error:', error)
             alert('구조현황 저장에 실패했습니다: ' + error.message)
         }
     }
