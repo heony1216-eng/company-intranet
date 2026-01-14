@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar } from 'lucide-react'
+import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar, ExternalLink } from 'lucide-react'
 import { useState } from 'react'
 
 const Sidebar = () => {
@@ -12,6 +12,13 @@ const Sidebar = () => {
         { to: '/rescue', icon: AlertTriangle, label: '구조현황' },
         { to: '/meetings', icon: Calendar, label: '회의록' },
         { to: '/mypage', icon: User, label: '마이페이지' },
+    ]
+
+    const externalLinks = [
+        { href: 'https://heony1216-eng.github.io/rescue-board/', icon: ExternalLink, label: '구조요청서' },
+        { href: 'https://login.ecount.com/', icon: ExternalLink, label: '이카운트' },
+        { href: 'https://www.dropbox.com/home', icon: ExternalLink, label: '드롭박스' },
+        { href: 'https://auth.worksmobile.com/login/login?accessUrl=https%3A%2F%2Fdrive.worksmobile.com%2Fdrive%2Fweb%2Fmy%3FresourceKey%3Droot&isRefreshed=true', icon: ExternalLink, label: '네이버드라이브' },
     ]
 
     const NavItem = ({ to, icon: Icon, label }) => (
@@ -57,7 +64,7 @@ const Sidebar = () => {
             >
                 <div className="flex items-center justify-between p-6 border-b border-toss-gray-100">
                     <h1 className="text-xl font-bold text-toss-gray-900">
-                        <span className="text-toss-blue">사내</span> 인트라넷
+                        <span className="text-toss-blue">한인구조단</span> 인트라넷
                     </h1>
                     <button
                         onClick={() => setIsOpen(false)}
@@ -71,6 +78,23 @@ const Sidebar = () => {
                     {navItems.map((item) => (
                         <NavItem key={item.to} {...item} />
                     ))}
+
+                    {/* 외부 링크 */}
+                    <div className="pt-4 mt-4 border-t border-toss-gray-100">
+                        {externalLinks.map((item) => (
+                            <a
+                                key={item.href}
+                                href={item.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => setIsOpen(false)}
+                                className="flex items-center gap-3 px-4 py-3 rounded-toss transition-all text-toss-gray-900 hover:bg-toss-blue/10 hover:text-toss-blue"
+                            >
+                                <item.icon size={20} />
+                                <span className="font-medium">{item.label}</span>
+                            </a>
+                        ))}
+                    </div>
                 </nav>
             </aside>
         </>
