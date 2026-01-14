@@ -6,6 +6,7 @@ import RegisterPage from './pages/RegisterPage'
 import Dashboard from './pages/Dashboard'
 import NoticePage from './pages/NoticePage'
 import WorkLogPage from './pages/WorkLogPage'
+import RescuePage from './pages/RescuePage'
 import MyPage from './pages/MyPage'
 
 // Protected Route component
@@ -79,6 +80,7 @@ function AppRoutes() {
         <Route path="/notices" element={<NoticePage />} />
         <Route path="/notices/:id" element={<NoticePage />} />
         <Route path="/worklogs" element={<WorkLogPage />} />
+        <Route path="/rescue" element={<RescuePage />} />
         <Route path="/mypage" element={<MyPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

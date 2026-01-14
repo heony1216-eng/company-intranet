@@ -1,16 +1,22 @@
 import { useState, useEffect, useRef } from 'react'
 import { Card, Button, Modal } from '../components/common'
-import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X } from 'lucide-react'
+import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, Printer } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 
 const WorkLogPage = () => {
     const { profile, isAdmin } = useAuth()
     const [worklogs, setWorklogs] = useState([])
+    const [filteredWorklogs, setFilteredWorklogs] = useState([])
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [isEditMode, setIsEditMode] = useState(false)
     const [loading, setLoading] = useState(true)
     const [uploading, setUploading] = useState(false)
     const [selectedWorklog, setSelectedWorklog] = useState(null)
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
+    const [currentPage, setCurrentPage] = useState(1)
+    const itemsPerPage = 15
     const fileInputRef = useRef(null)
 
     const [formData, setFormData] = useState({
@@ -19,59 +25,31 @@ const WorkLogPage = () => {
         afternoon_work: '',
         next_day_work: '',
         special_notes: '',
-        rescue_situations: [],
-        files: []
+        files: [],
+        existingFileUrls: []
     })
 
-    const emptyRescueRow = {
-        number: '',
-        location: '',
-        name: '',
-        request_date: '',
-        status: '',
-        details: ''  // 상세 진행상황
-    }
-
-    const [selectedRescueIndex, setSelectedRescueIndex] = useState(null)
+    // 연도 목록 생성 (2026년부터 현재 연도까지)
+    const startYear = 2026
+    const currentYear = new Date().getFullYear()
+    const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i)
+    const months = Array.from({ length: 12 }, (_, i) => i + 1)
 
     useEffect(() => {
         fetchWorklogs()
     }, [])
 
-    // 날짜 변경 시 전날 구조현황 자동 로드
     useEffect(() => {
-        if (formData.work_date) {
-            loadPreviousDayRescue()
-        }
-    }, [formData.work_date])
+        filterWorklogsByDate()
+    }, [worklogs, selectedYear, selectedMonth])
 
-    const loadPreviousDayRescue = async () => {
-        try {
-            const selectedDate = new Date(formData.work_date)
-            const previousDate = new Date(selectedDate)
-            previousDate.setDate(previousDate.getDate() - 1)
-            const prevDateStr = previousDate.toISOString().split('T')[0]
-
-            const { data, error } = await supabase
-                .from('work_logs')
-                .select('rescue_situations')
-                .eq('user_id', profile.user_id)
-                .eq('work_date', prevDateStr)
-                .single()
-
-            if (!error && data && data.rescue_situations && data.rescue_situations.length > 0) {
-                setFormData(prev => ({
-                    ...prev,
-                    rescue_situations: data.rescue_situations.map((item, index) => ({
-                        ...item,
-                        number: index + 1
-                    }))
-                }))
-            }
-        } catch (error) {
-            // 전날 데이터 없음 - 정상
-            console.log('No previous day data')
-        }
+    const filterWorklogsByDate = () => {
+        const filtered = worklogs.filter(log => {
+            const logDate = new Date(log.work_date)
+            return logDate.getFullYear() === selectedYear && logDate.getMonth() + 1 === selectedMonth
+        })
+        setFilteredWorklogs(filtered)
+        setCurrentPage(1) // 필터 변경 시 첫 페이지로 이동
     }
 
     const fetchWorklogs = async () => {
@@ -81,7 +59,6 @@ const WorkLogPage = () => {
                 .select('*')
                 .order('work_date', { ascending: false })
 
-            // Non-admin users can only see their own logs
             if (!isAdmin && profile) {
                 query = query.eq('user_id', profile.user_id)
             }
@@ -90,14 +67,12 @@ const WorkLogPage = () => {
 
             if (worklogsError) throw worklogsError
 
-            // Fetch user data separately
             const { data: usersData, error: usersError } = await supabase
                 .from('users')
                 .select('user_id, name, team, rank')
 
             if (usersError) throw usersError
 
-            // Manually join the data
             const worklogsWithUsers = worklogsData.map(worklog => {
                 const user = usersData.find(u => u.user_id === worklog.user_id)
                 return {
@@ -134,27 +109,10 @@ const WorkLogPage = () => {
         }))
     }
 
-    const addRescueRow = () => {
+    const removeExistingFile = (index) => {
         setFormData(prev => ({
             ...prev,
-            rescue_situations: [...prev.rescue_situations, { ...emptyRescueRow, number: prev.rescue_situations.length + 1 }]
-        }))
-    }
-
-    const removeRescueRow = (index) => {
-        setFormData(prev => ({
-            ...prev,
-            rescue_situations: prev.rescue_situations.filter((_, i) => i !== index)
-                .map((row, i) => ({ ...row, number: i + 1 }))
-        }))
-    }
-
-    const updateRescueRow = (index, field, value) => {
-        setFormData(prev => ({
-            ...prev,
-            rescue_situations: prev.rescue_situations.map((row, i) =>
-                i === index ? { ...row, [field]: value } : row
-            )
+            existingFileUrls: prev.existingFileUrls.filter((_, i) => i !== index)
         }))
     }
 
@@ -198,7 +156,6 @@ const WorkLogPage = () => {
                 afternoon_work: formData.afternoon_work,
                 next_day_work: formData.next_day_work,
                 special_notes: formData.special_notes,
-                rescue_situations: formData.rescue_situations,
                 file_urls: fileUrls,
                 user_id: profile.user_id,
                 is_read: false
@@ -218,6 +175,48 @@ const WorkLogPage = () => {
         }
     }
 
+    const handleEdit = async () => {
+        if (!formData.morning_work && !formData.afternoon_work) {
+            alert('오전 또는 오후 업무 중 하나는 입력해주세요.')
+            return
+        }
+
+        try {
+            setUploading(true)
+            let newFileUrls = []
+
+            if (formData.files.length > 0) {
+                newFileUrls = await uploadFiles(formData.files)
+            }
+
+            const allFileUrls = [...formData.existingFileUrls, ...newFileUrls]
+
+            const { error } = await supabase
+                .from('work_logs')
+                .update({
+                    work_date: formData.work_date,
+                    morning_work: formData.morning_work,
+                    afternoon_work: formData.afternoon_work,
+                    next_day_work: formData.next_day_work,
+                    special_notes: formData.special_notes,
+                    file_urls: allFileUrls
+                })
+                .eq('id', selectedWorklog.id)
+
+            if (error) throw error
+
+            setIsModalOpen(false)
+            resetForm()
+            fetchWorklogs()
+            alert('업무일지가 수정되었습니다.')
+        } catch (error) {
+            console.error('Error updating worklog:', error)
+            alert('업무일지 수정에 실패했습니다: ' + error.message)
+        } finally {
+            setUploading(false)
+        }
+    }
+
     const resetForm = () => {
         setFormData({
             work_date: new Date().toISOString().split('T')[0],
@@ -225,9 +224,31 @@ const WorkLogPage = () => {
             afternoon_work: '',
             next_day_work: '',
             special_notes: '',
-            rescue_situations: [],
-            files: []
+            files: [],
+            existingFileUrls: []
         })
+        setIsEditMode(false)
+        setSelectedWorklog(null)
+    }
+
+    const openEditModal = (worklog) => {
+        setFormData({
+            work_date: worklog.work_date,
+            morning_work: worklog.morning_work || '',
+            afternoon_work: worklog.afternoon_work || '',
+            next_day_work: worklog.next_day_work || '',
+            special_notes: worklog.special_notes || '',
+            files: [],
+            existingFileUrls: worklog.file_urls || []
+        })
+        setSelectedWorklog(worklog)
+        setIsEditMode(true)
+        setIsModalOpen(true)
+    }
+
+    const openCreateModal = () => {
+        resetForm()
+        setIsModalOpen(true)
     }
 
     const handleDelete = async (worklogId) => {
@@ -247,7 +268,6 @@ const WorkLogPage = () => {
     const viewWorklogDetail = async (worklog) => {
         setSelectedWorklog(worklog)
 
-        // 관리자가 읽지 않은 일지를 읽으면 is_read 업데이트
         if (isAdmin && !worklog.is_read) {
             await supabase
                 .from('work_logs')
@@ -255,6 +275,35 @@ const WorkLogPage = () => {
                 .eq('id', worklog.id)
             fetchWorklogs()
         }
+    }
+
+    const handlePrint = (worklog) => {
+        const printWindow = window.open('', '_blank')
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>업무일지 - ${formatDate(worklog.work_date)}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        h1 { border-bottom: 2px solid #333; padding-bottom: 10px; }
+                        .section { margin: 20px 0; }
+                        .section h2 { background: #f0f0f0; padding: 8px; margin-bottom: 10px; }
+                        .section p { margin: 10px 0; white-space: pre-wrap; }
+                    </style>
+                </head>
+                <body>
+                    <h1>업무일지</h1>
+                    <p><strong>날짜:</strong> ${formatDate(worklog.work_date)}</p>
+                    <p><strong>작성자:</strong> ${worklog.user?.name} (${worklog.user?.team})</p>
+                    ${worklog.morning_work ? `<div class="section"><h2>오전 업무</h2><p>${worklog.morning_work}</p></div>` : ''}
+                    ${worklog.afternoon_work ? `<div class="section"><h2>오후 업무</h2><p>${worklog.afternoon_work}</p></div>` : ''}
+                    ${worklog.next_day_work ? `<div class="section"><h2>익일 업무</h2><p>${worklog.next_day_work}</p></div>` : ''}
+                    ${worklog.special_notes ? `<div class="section"><h2>특이사항</h2><p>${worklog.special_notes}</p></div>` : ''}
+                </body>
+            </html>
+        `)
+        printWindow.document.close()
+        printWindow.print()
     }
 
     const getWeekday = (dateString) => {
@@ -270,6 +319,16 @@ const WorkLogPage = () => {
             month: 'long',
             day: 'numeric'
         }) + ` (${getWeekday(dateString)})`
+    }
+
+    // 페이지네이션
+    const indexOfLastItem = currentPage * itemsPerPage
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage
+    const currentItems = filteredWorklogs.slice(indexOfFirstItem, indexOfLastItem)
+    const totalPages = Math.ceil(filteredWorklogs.length / itemsPerPage)
+
+    const goToPage = (pageNumber) => {
+        setCurrentPage(pageNumber)
     }
 
     return (
@@ -292,122 +351,188 @@ const WorkLogPage = () => {
                 </div>
             </Card>
 
-            {/* Header */}
-            <div className="flex items-center justify-between">
+            {/* Header with Filters */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <h1 className="text-2xl font-bold text-toss-gray-900">업무일지</h1>
-                <Button onClick={() => setIsModalOpen(true)}>
-                    <Plus size={18} />
-                    새 업무일지 작성
-                </Button>
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* Year Filter */}
+                    <select
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(Number(e.target.value))}
+                        className="px-4 py-2 bg-white border border-toss-gray-300 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
+                    >
+                        {years.map(year => (
+                            <option key={year} value={year}>{year}년</option>
+                        ))}
+                    </select>
+
+                    {/* Month Filter */}
+                    <select
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                        className="px-4 py-2 bg-white border border-toss-gray-300 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
+                    >
+                        {months.map(month => (
+                            <option key={month} value={month}>{month}월</option>
+                        ))}
+                    </select>
+
+                    <Button onClick={openCreateModal}>
+                        <Plus size={18} />
+                        새 업무일지 작성
+                    </Button>
+                </div>
             </div>
 
-            {/* Worklog List - Table View */}
+            {/* Board-style Table */}
             <Card>
                 {loading ? (
-                    <div className="text-center text-toss-gray-500 py-8">
-                        로딩 중...
-                    </div>
-                ) : worklogs.length > 0 ? (
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-toss-gray-100 border-b border-toss-gray-200">
-                                <tr>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">날짜</th>
-                                    {isAdmin && (
-                                        <>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">작성자</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">팀</th>
-                                        </>
-                                    )}
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">오전 업무</th>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">오후 업무</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700">구조현황</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700">파일</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700">상태</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700">관리</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-toss-gray-200">
-                                {worklogs.map((log) => (
-                                    <tr
-                                        key={log.id}
-                                        className={`hover:bg-toss-gray-50 cursor-pointer transition-colors ${
-                                            isAdmin && !log.is_read ? 'bg-blue-50' : ''
-                                        }`}
-                                        onClick={() => viewWorklogDetail(log)}
-                                    >
-                                        <td className="px-4 py-3 text-sm text-toss-gray-900 whitespace-nowrap">
-                                            <div className="flex items-center gap-2">
-                                                <Calendar size={14} className="text-toss-gray-400" />
-                                                {new Date(log.work_date).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}
-                                            </div>
-                                        </td>
+                    <div className="text-center text-toss-gray-500 py-8">로딩 중...</div>
+                ) : currentItems.length > 0 ? (
+                    <>
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-toss-gray-100 border-b-2 border-toss-gray-300">
+                                    <tr>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700 w-16">No</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">작업일</th>
                                         {isAdmin && (
                                             <>
-                                                <td className="px-4 py-3 text-sm text-toss-gray-900">{log.user?.name || '-'}</td>
-                                                <td className="px-4 py-3 text-sm text-toss-gray-600">{log.user?.team || '-'}</td>
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">작성자</th>
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">팀</th>
                                             </>
                                         )}
-                                        <td className="px-4 py-3 text-sm text-toss-gray-700 max-w-xs truncate">
-                                            {log.morning_work || '-'}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-toss-gray-700 max-w-xs truncate">
-                                            {log.afternoon_work || '-'}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {log.rescue_situations && log.rescue_situations.length > 0 ? (
-                                                <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-xs font-medium">
-                                                    {log.rescue_situations.length}건
-                                                </span>
-                                            ) : (
-                                                <span className="text-toss-gray-400 text-xs">-</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {log.file_urls && log.file_urls.length > 0 ? (
-                                                <span className="inline-flex items-center gap-1 text-toss-gray-600 text-xs">
-                                                    <File size={14} />
-                                                    {log.file_urls.length}
-                                                </span>
-                                            ) : (
-                                                <span className="text-toss-gray-400 text-xs">-</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {isAdmin && !log.is_read && (
-                                                <span className="inline-block bg-red-500 text-white px-2 py-1 rounded-full text-xs font-medium">
-                                                    NEW
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {(profile?.user_id === log.user_id || isAdmin) && (
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); handleDelete(log.id); }}
-                                                    className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
-                                                    title="삭제"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            )}
-                                        </td>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">오전 업무</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">오후 업무</th>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700 w-24">관리</th>
                                     </tr>
+                                </thead>
+                                <tbody className="divide-y divide-toss-gray-200">
+                                    {currentItems.map((log, index) => (
+                                        <tr
+                                            key={log.id}
+                                            className={`hover:bg-toss-gray-50 transition-colors ${
+                                                isAdmin && !log.is_read ? 'bg-blue-50' : ''
+                                            }`}
+                                        >
+                                            <td className="px-4 py-3 text-sm text-center text-toss-gray-600">
+                                                {filteredWorklogs.length - (indexOfFirstItem + index)}
+                                            </td>
+                                            <td
+                                                className="px-4 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-toss-blue"
+                                                onClick={() => viewWorklogDetail(log)}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <Calendar size={14} className="text-toss-gray-400" />
+                                                    {new Date(log.work_date).toLocaleDateString('ko-KR')}
+                                                    {isAdmin && !log.is_read && (
+                                                        <span className="inline-block bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium ml-2">
+                                                            NEW
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            {isAdmin && (
+                                                <>
+                                                    <td className="px-4 py-3 text-sm text-toss-gray-900">{log.user?.name || '-'}</td>
+                                                    <td className="px-4 py-3 text-sm text-toss-gray-600">{log.user?.team || '-'}</td>
+                                                </>
+                                            )}
+                                            <td
+                                                className="px-4 py-3 text-sm text-toss-gray-700 max-w-xs truncate cursor-pointer"
+                                                onClick={() => viewWorklogDetail(log)}
+                                            >
+                                                {log.morning_work || '-'}
+                                            </td>
+                                            <td
+                                                className="px-4 py-3 text-sm text-toss-gray-700 max-w-xs truncate cursor-pointer"
+                                                onClick={() => viewWorklogDetail(log)}
+                                            >
+                                                {log.afternoon_work || '-'}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <button
+                                                        onClick={() => handlePrint(log)}
+                                                        className="p-2 text-toss-gray-600 hover:bg-toss-gray-100 rounded-lg transition-colors"
+                                                        title="인쇄"
+                                                    >
+                                                        <Printer size={16} />
+                                                    </button>
+                                                    {(profile?.user_id === log.user_id || isAdmin) && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => openEditModal(log)}
+                                                                className="p-2 text-blue-500 hover:bg-blue-100 rounded-lg transition-colors"
+                                                                title="수정"
+                                                            >
+                                                                <Edit2 size={16} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDelete(log.id)}
+                                                                className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
+                                                                title="삭제"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-center gap-2 mt-6 pt-4 border-t border-toss-gray-200">
+                                <button
+                                    onClick={() => goToPage(currentPage - 1)}
+                                    disabled={currentPage === 1}
+                                    className="px-3 py-1 rounded-lg text-sm font-medium text-toss-gray-700 hover:bg-toss-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    이전
+                                </button>
+                                {[...Array(totalPages)].map((_, i) => (
+                                    <button
+                                        key={i + 1}
+                                        onClick={() => goToPage(i + 1)}
+                                        className={`px-3 py-1 rounded-lg text-sm font-medium ${
+                                            currentPage === i + 1
+                                                ? 'bg-toss-blue text-white'
+                                                : 'text-toss-gray-700 hover:bg-toss-gray-100'
+                                        }`}
+                                    >
+                                        {i + 1}
+                                    </button>
                                 ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                <button
+                                    onClick={() => goToPage(currentPage + 1)}
+                                    disabled={currentPage === totalPages}
+                                    className="px-3 py-1 rounded-lg text-sm font-medium text-toss-gray-700 hover:bg-toss-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    다음
+                                </button>
+                            </div>
+                        )}
+                    </>
                 ) : (
                     <div className="text-center text-toss-gray-500 py-8">
-                        등록된 업무일지가 없습니다
+                        {selectedYear}년 {selectedMonth}월에 등록된 업무일지가 없습니다
                     </div>
                 )}
             </Card>
 
-            {/* Create Modal */}
+            {/* Create/Edit Modal */}
             <Modal
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title="새 업무일지 작성"
+                onClose={() => {
+                    setIsModalOpen(false)
+                    resetForm()
+                }}
+                title={isEditMode ? '업무일지 수정' : '새 업무일지 작성'}
             >
                 <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
                     {/* 작업일 */}
@@ -482,135 +607,33 @@ const WorkLogPage = () => {
                         />
                     </div>
 
-                    {/* 구조현황 테이블 */}
-                    <div className="space-y-4 p-5 bg-emerald-50 rounded-2xl border border-emerald-100">
-                        <div className="flex items-center justify-between">
-                            <h3 className="font-bold text-emerald-900 text-lg">구조현황</h3>
-                            <div className="flex gap-2">
-                                <Button size="sm" onClick={addRescueRow} variant="primary">
-                                    <Plus size={16} />
-                                    추가
-                                </Button>
+                    {/* 기존 파일 목록 (수정 모드일 때만) */}
+                    {isEditMode && formData.existingFileUrls.length > 0 && (
+                        <div>
+                            <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                기존 파일
+                            </label>
+                            <div className="space-y-2">
+                                {formData.existingFileUrls.map((url, index) => {
+                                    const fileName = url.split('/').pop()
+                                    return (
+                                        <div key={index} className="flex items-center justify-between p-3 bg-toss-gray-50 rounded-xl">
+                                            <div className="flex items-center gap-2">
+                                                <File size={16} className="text-toss-gray-500" />
+                                                <span className="text-sm text-toss-gray-700">{fileName}</span>
+                                            </div>
+                                            <button
+                                                onClick={() => removeExistingFile(index)}
+                                                className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    )
+                                })}
                             </div>
                         </div>
-
-                        {formData.rescue_situations.length > 0 ? (
-                            <div className="overflow-x-auto">
-                                <table className="w-full bg-white rounded-xl">
-                                    <thead className="bg-emerald-100">
-                                        <tr>
-                                            <th className="px-3 py-2 text-left text-sm font-medium text-emerald-900">번호</th>
-                                            <th className="px-3 py-2 text-left text-sm font-medium text-emerald-900">체류지</th>
-                                            <th className="px-3 py-2 text-left text-sm font-medium text-emerald-900">성명</th>
-                                            <th className="px-3 py-2 text-left text-sm font-medium text-emerald-900">구조요청</th>
-                                            <th className="px-3 py-2 text-left text-sm font-medium text-emerald-900">구조진행상황</th>
-                                            <th className="px-3 py-2 text-center text-sm font-medium text-emerald-900">삭제</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {formData.rescue_situations.map((row, index) => (
-                                            <tr
-                                                key={index}
-                                                className={`border-t border-emerald-100 cursor-pointer transition-colors ${
-                                                    selectedRescueIndex === index ? 'bg-emerald-100' : 'hover:bg-emerald-50'
-                                                }`}
-                                                onClick={() => setSelectedRescueIndex(index)}
-                                            >
-                                                <td className="px-3 py-2">
-                                                    <span className="text-sm font-medium">{row.number}</span>
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                    <input
-                                                        type="text"
-                                                        value={row.location}
-                                                        onChange={(e) => {
-                                                            e.stopPropagation()
-                                                            updateRescueRow(index, 'location', e.target.value)
-                                                        }}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                                        placeholder="체류지"
-                                                    />
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                    <input
-                                                        type="text"
-                                                        value={row.name}
-                                                        onChange={(e) => {
-                                                            e.stopPropagation()
-                                                            updateRescueRow(index, 'name', e.target.value)
-                                                        }}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                                        placeholder="성명"
-                                                    />
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                    <input
-                                                        type="text"
-                                                        value={row.request_date}
-                                                        onChange={(e) => {
-                                                            e.stopPropagation()
-                                                            updateRescueRow(index, 'request_date', e.target.value)
-                                                        }}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                                        placeholder="25.01.13"
-                                                    />
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                    <input
-                                                        type="text"
-                                                        value={row.status}
-                                                        onChange={(e) => {
-                                                            e.stopPropagation()
-                                                            updateRescueRow(index, 'status', e.target.value)
-                                                        }}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                                        placeholder="간략 상태"
-                                                    />
-                                                </td>
-                                                <td className="px-3 py-2 text-center">
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            removeRescueRow(index)
-                                                        }}
-                                                        className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors"
-                                                    >
-                                                        <X size={16} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        ) : (
-                            <p className="text-sm text-emerald-700 text-center py-6">
-                                구조현황을 추가하려면 '추가' 버튼을 클릭하세요
-                            </p>
-                        )}
-
-                        {/* 상세 구조진행상황 입력 영역 */}
-                        {selectedRescueIndex !== null && formData.rescue_situations[selectedRescueIndex] && (
-                            <div className="mt-4 p-4 bg-white rounded-xl border-2 border-emerald-200">
-                                <label className="block text-sm font-bold text-emerald-900 mb-2">
-                                    [{formData.rescue_situations[selectedRescueIndex].number}번] 상세 구조진행상황
-                                    {formData.rescue_situations[selectedRescueIndex].name &&
-                                        ` - ${formData.rescue_situations[selectedRescueIndex].name}`}
-                                </label>
-                                <textarea
-                                    value={formData.rescue_situations[selectedRescueIndex].details || ''}
-                                    onChange={(e) => updateRescueRow(selectedRescueIndex, 'details', e.target.value)}
-                                    rows={6}
-                                    className="w-full px-4 py-3 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none transition-all"
-                                    placeholder="상세한 구조진행상황을 입력하세요&#10;&#10;예시:&#10;- 1차 연락: 25.01.10 14:30 가족에게 연락&#10;- 2차 연락: 25.01.11 09:00 본인과 통화 완료&#10;- 귀국 일정: 25.01.15 예정&#10;- 비고: 건강상태 양호, 항공권 예매 완료"
-                                />
-                            </div>
-                        )}
-                    </div>
+                    )}
 
                     {/* 파일 첨부 */}
                     <div>
@@ -660,18 +683,21 @@ const WorkLogPage = () => {
                     <div className="flex gap-3 pt-4 sticky bottom-0 bg-white">
                         <Button
                             variant="secondary"
-                            onClick={() => setIsModalOpen(false)}
+                            onClick={() => {
+                                setIsModalOpen(false)
+                                resetForm()
+                            }}
                             className="flex-1"
                         >
                             취소
                         </Button>
                         <Button
-                            onClick={handleCreate}
+                            onClick={isEditMode ? handleEdit : handleCreate}
                             className="flex-1"
                             loading={uploading}
                             disabled={uploading}
                         >
-                            {uploading ? '업로드 중...' : '저장하기'}
+                            {uploading ? '업로드 중...' : isEditMode ? '수정하기' : '저장하기'}
                         </Button>
                     </div>
                 </div>
@@ -679,7 +705,7 @@ const WorkLogPage = () => {
 
             {/* Detail Modal */}
             <Modal
-                isOpen={!!selectedWorklog}
+                isOpen={!!selectedWorklog && !isModalOpen}
                 onClose={() => setSelectedWorklog(null)}
                 title="업무일지 상세"
             >
@@ -721,50 +747,6 @@ const WorkLogPage = () => {
                             <div className="bg-toss-gray-50 p-4 rounded-xl">
                                 <h4 className="font-bold text-toss-gray-900 mb-2">특이사항(비고)</h4>
                                 <p className="text-toss-gray-700 whitespace-pre-wrap">{selectedWorklog.special_notes}</p>
-                            </div>
-                        )}
-
-                        {selectedWorklog.rescue_situations && selectedWorklog.rescue_situations.length > 0 && (
-                            <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100">
-                                <h4 className="font-bold text-emerald-900 text-lg mb-3">구조현황</h4>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full bg-white rounded-xl">
-                                        <thead className="bg-emerald-100">
-                                            <tr>
-                                                <th className="px-3 py-2 text-left text-sm font-medium text-emerald-900">번호</th>
-                                                <th className="px-3 py-2 text-left text-sm font-medium text-emerald-900">체류지</th>
-                                                <th className="px-3 py-2 text-left text-sm font-medium text-emerald-900">성명</th>
-                                                <th className="px-3 py-2 text-left text-sm font-medium text-emerald-900">구조요청</th>
-                                                <th className="px-3 py-2 text-left text-sm font-medium text-emerald-900">진행상황</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {selectedWorklog.rescue_situations.map((situation, index) => (
-                                                <>
-                                                    <tr key={index} className="border-t border-emerald-100">
-                                                        <td className="px-3 py-2 text-sm">{situation.number}</td>
-                                                        <td className="px-3 py-2 text-sm">{situation.location}</td>
-                                                        <td className="px-3 py-2 text-sm font-medium">{situation.name}</td>
-                                                        <td className="px-3 py-2 text-sm">{situation.request_date}</td>
-                                                        <td className="px-3 py-2 text-sm">{situation.status}</td>
-                                                    </tr>
-                                                    {situation.details && (
-                                                        <tr key={`${index}-details`} className="bg-emerald-50">
-                                                            <td colSpan={5} className="px-3 py-3">
-                                                                <div className="text-xs text-emerald-800 font-medium mb-1">
-                                                                    상세 진행상황:
-                                                                </div>
-                                                                <div className="text-sm text-toss-gray-700 whitespace-pre-wrap bg-white p-3 rounded-lg border border-emerald-200">
-                                                                    {situation.details}
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    )}
-                                                </>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
                             </div>
                         )}
 
