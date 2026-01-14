@@ -63,8 +63,9 @@ const Sidebar = () => {
                     }`}
             >
                 <div className="flex items-center justify-between p-6 border-b border-toss-gray-100">
-                    <h1 className="text-xl font-bold text-toss-gray-900">
-                        <span className="text-toss-blue">한인구조단</span> 인트라넷
+                    <h1 className="flex items-center gap-2 text-xl font-bold text-toss-gray-900">
+                        <img src={import.meta.env.BASE_URL + 'logo.png'} alt="한인구조단" className="w-8 h-8 object-contain" />
+                        <span>인트라넷</span>
                     </h1>
                     <button
                         onClick={() => setIsOpen(false)}
