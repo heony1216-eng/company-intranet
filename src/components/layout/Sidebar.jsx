@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Megaphone, ClipboardList, Home, X, User } from 'lucide-react'
+import { Megaphone, ClipboardList, Home, X, User, AlertTriangle } from 'lucide-react'
 import { useState } from 'react'
 
 const Sidebar = () => {
@@ -9,6 +9,7 @@ const Sidebar = () => {
         { to: '/', icon: Home, label: '대시보드' },
         { to: '/notices', icon: Megaphone, label: '공지사항' },
         { to: '/worklogs', icon: ClipboardList, label: '업무일지' },
+        { to: '/rescue', icon: AlertTriangle, label: '구조현황' },
         { to: '/mypage', icon: User, label: '마이페이지' },
     ]
 
@@ -19,7 +20,7 @@ const Sidebar = () => {
             className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-3 rounded-toss transition-all ${isActive
                     ? 'bg-toss-blue text-white'
-                    : 'text-toss-gray-600 hover:bg-toss-gray-100'
+                    : 'text-toss-gray-900 hover:bg-toss-blue/10 hover:text-toss-blue'
                 }`
             }
         >

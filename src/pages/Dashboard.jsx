@@ -89,17 +89,17 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {statCards.map((stat, index) => (
                     <Link key={index} to={stat.link || '#'}>
-                        <div className={`${stat.color} rounded-2xl p-6 hover:shadow-toss-lg transition-all cursor-pointer`}>
+                        <Card className="hover:shadow-toss-lg transition-all cursor-pointer">
                             <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
+                                <div className={`w-14 h-14 ${stat.color} rounded-full flex items-center justify-center`}>
                                     <stat.icon size={28} className="text-white" />
                                 </div>
-                                <div className="text-white">
-                                    <p className="text-sm text-white/80 mb-1">{stat.label}</p>
-                                    <p className="text-3xl font-bold">{stat.value}</p>
+                                <div>
+                                    <p className="text-sm text-toss-gray-600 mb-1">{stat.label}</p>
+                                    <p className="text-3xl font-bold text-toss-gray-900">{stat.value}</p>
                                 </div>
                             </div>
-                        </div>
+                        </Card>
                     </Link>
                 ))}
             </div>
