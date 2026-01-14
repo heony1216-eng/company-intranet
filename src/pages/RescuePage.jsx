@@ -40,13 +40,22 @@ const RescuePage = () => {
     }, [])
 
     useEffect(() => {
+        console.log('🔍 필터링 실행')
+        console.log('rescueSituations 개수:', rescueSituations.length)
+        console.log('selectedYear:', selectedYear)
+        console.log('selectedMonth:', selectedMonth)
         filterRescueByDate()
     }, [rescueSituations, selectedYear, selectedMonth])
 
     const filterRescueByDate = () => {
+        console.log('🔍 filterRescueByDate 시작')
+
         const filtered = rescueSituations.filter(rescue => {
+            console.log('검사 중인 rescue:', rescue)
+
             // request_date가 있으면 그걸로 필터링
             if (rescue.request_date) {
+                console.log('request_date 있음:', rescue.request_date)
                 const dateParts = rescue.request_date.split('.')
                 if (dateParts.length >= 3) {
                     let year = parseInt(dateParts[0])
@@ -56,38 +65,55 @@ const RescuePage = () => {
                         year += 2000
                     }
 
-                    return year === selectedYear && month === selectedMonth
+                    const match = year === selectedYear && month === selectedMonth
+                    console.log(`request_date 매칭: ${year}년 ${month}월 vs ${selectedYear}년 ${selectedMonth}월 = ${match}`)
+                    return match
                 }
             }
 
             // request_date가 없으면 created_at으로 필터링
             if (rescue.created_at) {
+                console.log('created_at으로 필터링:', rescue.created_at)
                 const createdDate = new Date(rescue.created_at)
-                return createdDate.getFullYear() === selectedYear &&
+                const match = createdDate.getFullYear() === selectedYear &&
                        createdDate.getMonth() + 1 === selectedMonth
+                console.log(`created_at 매칭: ${createdDate.getFullYear()}년 ${createdDate.getMonth() + 1}월 vs ${selectedYear}년 ${selectedMonth}월 = ${match}`)
+                return match
             }
 
+            console.log('날짜 정보 없음, 제외')
             return false
         })
+
+        console.log('필터링 결과:', filtered.length, '개')
         setFilteredRescueSituations(filtered)
         setCurrentPage(1)
     }
 
     const fetchRescueSituations = async () => {
         try {
+            console.log('📡 fetchRescueSituations 시작')
             let query = supabase
                 .from('rescue_situations')
                 .select('*')
                 .order('created_at', { ascending: false })
 
             if (!isAdmin && profile) {
+                console.log('일반 유저, user_id 필터링:', profile.user_id)
                 query = query.eq('user_id', profile.user_id)
+            } else {
+                console.log('관리자, 모든 데이터 조회')
             }
 
             const { data, error } = await query
 
-            if (error) throw error
+            if (error) {
+                console.error('fetch 에러:', error)
+                throw error
+            }
 
+            console.log('📡 fetch 결과:', data?.length, '개')
+            console.log('데이터:', data)
             setRescueSituations(data || [])
         } catch (error) {
             console.error('Error fetching rescue situations:', error)
