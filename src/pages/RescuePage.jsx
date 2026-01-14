@@ -207,7 +207,7 @@ const RescuePage = () => {
     return (
         <div className="space-y-6">
             {/* Header Card */}
-            <Card className="bg-emerald-500 text-white">
+            <Card className="bg-toss-blue text-white">
                 <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
                         <AlertTriangle size={24} />
@@ -229,7 +229,7 @@ const RescuePage = () => {
                     <select
                         value={selectedYear}
                         onChange={(e) => setSelectedYear(Number(e.target.value))}
-                        className="px-4 py-2 bg-white border border-toss-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                        className="px-4 py-2 bg-white border border-toss-gray-300 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
                     >
                         {years.map(year => (
                             <option key={year} value={year}>{year}년</option>
@@ -240,14 +240,14 @@ const RescuePage = () => {
                     <select
                         value={selectedMonth}
                         onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                        className="px-4 py-2 bg-white border border-toss-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                        className="px-4 py-2 bg-white border border-toss-gray-300 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
                     >
                         {months.map(month => (
                             <option key={month} value={month}>{month}월</option>
                         ))}
                     </select>
 
-                    <Button onClick={openCreateModal} className="bg-emerald-500 hover:bg-emerald-600">
+                    <Button onClick={openCreateModal}>
                         <Plus size={18} />
                         새 구조현황 등록
                     </Button>
@@ -262,20 +262,20 @@ const RescuePage = () => {
                     <>
                         <div className="overflow-x-auto">
                             <table className="w-full">
-                                <thead className="bg-emerald-100 border-b-2 border-emerald-200">
+                                <thead className="bg-toss-blue/10 border-b-2 border-toss-blue/20">
                                     <tr>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-emerald-900 w-16">No</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-emerald-900">체류지</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-emerald-900">성명</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-emerald-900">구조요청</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-emerald-900">진행상황</th>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-emerald-900 w-20">완료</th>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-emerald-900 w-24">관리</th>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-900 w-16">No</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900">체류지</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900">성명</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900">구조요청</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900">진행상황</th>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-900 w-20">완료</th>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-900 w-24">관리</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-emerald-100">
+                                <tbody className="divide-y divide-toss-gray-100">
                                     {currentItems.map((rescue, index) => (
-                                        <tr key={rescue.id} className={`hover:bg-emerald-50 transition-colors ${rescue.is_completed ? 'opacity-60' : ''}`}>
+                                        <tr key={rescue.id} className={`hover:bg-toss-gray-50 transition-colors ${rescue.is_completed ? 'opacity-60' : ''}`}>
                                             <td className="px-4 py-3 text-sm text-center text-toss-gray-600">
                                                 {filteredRescueSituations.length - (indexOfFirstItem + index)}
                                             </td>
@@ -288,7 +288,7 @@ const RescuePage = () => {
                                                     type="checkbox"
                                                     checked={rescue.is_completed || false}
                                                     onChange={() => toggleComplete(rescue)}
-                                                    className="w-5 h-5 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 cursor-pointer"
+                                                    className="w-5 h-5 text-toss-blue border-gray-300 rounded focus:ring-toss-blue cursor-pointer"
                                                 />
                                             </td>
                                             <td className="px-4 py-3 text-center">
@@ -335,7 +335,7 @@ const RescuePage = () => {
                                         onClick={() => goToPage(i + 1)}
                                         className={`px-3 py-1 rounded-lg text-sm font-medium ${
                                             currentPage === i + 1
-                                                ? 'bg-emerald-500 text-white'
+                                                ? 'bg-toss-blue text-white'
                                                 : 'text-toss-gray-700 hover:bg-toss-gray-100'
                                         }`}
                                     >
@@ -377,7 +377,7 @@ const RescuePage = () => {
                             type="text"
                             value={formData.location}
                             onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
                             placeholder="체류지를 입력하세요"
                         />
                     </div>
@@ -390,7 +390,7 @@ const RescuePage = () => {
                             type="text"
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
                             placeholder="성명을 입력하세요"
                         />
                     </div>
@@ -403,7 +403,7 @@ const RescuePage = () => {
                             type="text"
                             value={formData.request_date}
                             onChange={(e) => setFormData({ ...formData, request_date: e.target.value })}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
                             placeholder="예: 25.01.13"
                         />
                     </div>
@@ -416,7 +416,7 @@ const RescuePage = () => {
                             type="text"
                             value={formData.status}
                             onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
                             placeholder="현재 진행상황을 간략히 입력하세요"
                         />
                     </div>
@@ -429,7 +429,7 @@ const RescuePage = () => {
                             value={formData.details}
                             onChange={(e) => setFormData({ ...formData, details: e.target.value })}
                             rows={8}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none transition-all"
+                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all"
                             placeholder="상세한 구조진행상황을 입력하세요&#10;&#10;예시:&#10;- 1차 연락: 25.01.10 14:30 가족에게 연락&#10;- 2차 연락: 25.01.11 09:00 본인과 통화 완료&#10;- 귀국 일정: 25.01.15 예정&#10;- 비고: 건강상태 양호, 항공권 예매 완료"
                         />
                     </div>
@@ -440,7 +440,7 @@ const RescuePage = () => {
                             id="is_completed"
                             checked={formData.is_completed || false}
                             onChange={(e) => setFormData({ ...formData, is_completed: e.target.checked })}
-                            className="w-5 h-5 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 cursor-pointer"
+                            className="w-5 h-5 text-toss-blue border-gray-300 rounded focus:ring-toss-blue cursor-pointer"
                         />
                         <label htmlFor="is_completed" className="text-sm font-medium text-toss-gray-700 cursor-pointer">
                             완료 처리
@@ -460,7 +460,7 @@ const RescuePage = () => {
                         </Button>
                         <Button
                             onClick={isEditMode ? handleEdit : handleCreate}
-                            className="flex-1 bg-emerald-500 hover:bg-emerald-600"
+                            className="flex-1"
                         >
                             {isEditMode ? '수정하기' : '저장하기'}
                         </Button>
