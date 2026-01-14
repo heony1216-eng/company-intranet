@@ -44,7 +44,10 @@ const RescuePage = () => {
         console.log('rescueSituations 개수:', rescueSituations.length)
         console.log('selectedYear:', selectedYear)
         console.log('selectedMonth:', selectedMonth)
-        filterRescueByDate()
+        // 필터링 비활성화 - 모든 데이터 표시
+        setFilteredRescueSituations(rescueSituations)
+        setCurrentPage(1)
+        // filterRescueByDate()
     }, [rescueSituations, selectedYear, selectedMonth])
 
     const filterRescueByDate = () => {
