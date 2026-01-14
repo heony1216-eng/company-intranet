@@ -67,6 +67,7 @@ const NoticePage = () => {
         }
 
         try {
+            console.log('Inserting notice with author_id:', profile.user_id, typeof profile.user_id)
             const { error } = await supabase.from('notices').insert({
                 title: formData.title,
                 content: formData.content,
@@ -74,7 +75,10 @@ const NoticePage = () => {
                 author_id: profile.user_id
             })
 
-            if (error) throw error
+            if (error) {
+                console.error('Notice insert error:', error)
+                throw error
+            }
             setIsModalOpen(false)
             setFormData({ title: '', content: '', is_pinned: false })
             fetchNotices()
