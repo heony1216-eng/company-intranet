@@ -96,19 +96,14 @@ const RescuePage = () => {
     const fetchRescueSituations = async () => {
         try {
             console.log('📡 fetchRescueSituations 시작')
-            let query = supabase
+            console.log('📡 isAdmin:', isAdmin)
+            console.log('📡 profile:', profile)
+
+            // 임시로 모든 데이터 가져오기 (권한 무시)
+            const { data, error } = await supabase
                 .from('rescue_situations')
                 .select('*')
                 .order('created_at', { ascending: false })
-
-            if (!isAdmin && profile) {
-                console.log('일반 유저, user_id 필터링:', profile.user_id)
-                query = query.eq('user_id', profile.user_id)
-            } else {
-                console.log('관리자, 모든 데이터 조회')
-            }
-
-            const { data, error } = await query
 
             if (error) {
                 console.error('fetch 에러:', error)
@@ -116,10 +111,16 @@ const RescuePage = () => {
             }
 
             console.log('📡 fetch 결과:', data?.length, '개')
-            console.log('데이터:', data)
+            console.log('📡 fetch 데이터 전체:', data)
+
+            if (data && data.length > 0) {
+                console.log('📡 첫 번째 데이터:', data[0])
+            }
+
             setRescueSituations(data || [])
         } catch (error) {
             console.error('Error fetching rescue situations:', error)
+            alert('데이터 조회 실패: ' + error.message)
         } finally {
             setLoading(false)
         }
