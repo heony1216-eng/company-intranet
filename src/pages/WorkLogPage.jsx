@@ -15,6 +15,7 @@ const WorkLogPage = () => {
     const [selectedWorklog, setSelectedWorklog] = useState(null)
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
+    const [selectedUserId, setSelectedUserId] = useState('all')
     const [currentPage, setCurrentPage] = useState(1)
     const itemsPerPage = 15
     const fileInputRef = useRef(null)
@@ -41,16 +42,26 @@ const WorkLogPage = () => {
 
     useEffect(() => {
         filterWorklogsByDate()
-    }, [worklogs, selectedYear, selectedMonth])
+    }, [worklogs, selectedYear, selectedMonth, selectedUserId])
 
     const filterWorklogsByDate = () => {
         const filtered = worklogs.filter(log => {
             const logDate = new Date(log.work_date)
-            return logDate.getFullYear() === selectedYear && logDate.getMonth() + 1 === selectedMonth
+            const dateMatch = logDate.getFullYear() === selectedYear && logDate.getMonth() + 1 === selectedMonth
+            const userMatch = selectedUserId === 'all' || log.user_id === selectedUserId
+            return dateMatch && userMatch
         })
         setFilteredWorklogs(filtered)
         setCurrentPage(1) // 필터 변경 시 첫 페이지로 이동
     }
+
+    // 고유한 사용자 목록 추출
+    const uniqueUsers = Array.from(new Set(worklogs.map(log => log.user_id)))
+        .map(userId => {
+            const log = worklogs.find(l => l.user_id === userId)
+            return { user_id: userId, name: log?.user?.name || '알 수 없음' }
+        })
+        .sort((a, b) => a.name.localeCompare(b.name))
 
     const fetchWorklogs = async () => {
         try {
@@ -377,6 +388,20 @@ const WorkLogPage = () => {
                         ))}
                     </select>
 
+                    {/* User Filter (관리자만) */}
+                    {isAdmin && uniqueUsers.length > 0 && (
+                        <select
+                            value={selectedUserId}
+                            onChange={(e) => setSelectedUserId(e.target.value)}
+                            className="px-4 py-2 bg-white border border-toss-gray-300 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
+                        >
+                            <option value="all">전체 작성자</option>
+                            {uniqueUsers.map(user => (
+                                <option key={user.user_id} value={user.user_id}>{user.name}</option>
+                            ))}
+                        </select>
+                    )}
+
                     <Button onClick={openCreateModal}>
                         <Plus size={18} />
                         새 업무일지 작성
@@ -434,7 +459,15 @@ const WorkLogPage = () => {
                                             </td>
                                             {isAdmin && (
                                                 <>
-                                                    <td className="px-4 py-3 text-sm text-toss-gray-900">{log.user?.name || '-'}</td>
+                                                    <td
+                                                        className="px-4 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-toss-blue hover:underline"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            setSelectedUserId(log.user_id)
+                                                        }}
+                                                    >
+                                                        {log.user?.name || '-'}
+                                                    </td>
                                                     <td className="px-4 py-3 text-sm text-toss-gray-600">{log.user?.team || '-'}</td>
                                                 </>
                                             )}
@@ -711,12 +744,12 @@ const WorkLogPage = () => {
             >
                 {selectedWorklog && (
                     <div className="space-y-5 max-h-[70vh] overflow-y-auto">
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <span className="text-sm bg-toss-gray-100 text-toss-gray-700 px-3 py-1.5 rounded-full font-medium">
+                        <div className="flex items-center gap-3 flex-wrap bg-toss-blue p-4 rounded-xl -mx-6 -mt-6 mb-4">
+                            <span className="text-sm bg-white/20 text-white px-3 py-1.5 rounded-full font-medium">
                                 {formatDate(selectedWorklog.work_date)}
                             </span>
                             {selectedWorklog.user && (
-                                <span className="text-sm text-toss-gray-600">
+                                <span className="text-sm text-white/90">
                                     {selectedWorklog.user.name} · {selectedWorklog.user.team || '팀 미설정'}
                                 </span>
                             )}

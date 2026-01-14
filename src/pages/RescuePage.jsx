@@ -7,10 +7,13 @@ import { useAuth } from '../hooks/useAuth'
 const RescuePage = () => {
     const { profile, isAdmin } = useAuth()
     const [rescueSituations, setRescueSituations] = useState([])
+    const [filteredRescueSituations, setFilteredRescueSituations] = useState([])
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isEditMode, setIsEditMode] = useState(false)
     const [selectedRescue, setSelectedRescue] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
     const [currentPage, setCurrentPage] = useState(1)
     const itemsPerPage = 15
 
@@ -20,12 +23,44 @@ const RescuePage = () => {
         name: '',
         request_date: '',
         status: '',
-        details: ''
+        details: '',
+        is_completed: false
     })
+
+    // 연도 목록 생성 (2026년부터 현재 연도까지)
+    const startYear = 2026
+    const currentYear = new Date().getFullYear()
+    const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i)
+    const months = Array.from({ length: 12 }, (_, i) => i + 1)
 
     useEffect(() => {
         fetchRescueSituations()
     }, [])
+
+    useEffect(() => {
+        filterRescueByDate()
+    }, [rescueSituations, selectedYear, selectedMonth])
+
+    const filterRescueByDate = () => {
+        const filtered = rescueSituations.filter(rescue => {
+            if (!rescue.request_date) return false
+            // request_date 형식: "25.01.13" 또는 "2025.01.13" 등을 지원
+            const dateParts = rescue.request_date.split('.')
+            if (dateParts.length < 3) return false
+
+            let year = parseInt(dateParts[0])
+            const month = parseInt(dateParts[1])
+
+            // 2자리 연도를 4자리로 변환
+            if (year < 100) {
+                year += 2000
+            }
+
+            return year === selectedYear && month === selectedMonth
+        })
+        setFilteredRescueSituations(filtered)
+        setCurrentPage(1)
+    }
 
     const fetchRescueSituations = async () => {
         try {
@@ -57,7 +92,8 @@ const RescuePage = () => {
             name: '',
             request_date: '',
             status: '',
-            details: ''
+            details: '',
+            is_completed: false
         })
         setIsEditMode(false)
         setSelectedRescue(null)
@@ -125,6 +161,21 @@ const RescuePage = () => {
         }
     }
 
+    const toggleComplete = async (rescue) => {
+        try {
+            const { error } = await supabase
+                .from('rescue_situations')
+                .update({ is_completed: !rescue.is_completed })
+                .eq('id', rescue.id)
+
+            if (error) throw error
+            fetchRescueSituations()
+        } catch (error) {
+            console.error('Error toggling complete:', error)
+            alert('상태 변경에 실패했습니다.')
+        }
+    }
+
     const openEditModal = (rescue) => {
         setFormData(rescue)
         setSelectedRescue(rescue)
@@ -140,8 +191,8 @@ const RescuePage = () => {
     // 페이지네이션
     const indexOfLastItem = currentPage * itemsPerPage
     const indexOfFirstItem = indexOfLastItem - itemsPerPage
-    const currentItems = rescueSituations.slice(indexOfFirstItem, indexOfLastItem)
-    const totalPages = Math.ceil(rescueSituations.length / itemsPerPage)
+    const currentItems = filteredRescueSituations.slice(indexOfFirstItem, indexOfLastItem)
+    const totalPages = Math.ceil(filteredRescueSituations.length / itemsPerPage)
 
     const goToPage = (pageNumber) => {
         setCurrentPage(pageNumber)
@@ -164,13 +215,37 @@ const RescuePage = () => {
                 </div>
             </Card>
 
-            {/* Header with Button */}
-            <div className="flex items-center justify-between">
+            {/* Header with Filters */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <h1 className="text-2xl font-bold text-toss-gray-900">구조현황</h1>
-                <Button onClick={openCreateModal}>
-                    <Plus size={18} />
-                    새 구조현황 등록
-                </Button>
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* Year Filter */}
+                    <select
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(Number(e.target.value))}
+                        className="px-4 py-2 bg-white border border-toss-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                    >
+                        {years.map(year => (
+                            <option key={year} value={year}>{year}년</option>
+                        ))}
+                    </select>
+
+                    {/* Month Filter */}
+                    <select
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                        className="px-4 py-2 bg-white border border-toss-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                    >
+                        {months.map(month => (
+                            <option key={month} value={month}>{month}월</option>
+                        ))}
+                    </select>
+
+                    <Button onClick={openCreateModal} className="bg-emerald-500 hover:bg-emerald-600">
+                        <Plus size={18} />
+                        새 구조현황 등록
+                    </Button>
+                </div>
             </div>
 
             {/* Table */}
@@ -181,26 +256,37 @@ const RescuePage = () => {
                     <>
                         <div className="overflow-x-auto">
                             <table className="w-full">
-                                <thead className="bg-emerald-100 border-b border-emerald-200">
+                                <thead className="bg-emerald-100 border-b-2 border-emerald-200">
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-emerald-900">번호</th>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold text-emerald-900 w-16">No</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-emerald-900">체류지</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-emerald-900">성명</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-emerald-900">구조요청</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-emerald-900">진행상황</th>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-emerald-900">관리</th>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold text-emerald-900 w-20">완료</th>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold text-emerald-900 w-24">관리</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-emerald-100">
                                     {currentItems.map((rescue, index) => (
-                                        <tr key={rescue.id} className="hover:bg-emerald-50 transition-colors">
-                                            <td className="px-4 py-3 text-sm text-toss-gray-900">{indexOfFirstItem + index + 1}</td>
+                                        <tr key={rescue.id} className={`hover:bg-emerald-50 transition-colors ${rescue.is_completed ? 'opacity-60' : ''}`}>
+                                            <td className="px-4 py-3 text-sm text-center text-toss-gray-600">
+                                                {filteredRescueSituations.length - (indexOfFirstItem + index)}
+                                            </td>
                                             <td className="px-4 py-3 text-sm text-toss-gray-900">{rescue.location || '-'}</td>
                                             <td className="px-4 py-3 text-sm text-toss-gray-900 font-medium">{rescue.name || '-'}</td>
                                             <td className="px-4 py-3 text-sm text-toss-gray-700">{rescue.request_date || '-'}</td>
                                             <td className="px-4 py-3 text-sm text-toss-gray-700">{rescue.status || '-'}</td>
                                             <td className="px-4 py-3 text-center">
-                                                <div className="flex items-center justify-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={rescue.is_completed || false}
+                                                    onChange={() => toggleComplete(rescue)}
+                                                    className="w-5 h-5 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 cursor-pointer"
+                                                />
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <div className="flex items-center justify-center gap-1">
                                                     {(profile?.user_id === rescue.user_id || isAdmin) && (
                                                         <>
                                                             <button
@@ -261,7 +347,9 @@ const RescuePage = () => {
                         )}
                     </>
                 ) : (
-                    <div className="text-center text-toss-gray-500 py-8">등록된 구조현황이 없습니다</div>
+                    <div className="text-center text-toss-gray-500 py-8">
+                        {selectedYear}년 {selectedMonth}월에 등록된 구조현황이 없습니다
+                    </div>
                 )}
             </Card>
 
@@ -338,6 +426,19 @@ const RescuePage = () => {
                             className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none transition-all"
                             placeholder="상세한 구조진행상황을 입력하세요&#10;&#10;예시:&#10;- 1차 연락: 25.01.10 14:30 가족에게 연락&#10;- 2차 연락: 25.01.11 09:00 본인과 통화 완료&#10;- 귀국 일정: 25.01.15 예정&#10;- 비고: 건강상태 양호, 항공권 예매 완료"
                         />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            id="is_completed"
+                            checked={formData.is_completed || false}
+                            onChange={(e) => setFormData({ ...formData, is_completed: e.target.checked })}
+                            className="w-5 h-5 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 cursor-pointer"
+                        />
+                        <label htmlFor="is_completed" className="text-sm font-medium text-toss-gray-700 cursor-pointer">
+                            완료 처리
+                        </label>
                     </div>
 
                     <div className="flex gap-3 pt-4">
