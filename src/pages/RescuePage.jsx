@@ -5,7 +5,9 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 
 const RescuePage = () => {
+    console.log('🚨 RescuePage 컴포넌트 로드됨')
     const { profile, isAdmin } = useAuth()
+    console.log('🚨 RescuePage profile:', profile)
     const [rescueSituations, setRescueSituations] = useState([])
     const [filteredRescueSituations, setFilteredRescueSituations] = useState([])
     const [isModalOpen, setIsModalOpen] = useState(false)
@@ -216,8 +218,10 @@ const RescuePage = () => {
     }
 
     const openCreateModal = () => {
+        console.log('🚨 openCreateModal 호출됨')
         resetForm()
         setIsModalOpen(true)
+        console.log('🚨 모달 열림, isModalOpen:', true)
     }
 
     // 페이지네이션
@@ -485,7 +489,16 @@ const RescuePage = () => {
                             취소
                         </Button>
                         <Button
-                            onClick={isEditMode ? handleEdit : handleCreate}
+                            onClick={() => {
+                                console.log('🚨 저장 버튼 클릭됨')
+                                console.log('🚨 isEditMode:', isEditMode)
+                                console.log('🚨 formData:', formData)
+                                if (isEditMode) {
+                                    handleEdit()
+                                } else {
+                                    handleCreate()
+                                }
+                            }}
                             className="flex-1 bg-emerald-500 hover:bg-emerald-600"
                         >
                             {isEditMode ? '수정하기' : '저장하기'}
