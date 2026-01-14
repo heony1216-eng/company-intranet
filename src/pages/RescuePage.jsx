@@ -12,8 +12,6 @@ const RescuePage = () => {
     const [isEditMode, setIsEditMode] = useState(false)
     const [selectedRescue, setSelectedRescue] = useState(null)
     const [loading, setLoading] = useState(true)
-    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
     const [currentPage, setCurrentPage] = useState(1)
     const itemsPerPage = 15
 
@@ -27,65 +25,37 @@ const RescuePage = () => {
         is_completed: false
     })
 
-    // 연도 목록 생성 (2026년부터 현재 연도까지)
-    const startYear = 2026
-    const currentYear = new Date().getFullYear()
-    const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i)
-    const months = Array.from({ length: 12 }, (_, i) => i + 1)
-
     useEffect(() => {
         fetchRescueSituations()
     }, [])
 
     useEffect(() => {
-        // 필터링 비활성화 - 모든 데이터 표시
+        // 모든 데이터 표시 (필터링 없음)
+        console.log('[RescuePage] rescueSituations updated:', rescueSituations.length, 'items')
         setFilteredRescueSituations(rescueSituations)
         setCurrentPage(1)
-    }, [rescueSituations, selectedYear, selectedMonth])
-
-    const filterRescueByDate = () => {
-        const filtered = rescueSituations.filter(rescue => {
-            // request_date가 있으면 그걸로 필터링
-            if (rescue.request_date) {
-                const dateParts = rescue.request_date.split('.')
-                if (dateParts.length >= 3) {
-                    let year = parseInt(dateParts[0])
-                    const month = parseInt(dateParts[1])
-
-                    if (year < 100) {
-                        year += 2000
-                    }
-
-                    return year === selectedYear && month === selectedMonth
-                }
-            }
-
-            // request_date가 없으면 created_at으로 필터링
-            if (rescue.created_at) {
-                const createdDate = new Date(rescue.created_at)
-                return createdDate.getFullYear() === selectedYear &&
-                       createdDate.getMonth() + 1 === selectedMonth
-            }
-
-            return false
-        })
-
-        setFilteredRescueSituations(filtered)
-        setCurrentPage(1)
-    }
+    }, [rescueSituations])
 
     const fetchRescueSituations = async () => {
         try {
+            console.log('[RescuePage] Fetching rescue situations...')
             const { data, error } = await supabase
                 .from('rescue_situations')
                 .select('*')
                 .order('created_at', { ascending: false })
 
-            if (error) throw error
+            console.log('[RescuePage] Fetch result:', { data, error })
 
+            if (error) {
+                console.error('[RescuePage] Fetch error:', error)
+                throw error
+            }
+
+            console.log('[RescuePage] Setting rescue situations:', data?.length || 0, 'items')
             setRescueSituations(data || [])
         } catch (error) {
-            console.error('Error fetching rescue situations:', error)
+            console.error('[RescuePage] Error fetching rescue situations:', error)
+            alert('데이터 조회 중 오류가 발생했습니다: ' + error.message)
         } finally {
             setLoading(false)
         }
@@ -112,19 +82,30 @@ const RescuePage = () => {
         }
 
         try {
-            const { error } = await supabase.from('rescue_situations').insert({
+            console.log('[RescuePage] Creating rescue situation with data:', {
                 ...formData,
                 user_id: profile.user_id
             })
 
-            if (error) throw error
+            const { data, error } = await supabase.from('rescue_situations').insert({
+                ...formData,
+                user_id: profile.user_id
+            }).select()
 
+            console.log('[RescuePage] Insert result:', { data, error })
+
+            if (error) {
+                console.error('[RescuePage] Insert error:', error)
+                throw error
+            }
+
+            console.log('[RescuePage] Successfully created, now fetching...')
             setIsModalOpen(false)
             resetForm()
-            fetchRescueSituations()
+            await fetchRescueSituations()
             alert('구조현황이 저장되었습니다.')
         } catch (error) {
-            console.error('Error creating rescue situation:', error)
+            console.error('[RescuePage] Error creating rescue situation:', error)
             alert('구조현황 저장에 실패했습니다: ' + error.message)
         }
     }
@@ -221,37 +202,13 @@ const RescuePage = () => {
                 </div>
             </Card>
 
-            {/* Header with Filters */}
+            {/* Header */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <h1 className="text-2xl font-bold text-toss-gray-900">구조현황</h1>
-                <div className="flex flex-wrap items-center gap-3">
-                    {/* Year Filter */}
-                    <select
-                        value={selectedYear}
-                        onChange={(e) => setSelectedYear(Number(e.target.value))}
-                        className="px-4 py-2 bg-white border border-toss-gray-300 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
-                    >
-                        {years.map(year => (
-                            <option key={year} value={year}>{year}년</option>
-                        ))}
-                    </select>
-
-                    {/* Month Filter */}
-                    <select
-                        value={selectedMonth}
-                        onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                        className="px-4 py-2 bg-white border border-toss-gray-300 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
-                    >
-                        {months.map(month => (
-                            <option key={month} value={month}>{month}월</option>
-                        ))}
-                    </select>
-
-                    <Button onClick={openCreateModal}>
-                        <Plus size={18} />
-                        새 구조현황 등록
-                    </Button>
-                </div>
+                <Button onClick={openCreateModal}>
+                    <Plus size={18} />
+                    새 구조현황 등록
+                </Button>
             </div>
 
             {/* Table */}
@@ -354,7 +311,7 @@ const RescuePage = () => {
                     </>
                 ) : (
                     <div className="text-center text-toss-gray-500 py-8">
-                        {selectedYear}년 {selectedMonth}월에 등록된 구조현황이 없습니다
+                        등록된 구조현황이 없습니다
                     </div>
                 )}
             </Card>
