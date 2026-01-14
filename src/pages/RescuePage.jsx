@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Card, Button, Modal } from '../components/common'
-import { Plus, Trash2, Edit2, X, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, Edit2, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 
 const RescuePage = () => {
     const { profile, isAdmin } = useAuth()
     const [rescueSituations, setRescueSituations] = useState([])
-    const [filteredRescueSituations, setFilteredRescueSituations] = useState([])
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
     const [isEditMode, setIsEditMode] = useState(false)
     const [selectedRescue, setSelectedRescue] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -16,7 +16,6 @@ const RescuePage = () => {
     const itemsPerPage = 15
 
     const [formData, setFormData] = useState({
-        number: '',
         location: '',
         name: '',
         request_date: '',
@@ -29,33 +28,19 @@ const RescuePage = () => {
         fetchRescueSituations()
     }, [])
 
-    useEffect(() => {
-        // 모든 데이터 표시 (필터링 없음)
-        console.log('[RescuePage] rescueSituations updated:', rescueSituations.length, 'items')
-        setFilteredRescueSituations(rescueSituations)
-        setCurrentPage(1)
-    }, [rescueSituations])
-
     const fetchRescueSituations = async () => {
         try {
-            console.log('[RescuePage] Fetching rescue situations...')
             const { data, error } = await supabase
                 .from('rescue_situations')
                 .select('*')
                 .order('created_at', { ascending: false })
 
-            console.log('[RescuePage] Fetch result:', { data, error })
+            if (error) throw error
 
-            if (error) {
-                console.error('[RescuePage] Fetch error:', error)
-                throw error
-            }
-
-            console.log('[RescuePage] Setting rescue situations:', data?.length || 0, 'items')
             setRescueSituations(data || [])
         } catch (error) {
-            console.error('[RescuePage] Error fetching rescue situations:', error)
-            alert('데이터 조회 중 오류가 발생했습니다: ' + error.message)
+            console.error('Error fetching rescue situations:', error)
+            alert('데이터 조회 실패: ' + error.message)
         } finally {
             setLoading(false)
         }
@@ -63,7 +48,6 @@ const RescuePage = () => {
 
     const resetForm = () => {
         setFormData({
-            number: '',
             location: '',
             name: '',
             request_date: '',
@@ -82,30 +66,26 @@ const RescuePage = () => {
         }
 
         try {
-            console.log('[RescuePage] Creating rescue situation with data:', {
-                ...formData,
-                user_id: profile.user_id
-            })
+            const { error } = await supabase
+                .from('rescue_situations')
+                .insert({
+                    location: formData.location,
+                    name: formData.name,
+                    request_date: formData.request_date,
+                    status: formData.status,
+                    details: formData.details,
+                    is_completed: formData.is_completed,
+                    user_id: profile.user_id
+                })
 
-            const { data, error } = await supabase.from('rescue_situations').insert({
-                ...formData,
-                user_id: profile.user_id
-            }).select()
+            if (error) throw error
 
-            console.log('[RescuePage] Insert result:', { data, error })
-
-            if (error) {
-                console.error('[RescuePage] Insert error:', error)
-                throw error
-            }
-
-            console.log('[RescuePage] Successfully created, now fetching...')
             setIsModalOpen(false)
             resetForm()
-            await fetchRescueSituations()
+            fetchRescueSituations()
             alert('구조현황이 저장되었습니다.')
         } catch (error) {
-            console.error('[RescuePage] Error creating rescue situation:', error)
+            console.error('Error creating rescue situation:', error)
             alert('구조현황 저장에 실패했습니다: ' + error.message)
         }
     }
@@ -119,7 +99,14 @@ const RescuePage = () => {
         try {
             const { error } = await supabase
                 .from('rescue_situations')
-                .update(formData)
+                .update({
+                    location: formData.location,
+                    name: formData.name,
+                    request_date: formData.request_date,
+                    status: formData.status,
+                    details: formData.details,
+                    is_completed: formData.is_completed
+                })
                 .eq('id', selectedRescue.id)
 
             if (error) throw error
@@ -138,8 +125,13 @@ const RescuePage = () => {
         if (!confirm('정말 삭제하시겠습니까?')) return
 
         try {
-            const { error } = await supabase.from('rescue_situations').delete().eq('id', id)
+            const { error } = await supabase
+                .from('rescue_situations')
+                .delete()
+                .eq('id', id)
+
             if (error) throw error
+
             fetchRescueSituations()
             alert('삭제되었습니다.')
         } catch (error) {
@@ -164,7 +156,14 @@ const RescuePage = () => {
     }
 
     const openEditModal = (rescue) => {
-        setFormData(rescue)
+        setFormData({
+            location: rescue.location || '',
+            name: rescue.name || '',
+            request_date: rescue.request_date || '',
+            status: rescue.status || '',
+            details: rescue.details || '',
+            is_completed: rescue.is_completed || false
+        })
         setSelectedRescue(rescue)
         setIsEditMode(true)
         setIsModalOpen(true)
@@ -175,11 +174,16 @@ const RescuePage = () => {
         setIsModalOpen(true)
     }
 
+    const openDetailModal = (rescue) => {
+        setSelectedRescue(rescue)
+        setIsDetailModalOpen(true)
+    }
+
     // 페이지네이션
     const indexOfLastItem = currentPage * itemsPerPage
     const indexOfFirstItem = indexOfLastItem - itemsPerPage
-    const currentItems = filteredRescueSituations.slice(indexOfFirstItem, indexOfLastItem)
-    const totalPages = Math.ceil(filteredRescueSituations.length / itemsPerPage)
+    const currentItems = rescueSituations.slice(indexOfFirstItem, indexOfLastItem)
+    const totalPages = Math.ceil(rescueSituations.length / itemsPerPage)
 
     const goToPage = (pageNumber) => {
         setCurrentPage(pageNumber)
@@ -188,7 +192,7 @@ const RescuePage = () => {
     return (
         <div className="space-y-6">
             {/* Header Card */}
-            <Card className="bg-toss-blue text-white">
+            <Card className="bg-gradient-to-r from-toss-blue to-blue-600 text-white">
                 <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
                         <AlertTriangle size={24} />
@@ -212,12 +216,13 @@ const RescuePage = () => {
             </div>
 
             {/* Table */}
-            <Card>
+            <Card padding="p-0 sm:p-6">
                 {loading ? (
                     <div className="text-center text-toss-gray-500 py-8">로딩 중...</div>
                 ) : currentItems.length > 0 ? (
                     <>
-                        <div className="overflow-x-auto">
+                        {/* Desktop Table */}
+                        <div className="hidden md:block overflow-x-auto">
                             <table className="w-full">
                                 <thead className="bg-toss-blue/10 border-b-2 border-toss-blue/20">
                                     <tr>
@@ -225,22 +230,26 @@ const RescuePage = () => {
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900">체류지</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900">성명</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900">구조요청</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900">진행상황</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900">현재 진행상황</th>
                                         <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-900 w-20">완료</th>
                                         <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-900 w-24">관리</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-toss-gray-100">
                                     {currentItems.map((rescue, index) => (
-                                        <tr key={rescue.id} className={`hover:bg-toss-gray-50 transition-colors ${rescue.is_completed ? 'opacity-60' : ''}`}>
+                                        <tr
+                                            key={rescue.id}
+                                            className={`hover:bg-toss-gray-50 transition-colors cursor-pointer ${rescue.is_completed ? 'opacity-60' : ''}`}
+                                            onClick={() => openDetailModal(rescue)}
+                                        >
                                             <td className="px-4 py-3 text-sm text-center text-toss-gray-600">
-                                                {filteredRescueSituations.length - (indexOfFirstItem + index)}
+                                                {indexOfFirstItem + index + 1}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-toss-gray-900">{rescue.location || '-'}</td>
                                             <td className="px-4 py-3 text-sm text-toss-gray-900 font-medium">{rescue.name || '-'}</td>
                                             <td className="px-4 py-3 text-sm text-toss-gray-700">{rescue.request_date || '-'}</td>
                                             <td className="px-4 py-3 text-sm text-toss-gray-700">{rescue.status || '-'}</td>
-                                            <td className="px-4 py-3 text-center">
+                                            <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                                                 <input
                                                     type="checkbox"
                                                     checked={rescue.is_completed || false}
@@ -248,32 +257,83 @@ const RescuePage = () => {
                                                     className="w-5 h-5 text-toss-blue border-gray-300 rounded focus:ring-toss-blue cursor-pointer"
                                                 />
                                             </td>
-                                            <td className="px-4 py-3 text-center">
+                                            <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                                                 <div className="flex items-center justify-center gap-1">
-                                                    {(profile?.user_id === rescue.user_id || isAdmin) && (
-                                                        <>
-                                                            <button
-                                                                onClick={() => openEditModal(rescue)}
-                                                                className="p-2 text-blue-500 hover:bg-blue-100 rounded-lg transition-colors"
-                                                                title="수정"
-                                                            >
-                                                                <Edit2 size={16} />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDelete(rescue.id)}
-                                                                className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
-                                                                title="삭제"
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </button>
-                                                        </>
-                                                    )}
+                                                    <button
+                                                        onClick={() => openEditModal(rescue)}
+                                                        className="p-2 text-blue-500 hover:bg-blue-100 rounded-lg transition-colors"
+                                                        title="수정"
+                                                    >
+                                                        <Edit2 size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(rescue.id)}
+                                                        className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
+                                                        title="삭제"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
+                        </div>
+
+                        {/* Mobile Card View */}
+                        <div className="md:hidden divide-y divide-toss-gray-100">
+                            {currentItems.map((rescue, index) => (
+                                <div
+                                    key={rescue.id}
+                                    className={`p-4 ${rescue.is_completed ? 'opacity-60' : ''}`}
+                                    onClick={() => openDetailModal(rescue)}
+                                >
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-toss-gray-500">#{indexOfFirstItem + index + 1}</span>
+                                            <span className="text-sm font-medium text-toss-gray-900">{rescue.name || '-'}</span>
+                                            <span className={`text-xs px-2 py-0.5 rounded-full ${rescue.is_completed ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
+                                                {rescue.is_completed ? '완료' : '진행중'}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                                type="checkbox"
+                                                checked={rescue.is_completed || false}
+                                                onChange={() => toggleComplete(rescue)}
+                                                className="w-4 h-4 text-toss-blue border-gray-300 rounded focus:ring-toss-blue cursor-pointer"
+                                            />
+                                            <button
+                                                onClick={() => openEditModal(rescue)}
+                                                className="p-1.5 text-blue-500 hover:bg-blue-100 rounded-lg"
+                                            >
+                                                <Edit2 size={14} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(rescue.id)}
+                                                className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1 text-sm">
+                                        <p className="text-toss-gray-700">
+                                            <span className="text-toss-gray-500 mr-1">체류지:</span>
+                                            {rescue.location || '-'}
+                                        </p>
+                                        <p className="text-toss-gray-700">
+                                            <span className="text-toss-gray-500 mr-1">구조요청:</span>
+                                            {rescue.request_date || '-'}
+                                        </p>
+                                        <p className="text-toss-gray-700 line-clamp-1">
+                                            <span className="text-toss-gray-500 mr-1">상황:</span>
+                                            {rescue.status || '-'}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
 
                         {/* Pagination */}
@@ -367,7 +427,7 @@ const RescuePage = () => {
 
                     <div>
                         <label className="block text-sm font-medium text-toss-gray-700 mb-2">
-                            진행상황 (간략)
+                            현재 진행상황 (간략)
                         </label>
                         <input
                             type="text"
@@ -387,7 +447,7 @@ const RescuePage = () => {
                             onChange={(e) => setFormData({ ...formData, details: e.target.value })}
                             rows={8}
                             className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all"
-                            placeholder="상세한 구조진행상황을 입력하세요&#10;&#10;예시:&#10;- 1차 연락: 25.01.10 14:30 가족에게 연락&#10;- 2차 연락: 25.01.11 09:00 본인과 통화 완료&#10;- 귀국 일정: 25.01.15 예정&#10;- 비고: 건강상태 양호, 항공권 예매 완료"
+                            placeholder="상세한 구조진행상황을 입력하세요"
                         />
                     </div>
 
@@ -424,8 +484,78 @@ const RescuePage = () => {
                     </div>
                 </div>
             </Modal>
+
+            {/* Detail Modal */}
+            <Modal
+                isOpen={isDetailModalOpen}
+                onClose={() => {
+                    setIsDetailModalOpen(false)
+                    setSelectedRescue(null)
+                }}
+                title="구조현황 상세"
+            >
+                {selectedRescue && (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-toss-gray-500 mb-1">체류지</label>
+                                <p className="text-toss-gray-900">{selectedRescue.location || '-'}</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-toss-gray-500 mb-1">성명</label>
+                                <p className="text-toss-gray-900 font-medium">{selectedRescue.name || '-'}</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-toss-gray-500 mb-1">구조요청 일자</label>
+                                <p className="text-toss-gray-900">{selectedRescue.request_date || '-'}</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-toss-gray-500 mb-1">완료 여부</label>
+                                <p className={`font-medium ${selectedRescue.is_completed ? 'text-green-600' : 'text-orange-500'}`}>
+                                    {selectedRescue.is_completed ? '완료' : '진행중'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-toss-gray-500 mb-1">현재 진행상황 (간략)</label>
+                            <p className="text-toss-gray-900">{selectedRescue.status || '-'}</p>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-toss-gray-500 mb-2">상세 구조진행상황</label>
+                            <div className="bg-toss-gray-50 rounded-xl p-4 min-h-[150px] whitespace-pre-wrap text-toss-gray-900">
+                                {selectedRescue.details || '상세 내용이 없습니다.'}
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 pt-4">
+                            <Button
+                                variant="secondary"
+                                onClick={() => {
+                                    setIsDetailModalOpen(false)
+                                    setSelectedRescue(null)
+                                }}
+                                className="flex-1"
+                            >
+                                닫기
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    setIsDetailModalOpen(false)
+                                    openEditModal(selectedRescue)
+                                }}
+                                className="flex-1"
+                            >
+                                수정하기
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </div>
     )
 }
 
 export default RescuePage
+// force rebuild Wed Jan 14 12:49:00 KST 2026

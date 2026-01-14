@@ -124,7 +124,8 @@ export const AuthProvider = ({ children }) => {
         signUp,
         signOut,
         updateProfile,
-        isAdmin: profile?.role === 'admin'
+        isAdmin: profile?.role === 'admin',
+        isSubAdmin: profile?.role === 'sub_admin'
     }
 
     return (

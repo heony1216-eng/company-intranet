@@ -8,7 +8,7 @@ import { useAuth } from '../hooks/useAuth'
 const NoticePage = () => {
     const { id } = useParams()
     const navigate = useNavigate()
-    const { isAdmin, profile } = useAuth()
+    const { isAdmin, isSubAdmin, profile } = useAuth()
     const [notices, setNotices] = useState([])
     const [selectedNotice, setSelectedNotice] = useState(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
@@ -160,7 +160,7 @@ const NoticePage = () => {
                                 </span>
                             )}
                         </div>
-                        {isAdmin && (
+                        {(isAdmin || isSubAdmin) && (
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => openEditModal(selectedNotice)}
@@ -204,7 +204,7 @@ const NoticePage = () => {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-toss-gray-900">공지사항</h1>
-                {isAdmin && (
+                {(isAdmin || isSubAdmin) && (
                     <Button onClick={openCreateModal}>
                         <Plus size={18} />
                         새 공지 작성

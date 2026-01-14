@@ -1,163 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { Card, Button, Modal } from '../components/common'
-import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, Printer, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, Printer } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { uploadMultipleToDropbox } from '../lib/dropbox'
 
-// 이미지 파일인지 확인하는 함수
-const isImageFile = (url) => {
-    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg']
-    const lowerUrl = url.toLowerCase()
-    return imageExtensions.some(ext => lowerUrl.includes(ext))
-}
-
-// 이미지 갤러리 컴포넌트 (드래그 스크롤 지원)
-const ImageGallery = ({ urls }) => {
-    const scrollRef = useRef(null)
-    const [canScrollLeft, setCanScrollLeft] = useState(false)
-    const [canScrollRight, setCanScrollRight] = useState(false)
-    const [selectedImage, setSelectedImage] = useState(null)
-
-    const imageUrls = urls.filter(isImageFile)
-    const otherUrls = urls.filter(url => !isImageFile(url))
-
-    const checkScroll = () => {
-        if (scrollRef.current) {
-            const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current
-            setCanScrollLeft(scrollLeft > 0)
-            setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10)
-        }
-    }
-
-    useEffect(() => {
-        checkScroll()
-        window.addEventListener('resize', checkScroll)
-        return () => window.removeEventListener('resize', checkScroll)
-    }, [urls])
-
-    const scroll = (direction) => {
-        if (scrollRef.current) {
-            const scrollAmount = 200
-            scrollRef.current.scrollBy({
-                left: direction === 'left' ? -scrollAmount : scrollAmount,
-                behavior: 'smooth'
-            })
-            setTimeout(checkScroll, 300)
-        }
-    }
-
-    if (imageUrls.length === 0 && otherUrls.length === 0) return null
-
-    return (
-        <div className="space-y-3">
-            {/* 이미지 갤러리 */}
-            {imageUrls.length > 0 && (
-                <div>
-                    <label className="block text-sm font-medium text-toss-gray-500 mb-2">
-                        사진 ({imageUrls.length}장)
-                    </label>
-                    <div className="relative">
-                        {/* 왼쪽 스크롤 버튼 */}
-                        {canScrollLeft && (
-                            <button
-                                onClick={() => scroll('left')}
-                                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 shadow-lg rounded-full p-1.5 hover:bg-white"
-                            >
-                                <ChevronLeft size={20} />
-                            </button>
-                        )}
-
-                        {/* 이미지 스크롤 컨테이너 */}
-                        <div
-                            ref={scrollRef}
-                            onScroll={checkScroll}
-                            className="flex gap-3 overflow-x-auto scrollbar-hide pb-2"
-                            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                        >
-                            {imageUrls.map((url, index) => (
-                                <div
-                                    key={index}
-                                    className="flex-shrink-0 cursor-pointer w-32 h-32 rounded-xl overflow-hidden bg-toss-gray-100"
-                                    onClick={() => setSelectedImage(url)}
-                                >
-                                    <img
-                                        src={url}
-                                        alt={`첨부 이미지 ${index + 1}`}
-                                        className="w-full h-full object-cover hover:opacity-90 transition-opacity"
-                                        onError={(e) => {
-                                            e.target.style.display = 'none'
-                                        }}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* 오른쪽 스크롤 버튼 */}
-                        {canScrollRight && (
-                            <button
-                                onClick={() => scroll('right')}
-                                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 shadow-lg rounded-full p-1.5 hover:bg-white"
-                            >
-                                <ChevronRight size={20} />
-                            </button>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* 기타 파일 */}
-            {otherUrls.length > 0 && (
-                <div>
-                    <label className="block text-sm font-medium text-toss-gray-500 mb-2">
-                        기타 파일 ({otherUrls.length}개)
-                    </label>
-                    <div className="space-y-2">
-                        {otherUrls.map((url, index) => {
-                            const fileName = url.split('/').pop()
-                            return (
-                                <a
-                                    key={index}
-                                    href={url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 p-3 bg-toss-gray-50 rounded-xl hover:bg-toss-gray-100 transition-colors"
-                                >
-                                    <File size={16} className="text-toss-gray-500" />
-                                    <span className="text-sm text-toss-blue hover:underline flex-1 truncate">{fileName}</span>
-                                    <Download size={16} className="text-toss-gray-500" />
-                                </a>
-                            )
-                        })}
-                    </div>
-                </div>
-            )}
-
-            {/* 이미지 확대 모달 */}
-            {selectedImage && (
-                <div
-                    className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
-                    onClick={() => setSelectedImage(null)}
-                >
-                    <button
-                        className="absolute top-4 right-4 text-white hover:text-gray-300"
-                        onClick={() => setSelectedImage(null)}
-                    >
-                        <X size={32} />
-                    </button>
-                    <img
-                        src={selectedImage}
-                        alt="확대 이미지"
-                        className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"
-                        onClick={(e) => e.stopPropagation()}
-                    />
-                </div>
-            )}
-        </div>
-    )
-}
-
-const WorkLogPage = () => {
+const WorkLog2Page = () => {
     const { profile, isAdmin } = useAuth()
     const [worklogs, setWorklogs] = useState([])
     const [filteredWorklogs, setFilteredWorklogs] = useState([])
@@ -183,7 +30,6 @@ const WorkLogPage = () => {
         existingFileUrls: []
     })
 
-    // 연도 목록 생성 (2026년부터 현재 연도까지)
     const startYear = 2026
     const currentYear = new Date().getFullYear()
     const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i)
@@ -205,10 +51,9 @@ const WorkLogPage = () => {
             return dateMatch && userMatch
         })
         setFilteredWorklogs(filtered)
-        setCurrentPage(1) // 필터 변경 시 첫 페이지로 이동
+        setCurrentPage(1)
     }
 
-    // 고유한 사용자 목록 추출
     const uniqueUsers = Array.from(new Set(worklogs.map(log => log.user_id)))
         .map(userId => {
             const log = worklogs.find(l => l.user_id === userId)
@@ -221,7 +66,7 @@ const WorkLogPage = () => {
             let query = supabase
                 .from('work_logs')
                 .select('*')
-                .neq('type', 'rescue')
+                .eq('type', 'worklog2')
                 .order('work_date', { ascending: false })
 
             if (!isAdmin && profile) {
@@ -282,13 +127,23 @@ const WorkLogPage = () => {
     }
 
     const uploadFiles = async (files) => {
-        // Dropbox에 업로드
-        const folder = `/intranet/worklogs/${profile.user_id}`
-        const results = await uploadMultipleToDropbox(
-            files.map(f => f.file),
-            folder
+        const urls = await Promise.all(
+            files.map(async (fileData) => {
+                const fileName = `${profile.user_id}/${Date.now()}_${fileData.file.name}`
+                const { error } = await supabase.storage
+                    .from('work_log_files')
+                    .upload(fileName, fileData.file)
+
+                if (error) throw error
+
+                const { data: urlData } = supabase.storage
+                    .from('work_log_files')
+                    .getPublicUrl(fileName)
+
+                return urlData.publicUrl
+            })
         )
-        return results.map(r => r.url)
+        return urls
     }
 
     const handleCreate = async () => {
@@ -306,6 +161,7 @@ const WorkLogPage = () => {
             }
 
             const { error } = await supabase.from('work_logs').insert({
+                type: 'worklog2',
                 work_date: formData.work_date,
                 morning_work: formData.morning_work,
                 afternoon_work: formData.afternoon_work,
@@ -321,10 +177,10 @@ const WorkLogPage = () => {
             setIsModalOpen(false)
             resetForm()
             fetchWorklogs()
-            alert('업무일지가 저장되었습니다.')
+            alert('업무일지2가 저장되었습니다.')
         } catch (error) {
             console.error('Error creating worklog:', error)
-            alert('업무일지 저장에 실패했습니다: ' + error.message)
+            alert('업무일지2 저장에 실패했습니다: ' + error.message)
         } finally {
             setUploading(false)
         }
@@ -363,10 +219,10 @@ const WorkLogPage = () => {
             setIsModalOpen(false)
             resetForm()
             fetchWorklogs()
-            alert('업무일지가 수정되었습니다.')
+            alert('업무일지2가 수정되었습니다.')
         } catch (error) {
             console.error('Error updating worklog:', error)
-            alert('업무일지 수정에 실패했습니다: ' + error.message)
+            alert('업무일지2 수정에 실패했습니다: ' + error.message)
         } finally {
             setUploading(false)
         }
@@ -437,7 +293,7 @@ const WorkLogPage = () => {
         printWindow.document.write(`
             <html>
                 <head>
-                    <title>업무일지 - ${formatDate(worklog.work_date)}</title>
+                    <title>업무일지2 - ${formatDate(worklog.work_date)}</title>
                     <style>
                         body { font-family: Arial, sans-serif; padding: 20px; }
                         h1 { border-bottom: 2px solid #333; padding-bottom: 10px; }
@@ -447,7 +303,7 @@ const WorkLogPage = () => {
                     </style>
                 </head>
                 <body>
-                    <h1>업무일지</h1>
+                    <h1>업무일지2</h1>
                     <p><strong>날짜:</strong> ${formatDate(worklog.work_date)}</p>
                     <p><strong>작성자:</strong> ${worklog.user?.name} (${worklog.user?.team})</p>
                     ${worklog.morning_work ? `<div class="section"><h2>오전 업무</h2><p>${worklog.morning_work}</p></div>` : ''}
@@ -476,7 +332,6 @@ const WorkLogPage = () => {
         }) + ` (${getWeekday(dateString)})`
     }
 
-    // 페이지네이션
     const indexOfLastItem = currentPage * itemsPerPage
     const indexOfFirstItem = indexOfLastItem - itemsPerPage
     const currentItems = filteredWorklogs.slice(indexOfFirstItem, indexOfLastItem)
@@ -488,29 +343,26 @@ const WorkLogPage = () => {
 
     return (
         <div className="space-y-6">
-            {/* User Info Header */}
-            <Card className="bg-gradient-to-r from-toss-blue to-blue-600 text-white">
+            <Card className="bg-toss-blue text-white">
                 <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
                         <FileText size={24} />
                     </div>
                     <div>
                         <h2 className="text-xl font-bold mb-1">
-                            {isAdmin ? '전체 업무일지' : `${profile?.name || '사용자'}님의 업무일지`}
+                            {isAdmin ? '전체 업무일지2' : `${profile?.name || '사용자'}님의 업무일지2`}
                         </h2>
                         <p className="text-white/90">
-                            {isAdmin ? '관리자 권한으로 모든 직원의 업무일지를 확인할 수 있습니다' :
+                            {isAdmin ? '관리자 권한으로 모든 직원의 업무일지2를 확인할 수 있습니다' :
                              `${profile?.team ? `${profile.team} · ` : ''}${profile?.rank || '직급 미설정'}`}
                         </p>
                     </div>
                 </div>
             </Card>
 
-            {/* Header with Filters */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <h1 className="text-2xl font-bold text-toss-gray-900">업무일지</h1>
+                <h1 className="text-2xl font-bold text-toss-gray-900">업무일지2</h1>
                 <div className="flex flex-wrap items-center gap-3">
-                    {/* Year Filter */}
                     <select
                         value={selectedYear}
                         onChange={(e) => setSelectedYear(Number(e.target.value))}
@@ -521,7 +373,6 @@ const WorkLogPage = () => {
                         ))}
                     </select>
 
-                    {/* Month Filter */}
                     <select
                         value={selectedMonth}
                         onChange={(e) => setSelectedMonth(Number(e.target.value))}
@@ -532,7 +383,6 @@ const WorkLogPage = () => {
                         ))}
                     </select>
 
-                    {/* User Filter (관리자만) */}
                     {isAdmin && uniqueUsers.length > 0 && (
                         <select
                             value={selectedUserId}
@@ -548,19 +398,17 @@ const WorkLogPage = () => {
 
                     <Button onClick={openCreateModal}>
                         <Plus size={18} />
-                        새 업무일지 작성
+                        새 업무일지2 작성
                     </Button>
                 </div>
             </div>
 
-            {/* Board-style Table */}
-            <Card padding="p-0 sm:p-6">
+            <Card>
                 {loading ? (
                     <div className="text-center text-toss-gray-500 py-8">로딩 중...</div>
                 ) : currentItems.length > 0 ? (
                     <>
-                        {/* Desktop Table */}
-                        <div className="hidden md:block overflow-x-auto">
+                        <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead className="bg-toss-gray-100 border-b-2 border-toss-gray-300">
                                     <tr>
@@ -586,7 +434,7 @@ const WorkLogPage = () => {
                                             }`}
                                         >
                                             <td className="px-4 py-3 text-sm text-center text-toss-gray-600">
-                                                {indexOfFirstItem + index + 1}
+                                                {filteredWorklogs.length - (indexOfFirstItem + index)}
                                             </td>
                                             <td
                                                 className="px-4 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-toss-blue"
@@ -663,74 +511,6 @@ const WorkLogPage = () => {
                             </table>
                         </div>
 
-                        {/* Mobile Card View */}
-                        <div className="md:hidden divide-y divide-toss-gray-100">
-                            {currentItems.map((log, index) => (
-                                <div
-                                    key={log.id}
-                                    className={`p-4 ${isAdmin && !log.is_read ? 'bg-blue-50' : ''}`}
-                                    onClick={() => viewWorklogDetail(log)}
-                                >
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-toss-gray-500">#{indexOfFirstItem + index + 1}</span>
-                                            <Calendar size={14} className="text-toss-gray-400" />
-                                            <span className="text-sm font-medium text-toss-gray-900">
-                                                {new Date(log.work_date).toLocaleDateString('ko-KR')}
-                                            </span>
-                                            {isAdmin && !log.is_read && (
-                                                <span className="bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">
-                                                    NEW
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                            <button
-                                                onClick={() => handlePrint(log)}
-                                                className="p-1.5 text-toss-gray-600 hover:bg-toss-gray-100 rounded-lg"
-                                            >
-                                                <Printer size={14} />
-                                            </button>
-                                            {(profile?.user_id === log.user_id || isAdmin) && (
-                                                <>
-                                                    <button
-                                                        onClick={() => openEditModal(log)}
-                                                        className="p-1.5 text-blue-500 hover:bg-blue-100 rounded-lg"
-                                                    >
-                                                        <Edit2 size={14} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(log.id)}
-                                                        className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                    {isAdmin && (
-                                        <div className="text-xs text-toss-gray-600 mb-2">
-                                            <span className="font-medium">{log.user?.name || '-'}</span>
-                                            <span className="mx-1">·</span>
-                                            <span>{log.user?.team || '-'}</span>
-                                        </div>
-                                    )}
-                                    <div className="space-y-1">
-                                        <p className="text-sm text-toss-gray-700 line-clamp-1">
-                                            <span className="text-toss-gray-500 mr-1">오전:</span>
-                                            {log.morning_work || '-'}
-                                        </p>
-                                        <p className="text-sm text-toss-gray-700 line-clamp-1">
-                                            <span className="text-toss-gray-500 mr-1">오후:</span>
-                                            {log.afternoon_work || '-'}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Pagination */}
                         {totalPages > 1 && (
                             <div className="flex items-center justify-center gap-2 mt-6 pt-4 border-t border-toss-gray-200">
                                 <button
@@ -765,22 +545,20 @@ const WorkLogPage = () => {
                     </>
                 ) : (
                     <div className="text-center text-toss-gray-500 py-8">
-                        {selectedYear}년 {selectedMonth}월에 등록된 업무일지가 없습니다
+                        {selectedYear}년 {selectedMonth}월에 등록된 업무일지2가 없습니다
                     </div>
                 )}
             </Card>
 
-            {/* Create/Edit Modal */}
             <Modal
                 isOpen={isModalOpen}
                 onClose={() => {
                     setIsModalOpen(false)
                     resetForm()
                 }}
-                title={isEditMode ? '업무일지 수정' : '새 업무일지 작성'}
+                title={isEditMode ? '업무일지2 수정' : '새 업무일지2 작성'}
             >
                 <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
-                    {/* 작업일 */}
                     <div>
                         <label className="block text-sm font-medium text-toss-gray-700 mb-2">
                             작업일 *
@@ -796,7 +574,6 @@ const WorkLogPage = () => {
                         </p>
                     </div>
 
-                    {/* 오전 업무 */}
                     <div>
                         <label className="block text-sm font-medium text-toss-gray-700 mb-2">
                             오전 업무
@@ -810,7 +587,6 @@ const WorkLogPage = () => {
                         />
                     </div>
 
-                    {/* 오후 업무 */}
                     <div>
                         <label className="block text-sm font-medium text-toss-gray-700 mb-2">
                             오후 업무
@@ -824,7 +600,6 @@ const WorkLogPage = () => {
                         />
                     </div>
 
-                    {/* 익일 업무 */}
                     <div>
                         <label className="block text-sm font-medium text-toss-gray-700 mb-2">
                             익일 업무
@@ -838,7 +613,6 @@ const WorkLogPage = () => {
                         />
                     </div>
 
-                    {/* 특이사항(비고) */}
                     <div>
                         <label className="block text-sm font-medium text-toss-gray-700 mb-2">
                             특이사항(비고)
@@ -852,7 +626,6 @@ const WorkLogPage = () => {
                         />
                     </div>
 
-                    {/* 기존 파일 목록 (수정 모드일 때만) */}
                     {isEditMode && formData.existingFileUrls.length > 0 && (
                         <div>
                             <label className="block text-sm font-medium text-toss-gray-700 mb-2">
@@ -880,7 +653,6 @@ const WorkLogPage = () => {
                         </div>
                     )}
 
-                    {/* 파일 첨부 */}
                     <div>
                         <label className="block text-sm font-medium text-toss-gray-700 mb-2">
                             파일 첨부 (모든 파일 형식)
@@ -948,79 +720,75 @@ const WorkLogPage = () => {
                 </div>
             </Modal>
 
-            {/* Detail Modal */}
             <Modal
                 isOpen={!!selectedWorklog && !isModalOpen}
                 onClose={() => setSelectedWorklog(null)}
-                title="업무일지 상세"
+                title="업무일지2 상세"
             >
                 {selectedWorklog && (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-toss-gray-500 mb-1">작성일</label>
-                                <p className="text-toss-gray-900">{formatDate(selectedWorklog.work_date)}</p>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-toss-gray-500 mb-1">작성자</label>
-                                <p className="text-toss-gray-900 font-medium">
-                                    {selectedWorklog.user ? `${selectedWorklog.user.name} · ${selectedWorklog.user.team || '팀 미설정'}` : '-'}
-                                </p>
-                            </div>
+                    <div className="space-y-5 max-h-[70vh] overflow-y-auto">
+                        <div className="flex items-center gap-3 flex-wrap bg-toss-blue p-4 rounded-xl -mx-6 -mt-6 mb-4">
+                            <span className="text-sm bg-white/20 text-white px-3 py-1.5 rounded-full font-medium">
+                                {formatDate(selectedWorklog.work_date)}
+                            </span>
+                            {selectedWorklog.user && (
+                                <span className="text-sm text-white/90">
+                                    {selectedWorklog.user.name} · {selectedWorklog.user.team || '팀 미설정'}
+                                </span>
+                            )}
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-toss-gray-500 mb-2">오전 업무</label>
-                            <div className="bg-toss-gray-50 rounded-xl p-4 min-h-[80px] whitespace-pre-wrap text-toss-gray-900">
-                                {selectedWorklog.morning_work || '-'}
+                        {selectedWorklog.morning_work && (
+                            <div className="bg-amber-50 p-4 rounded-xl">
+                                <h4 className="font-bold text-amber-900 mb-2">오전 업무</h4>
+                                <p className="text-toss-gray-700 whitespace-pre-wrap">{selectedWorklog.morning_work}</p>
                             </div>
-                        </div>
+                        )}
 
-                        <div>
-                            <label className="block text-sm font-medium text-toss-gray-500 mb-2">오후 업무</label>
-                            <div className="bg-toss-gray-50 rounded-xl p-4 min-h-[80px] whitespace-pre-wrap text-toss-gray-900">
-                                {selectedWorklog.afternoon_work || '-'}
+                        {selectedWorklog.afternoon_work && (
+                            <div className="bg-blue-50 p-4 rounded-xl">
+                                <h4 className="font-bold text-blue-900 mb-2">오후 업무</h4>
+                                <p className="text-toss-gray-700 whitespace-pre-wrap">{selectedWorklog.afternoon_work}</p>
                             </div>
-                        </div>
+                        )}
 
-                        <div>
-                            <label className="block text-sm font-medium text-toss-gray-500 mb-2">익일 업무</label>
-                            <div className="bg-toss-gray-50 rounded-xl p-4 min-h-[80px] whitespace-pre-wrap text-toss-gray-900">
-                                {selectedWorklog.next_day_work || '-'}
+                        {selectedWorklog.next_day_work && (
+                            <div className="bg-purple-50 p-4 rounded-xl">
+                                <h4 className="font-bold text-purple-900 mb-2">익일 업무</h4>
+                                <p className="text-toss-gray-700 whitespace-pre-wrap">{selectedWorklog.next_day_work}</p>
                             </div>
-                        </div>
+                        )}
 
                         {selectedWorklog.special_notes && (
-                            <div>
-                                <label className="block text-sm font-medium text-toss-gray-500 mb-2">특이사항(비고)</label>
-                                <div className="bg-toss-gray-50 rounded-xl p-4 whitespace-pre-wrap text-toss-gray-900">
-                                    {selectedWorklog.special_notes}
-                                </div>
+                            <div className="bg-toss-gray-50 p-4 rounded-xl">
+                                <h4 className="font-bold text-toss-gray-900 mb-2">특이사항(비고)</h4>
+                                <p className="text-toss-gray-700 whitespace-pre-wrap">{selectedWorklog.special_notes}</p>
                             </div>
                         )}
 
                         {selectedWorklog.file_urls && selectedWorklog.file_urls.length > 0 && (
-                            <ImageGallery urls={selectedWorklog.file_urls} />
+                            <div>
+                                <h4 className="font-bold text-toss-gray-900 mb-3">첨부 파일 ({selectedWorklog.file_urls.length}개)</h4>
+                                <div className="space-y-2">
+                                    {selectedWorklog.file_urls.map((url, index) => {
+                                        const fileName = url.split('/').pop()
+                                        return (
+                                            <a
+                                                key={index}
+                                                href={url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-2 p-3 bg-toss-gray-50 rounded-xl hover:bg-toss-gray-100 transition-colors"
+                                            >
+                                                <File size={16} className="text-toss-gray-500" />
+                                                <span className="text-sm text-toss-blue hover:underline flex-1">{fileName}</span>
+                                                <Download size={16} className="text-toss-gray-500" />
+                                            </a>
+                                        )
+                                    })}
+                                </div>
+                            </div>
                         )}
-
-                        <div className="flex gap-3 pt-4">
-                            <Button
-                                variant="secondary"
-                                onClick={() => setSelectedWorklog(null)}
-                                className="flex-1"
-                            >
-                                닫기
-                            </Button>
-                            <Button
-                                onClick={() => {
-                                    openEditModal(selectedWorklog)
-                                    setSelectedWorklog(null)
-                                }}
-                                className="flex-1"
-                            >
-                                수정하기
-                            </Button>
-                        </div>
                     </div>
                 )}
             </Modal>
@@ -1028,4 +796,4 @@ const WorkLogPage = () => {
     )
 }
 
-export default WorkLogPage
+export default WorkLog2Page

@@ -65,7 +65,7 @@ const MyPage = () => {
             </Link>
 
             {/* Header Card */}
-            <Card className="bg-toss-blue text-white">
+            <Card className="bg-gradient-to-r from-toss-blue to-blue-600 text-white">
                 <div className="flex items-center gap-6">
                     <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
                         <span className="text-3xl font-bold">
