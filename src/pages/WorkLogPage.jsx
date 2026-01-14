@@ -5,8 +5,17 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { uploadMultipleToDropbox } from '../lib/dropbox'
 
+// URL 추출 함수 (문자열 또는 {url, name} 객체 모두 지원)
+const getUrl = (item) => {
+    if (typeof item === 'string') return item
+    if (item && item.url) return item.url
+    return ''
+}
+
 // 이미지 파일인지 확인하는 함수
-const isImageFile = (url) => {
+const isImageFile = (item) => {
+    const url = getUrl(item)
+    if (!url) return false
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg']
     const lowerUrl = url.toLowerCase()
     return imageExtensions.some(ext => lowerUrl.includes(ext))
@@ -20,7 +29,7 @@ const ImageGallery = ({ urls }) => {
     const [selectedImage, setSelectedImage] = useState(null)
 
     const imageUrls = urls.filter(isImageFile)
-    const otherUrls = urls.filter(url => !isImageFile(url))
+    const otherUrls = urls.filter(item => !isImageFile(item))
 
     const checkScroll = () => {
         if (scrollRef.current) {
@@ -75,22 +84,25 @@ const ImageGallery = ({ urls }) => {
                             className="flex gap-3 overflow-x-auto scrollbar-hide pb-2"
                             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                         >
-                            {imageUrls.map((url, index) => (
-                                <div
-                                    key={index}
-                                    className="flex-shrink-0 cursor-pointer w-32 h-32 rounded-xl overflow-hidden bg-toss-gray-100"
-                                    onClick={() => setSelectedImage(url)}
-                                >
-                                    <img
-                                        src={url}
-                                        alt={`첨부 이미지 ${index + 1}`}
-                                        className="w-full h-full object-cover hover:opacity-90 transition-opacity"
-                                        onError={(e) => {
-                                            e.target.style.display = 'none'
-                                        }}
-                                    />
-                                </div>
-                            ))}
+                            {imageUrls.map((item, index) => {
+                                const url = getUrl(item)
+                                return (
+                                    <div
+                                        key={index}
+                                        className="flex-shrink-0 cursor-pointer w-32 h-32 rounded-xl overflow-hidden bg-toss-gray-100"
+                                        onClick={() => setSelectedImage(url)}
+                                    >
+                                        <img
+                                            src={url}
+                                            alt={`첨부 이미지 ${index + 1}`}
+                                            className="w-full h-full object-cover hover:opacity-90 transition-opacity"
+                                            onError={(e) => {
+                                                e.target.style.display = 'none'
+                                            }}
+                                        />
+                                    </div>
+                                )
+                            })}
                         </div>
 
                         {/* 오른쪽 스크롤 버튼 */}
@@ -113,8 +125,9 @@ const ImageGallery = ({ urls }) => {
                         기타 파일 ({otherUrls.length}개)
                     </label>
                     <div className="space-y-2">
-                        {otherUrls.map((url, index) => {
-                            const fileName = url.split('/').pop()
+                        {otherUrls.map((item, index) => {
+                            const url = getUrl(item)
+                            const fileName = typeof item === 'string' ? url.split('/').pop() : (item.name || url.split('/').pop())
                             return (
                                 <a
                                     key={index}
