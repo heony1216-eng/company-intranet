@@ -475,6 +475,34 @@ const WorkLogPage = () => {
         }
     }
 
+    // 이미지를 img 태그로 로드 후 canvas를 통해 ArrayBuffer로 변환 (CORS 우회)
+    const loadImageAsArrayBuffer = (url) => {
+        return new Promise((resolve, reject) => {
+            const img = new Image()
+            img.crossOrigin = 'anonymous'
+            img.onload = () => {
+                try {
+                    const canvas = document.createElement('canvas')
+                    canvas.width = img.naturalWidth
+                    canvas.height = img.naturalHeight
+                    const ctx = canvas.getContext('2d')
+                    ctx.drawImage(img, 0, 0)
+                    canvas.toBlob((blob) => {
+                        if (blob) {
+                            blob.arrayBuffer().then(resolve).catch(reject)
+                        } else {
+                            reject(new Error('Canvas to blob failed'))
+                        }
+                    }, 'image/png')
+                } catch (e) {
+                    reject(e)
+                }
+            }
+            img.onerror = () => reject(new Error('이미지 로드 실패'))
+            img.src = url
+        })
+    }
+
     // Word 파일로 저장
     const handleSaveAsWord = async (worklog) => {
         // 이미지 파일들 가져오기
@@ -490,17 +518,27 @@ const WorkLogPage = () => {
             for (const item of imageUrls) {
                 try {
                     const url = getUrl(item)
-                    // CORS 우회를 위해 mode: 'cors' 추가
-                    const response = await fetch(url, { mode: 'cors' })
-                    if (!response.ok) throw new Error('이미지 로드 실패')
-                    const arrayBuffer = await response.arrayBuffer()
+                    const arrayBuffer = await loadImageAsArrayBuffer(url)
 
-                    // 이미지 타입 감지
-                    const urlLower = url.toLowerCase()
-                    let imageType = 'jpg'
-                    if (urlLower.includes('.png')) imageType = 'png'
-                    else if (urlLower.includes('.gif')) imageType = 'gif'
-                    else if (urlLower.includes('.webp')) imageType = 'png' // webp는 png로 처리
+                    // 원본 이미지 크기 계산을 위한 임시 이미지 로드
+                    const img = new Image()
+                    img.src = url
+                    await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+
+                    // 이미지 크기 계산 (최대 500px 너비, 비율 유지)
+                    const maxWidth = 500
+                    const maxHeight = 400
+                    let width = img.naturalWidth || 400
+                    let height = img.naturalHeight || 300
+
+                    if (width > maxWidth) {
+                        height = (height * maxWidth) / width
+                        width = maxWidth
+                    }
+                    if (height > maxHeight) {
+                        width = (width * maxHeight) / height
+                        height = maxHeight
+                    }
 
                     imageElements.push(
                         new Paragraph({ text: '' }),
@@ -509,10 +547,10 @@ const WorkLogPage = () => {
                                 new ImageRun({
                                     data: arrayBuffer,
                                     transformation: {
-                                        width: 400,
-                                        height: 300,
+                                        width: Math.round(width),
+                                        height: Math.round(height),
                                     },
-                                    type: imageType,
+                                    type: 'png',
                                 }),
                             ],
                         })
@@ -525,10 +563,22 @@ const WorkLogPage = () => {
             }
         }
 
-        // 로드 실패한 이미지가 있으면 알림
-        if (failedImages.length > 0) {
-            console.warn('일부 이미지를 Word에 포함시키지 못했습니다:', failedImages)
-        }
+        // 실패한 이미지는 링크로 표시
+        const failedImageLinks = failedImages.length > 0 ? [
+            new Paragraph({ text: '' }),
+            new Paragraph({
+                children: [
+                    new TextRun({ text: '(일부 이미지는 링크로 대체되었습니다)', italics: true, color: '666666' }),
+                ],
+            }),
+            ...failedImages.map((fileName, index) =>
+                new Paragraph({
+                    children: [
+                        new TextRun({ text: `${index + 1}. ${fileName}`, color: '0066CC' }),
+                    ],
+                })
+            ),
+        ] : []
 
         const doc = new Document({
             sections: [{
@@ -587,13 +637,14 @@ const WorkLogPage = () => {
                         }),
                     ] : []),
                     // 이미지 첨부
-                    ...(imageElements.length > 0 ? [
+                    ...(imageElements.length > 0 || failedImages.length > 0 ? [
                         new Paragraph({ text: '' }),
                         new Paragraph({
                             text: '첨부 사진',
                             heading: HeadingLevel.HEADING_2,
                         }),
                         ...imageElements,
+                        ...failedImageLinks,
                     ] : []),
                 ],
             }],
