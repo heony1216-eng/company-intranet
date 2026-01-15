@@ -167,13 +167,15 @@ const Dashboard = () => {
                                     to="/rescue"
                                     className="block p-3 rounded-lg hover:bg-toss-gray-50 transition-colors border border-toss-gray-100"
                                 >
-                                    <div className="flex items-center gap-2">
-                                        <p className="font-medium text-toss-gray-900 text-sm">{rescue.name}</p>
-                                        <span className="text-toss-gray-300">|</span>
-                                        <p className="text-sm text-toss-gray-600 flex-1">{rescue.location}</p>
-                                        <p className="text-xs text-toss-gray-700">{rescue.status || '-'}</p>
+                                    <div className="flex items-center justify-between gap-2 mb-1">
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-medium text-toss-gray-900 text-sm">{rescue.name}</p>
+                                            <span className="text-toss-gray-300">|</span>
+                                            <p className="text-sm text-toss-gray-600">{rescue.location}</p>
+                                        </div>
+                                        <p className="text-xs text-toss-gray-400">{rescue.request_date || '-'}</p>
                                     </div>
-                                    <p className="text-xs text-toss-gray-400 mt-1">{rescue.request_date || '-'}</p>
+                                    <p className="text-sm text-toss-gray-700 line-clamp-2">{rescue.status || '-'}</p>
                                 </Link>
                             ))}
                         </div>
