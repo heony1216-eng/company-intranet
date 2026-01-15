@@ -112,7 +112,7 @@ export const Modal = ({
                 className="absolute inset-0 bg-black/50 backdrop-blur-sm"
                 onClick={onClose}
             />
-            <div className="relative bg-white rounded-toss-lg shadow-toss-lg w-full max-w-lg mx-4 max-h-[90vh] overflow-auto">
+            <div className="relative bg-white rounded-toss-lg shadow-toss-lg w-full max-w-2xl mx-4 max-h-[90vh] overflow-auto">
                 <div className="flex items-center justify-between p-6 border-b border-toss-gray-100">
                     <h2 className="text-xl font-bold text-toss-gray-900">{title}</h2>
                     <button

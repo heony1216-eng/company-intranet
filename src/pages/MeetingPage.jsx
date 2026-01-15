@@ -3,7 +3,7 @@ import { Card, Button, Modal } from '../components/common'
 import { ChevronLeft, ChevronRight, FileText, Upload, File, X, Download } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { uploadMultipleToDropbox } from '../lib/dropbox'
+import { uploadMultipleToDropbox, deleteMultipleFilesByUrl } from '../lib/dropbox'
 
 // Dropbox URL을 직접 이미지 링크로 변환 (Safari 호환)
 const convertDropboxUrl = (url) => {
@@ -355,6 +355,11 @@ const MeetingPage = () => {
         try {
             const existingMeeting = meetings.find(m => m.meeting_date === selectedDate)
             if (existingMeeting) {
+                // Dropbox에서 첨부파일 삭제
+                if (existingMeeting.file_urls && existingMeeting.file_urls.length > 0) {
+                    await deleteMultipleFilesByUrl(existingMeeting.file_urls)
+                }
+
                 await supabase
                     .from('meetings')
                     .delete()
@@ -603,7 +608,7 @@ const MeetingPage = () => {
                         <textarea
                             value={formData.content}
                             onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all min-h-[200px] resize-none"
+                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all min-h-[200px] resize-none leading-relaxed"
                             placeholder="회의 내용을 입력하세요"
                         />
                     </div>
