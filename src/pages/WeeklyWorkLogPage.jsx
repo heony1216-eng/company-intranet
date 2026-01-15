@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { Card, Button, Modal } from '../components/common'
-import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, FileDown, Sparkles, Loader2 } from 'lucide-react'
+import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, FileDown } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { uploadMultipleToDropbox } from '../lib/dropbox'
-import { summarizeWeeklyWork } from '../lib/openai'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun } from 'docx'
 import { saveAs } from 'file-saver'
 
@@ -184,7 +183,6 @@ const WeeklyWorkLogPage = () => {
     const [isEditMode, setIsEditMode] = useState(false)
     const [loading, setLoading] = useState(true)
     const [uploading, setUploading] = useState(false)
-    const [summarizing, setSummarizing] = useState(false)
     const [selectedWorklog, setSelectedWorklog] = useState(null)
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
@@ -388,69 +386,6 @@ const WeeklyWorkLogPage = () => {
             alert('주간 업무일지 수정에 실패했습니다: ' + error.message)
         } finally {
             setUploading(false)
-        }
-    }
-
-    // 선택한 날짜가 속한 주의 시작일(월요일)과 끝일(일요일) 계산
-    const getWeekRange = (dateString) => {
-        const date = new Date(dateString)
-        const day = date.getDay()
-        const diff = date.getDate() - day + (day === 0 ? -6 : 1) // 월요일로 조정
-        const monday = new Date(date.setDate(diff))
-        const sunday = new Date(monday)
-        sunday.setDate(monday.getDate() + 6)
-
-        return {
-            start: monday.toISOString().split('T')[0],
-            end: sunday.toISOString().split('T')[0]
-        }
-    }
-
-    // AI로 일일 업무일지 요약하기
-    const handleSummarizeFromDaily = async () => {
-        if (!profile?.user_id) {
-            alert('로그인이 필요합니다.')
-            return
-        }
-
-        const { start, end } = getWeekRange(formData.work_date)
-
-        try {
-            setSummarizing(true)
-
-            // 해당 주의 일일 업무일지 가져오기
-            const { data: dailyLogs, error } = await supabase
-                .from('work_logs')
-                .select('*')
-                .eq('user_id', profile.user_id)
-                .neq('type', 'weekly')
-                .neq('type', 'monthly')
-                .gte('work_date', start)
-                .lte('work_date', end)
-                .order('work_date', { ascending: true })
-
-            if (error) throw error
-
-            if (!dailyLogs || dailyLogs.length === 0) {
-                alert(`${start} ~ ${end} 기간의 일일 업무일지가 없습니다.`)
-                return
-            }
-
-            // AI로 요약
-            const summary = await summarizeWeeklyWork(dailyLogs)
-
-            // 폼에 요약 결과 입력
-            setFormData(prev => ({
-                ...prev,
-                weekly_work: summary
-            }))
-
-            alert(`${dailyLogs.length}개의 일일 업무일지를 요약했습니다.`)
-        } catch (error) {
-            console.error('Error summarizing:', error)
-            alert('요약 생성에 실패했습니다: ' + error.message)
-        } finally {
-            setSummarizing(false)
         }
     }
 
@@ -909,39 +844,16 @@ const WeeklyWorkLogPage = () => {
                     </div>
 
                     <div>
-                        <div className="flex items-center justify-between mb-2">
-                            <label className="block text-sm font-medium text-toss-gray-700">
-                                주간 업무 *
-                            </label>
-                            <button
-                                type="button"
-                                onClick={handleSummarizeFromDaily}
-                                disabled={summarizing}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-medium rounded-lg hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                            >
-                                {summarizing ? (
-                                    <>
-                                        <Loader2 size={14} className="animate-spin" />
-                                        요약 중...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Sparkles size={14} />
-                                        AI 요약
-                                    </>
-                                )}
-                            </button>
-                        </div>
+                        <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                            주간 업무 *
+                        </label>
                         <textarea
                             value={formData.weekly_work}
                             onChange={(e) => setFormData({ ...formData, weekly_work: e.target.value })}
                             rows={6}
                             className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none transition-all"
-                            placeholder="이번 주에 수행한 업무를 입력하세요. 'AI 요약' 버튼을 누르면 일일 업무일지를 자동으로 요약합니다."
+                            placeholder="이번 주에 수행한 업무를 입력하세요"
                         />
-                        <p className="text-xs text-toss-gray-500 mt-1">
-                            💡 AI 요약: 선택한 날짜가 포함된 주의 일일 업무일지를 자동으로 요약합니다
-                        </p>
                     </div>
 
                     <div>
