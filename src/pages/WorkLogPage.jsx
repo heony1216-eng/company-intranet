@@ -3,7 +3,7 @@ import { Card, Button, Modal } from '../components/common'
 import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, FileDown } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { uploadMultipleToDropbox } from '../lib/dropbox'
+import { uploadMultipleToDropbox, deleteMultipleFilesByUrl } from '../lib/dropbox'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun } from 'docx'
 import { saveAs } from 'file-saver'
 
@@ -444,11 +444,16 @@ const WorkLogPage = () => {
         setIsModalOpen(true)
     }
 
-    const handleDelete = async (worklogId) => {
+    const handleDelete = async (worklog) => {
         if (!confirm('정말 삭제하시겠습니까?')) return
 
         try {
-            const { error } = await supabase.from('work_logs').delete().eq('id', worklogId)
+            // Dropbox에서 첨부파일 삭제
+            if (worklog.file_urls && worklog.file_urls.length > 0) {
+                await deleteMultipleFilesByUrl(worklog.file_urls)
+            }
+
+            const { error } = await supabase.from('work_logs').delete().eq('id', worklog.id)
             if (error) throw error
             fetchWorklogs()
             alert('삭제되었습니다.')
@@ -787,7 +792,7 @@ const WorkLogPage = () => {
                                                                 <Edit2 size={16} />
                                                             </button>
                                                             <button
-                                                                onClick={() => handleDelete(log.id)}
+                                                                onClick={() => handleDelete(log)}
                                                                 className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
                                                                 title="삭제"
                                                             >
@@ -841,7 +846,7 @@ const WorkLogPage = () => {
                                                         <Edit2 size={14} />
                                                     </button>
                                                     <button
-                                                        onClick={() => handleDelete(log.id)}
+                                                        onClick={() => handleDelete(log)}
                                                         className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg"
                                                     >
                                                         <Trash2 size={14} />
@@ -946,7 +951,7 @@ const WorkLogPage = () => {
                             value={formData.morning_work}
                             onChange={(e) => setFormData({ ...formData, morning_work: e.target.value })}
                             rows={4}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all"
+                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all leading-relaxed"
                             placeholder="오전에 수행한 업무를 입력하세요"
                         />
                     </div>
@@ -960,7 +965,7 @@ const WorkLogPage = () => {
                             value={formData.afternoon_work}
                             onChange={(e) => setFormData({ ...formData, afternoon_work: e.target.value })}
                             rows={4}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all"
+                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all leading-relaxed"
                             placeholder="오후에 수행한 업무를 입력하세요"
                         />
                     </div>
@@ -974,7 +979,7 @@ const WorkLogPage = () => {
                             value={formData.next_day_work}
                             onChange={(e) => setFormData({ ...formData, next_day_work: e.target.value })}
                             rows={3}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all"
+                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all leading-relaxed"
                             placeholder="다음날 수행할 업무를 입력하세요"
                         />
                     </div>
@@ -988,7 +993,7 @@ const WorkLogPage = () => {
                             value={formData.special_notes}
                             onChange={(e) => setFormData({ ...formData, special_notes: e.target.value })}
                             rows={3}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all"
+                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all leading-relaxed"
                             placeholder="특이사항이나 비고사항을 입력하세요"
                         />
                     </div>

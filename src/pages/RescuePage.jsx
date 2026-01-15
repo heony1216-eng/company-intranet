@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle } from 'docx'
 import { saveAs } from 'file-saver'
-import { uploadToDropbox } from '../lib/dropbox'
+import { uploadToDropbox, deleteFileByUrl } from '../lib/dropbox'
 
 const RescuePage = () => {
     const { profile, isAdmin } = useAuth()
@@ -173,14 +173,19 @@ const RescuePage = () => {
         }
     }
 
-    const handleDelete = async (id) => {
+    const handleDelete = async (rescue) => {
         if (!confirm('정말 삭제하시겠습니까?')) return
 
         try {
+            // Dropbox에서 사진 삭제
+            if (rescue.photo_url) {
+                await deleteFileByUrl(rescue.photo_url)
+            }
+
             const { error } = await supabase
                 .from('rescue_situations')
                 .delete()
-                .eq('id', id)
+                .eq('id', rescue.id)
 
             if (error) throw error
 
@@ -481,7 +486,7 @@ const RescuePage = () => {
                                                         <Edit2 size={16} />
                                                     </button>
                                                     <button
-                                                        onClick={() => handleDelete(rescue.id)}
+                                                        onClick={() => handleDelete(rescue)}
                                                         className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
                                                         title="삭제"
                                                     >
@@ -533,7 +538,7 @@ const RescuePage = () => {
                                                 <Edit2 size={14} />
                                             </button>
                                             <button
-                                                onClick={() => handleDelete(rescue.id)}
+                                                onClick={() => handleDelete(rescue)}
                                                 className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg"
                                             >
                                                 <Trash2 size={14} />
@@ -668,7 +673,7 @@ const RescuePage = () => {
                             value={formData.details}
                             onChange={(e) => setFormData({ ...formData, details: e.target.value })}
                             rows={8}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all"
+                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all leading-relaxed"
                             placeholder="상세한 구조진행상황을 입력하세요"
                         />
                     </div>

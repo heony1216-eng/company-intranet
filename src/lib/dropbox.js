@@ -147,7 +147,7 @@ export const uploadMultipleToDropbox = async (files, folder = '/intranet') => {
 }
 
 /**
- * Dropbox에서 파일 삭제
+ * Dropbox에서 파일 삭제 (경로로 삭제)
  * @param {string} path - 삭제할 파일 경로
  */
 export const deleteFromDropbox = async (path) => {
@@ -158,6 +158,63 @@ export const deleteFromDropbox = async (path) => {
     } catch (error) {
         console.error('Dropbox delete error:', error)
         return false
+    }
+}
+
+/**
+ * 공유 링크 URL에서 파일 경로를 가져와 삭제
+ * @param {string} url - Dropbox 공유 링크 URL
+ */
+export const deleteFileByUrl = async (url) => {
+    try {
+        if (!url) return false
+
+        // dl.dropboxusercontent.com URL을 www.dropbox.com URL로 변환
+        let sharedUrl = url
+            .replace('dl.dropboxusercontent.com', 'www.dropbox.com')
+
+        // URL에 dl=0 파라미터가 없으면 추가
+        if (!sharedUrl.includes('dl=')) {
+            sharedUrl += sharedUrl.includes('?') ? '&dl=0' : '?dl=0'
+        }
+
+        const dbx = await getDropboxClient()
+
+        // 공유 링크에서 파일 메타데이터 가져오기
+        const metadata = await dbx.sharingGetSharedLinkMetadata({
+            url: sharedUrl
+        })
+
+        if (metadata.result?.path_lower) {
+            // 파일 삭제
+            await dbx.filesDeleteV2({ path: metadata.result.path_lower })
+            return true
+        }
+
+        return false
+    } catch (error) {
+        console.error('Dropbox delete by URL error:', error)
+        // 파일이 이미 삭제된 경우나 찾을 수 없는 경우는 성공으로 처리
+        if (error.error?.error?.['.tag'] === 'path' ||
+            error.error?.error_summary?.includes('not_found')) {
+            return true
+        }
+        return false
+    }
+}
+
+/**
+ * 여러 파일을 URL로 삭제
+ * @param {Array} fileUrls - 파일 URL 배열 (문자열 또는 {url, name} 객체)
+ */
+export const deleteMultipleFilesByUrl = async (fileUrls) => {
+    if (!fileUrls || fileUrls.length === 0) return
+
+    for (const item of fileUrls) {
+        const url = typeof item === 'string' ? item : item?.url
+        if (url) {
+            await deleteFileByUrl(url)
+        }
     }
 }
 
