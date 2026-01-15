@@ -462,31 +462,85 @@ const MonthlyWorkLogPage = () => {
         })
     }
 
+    // 이미지를 img 태그로 로드 후 canvas를 통해 ArrayBuffer로 변환 (CORS 우회)
+    const loadImageAsArrayBuffer = (url) => {
+        return new Promise((resolve, reject) => {
+            const img = new Image()
+            img.crossOrigin = 'anonymous'
+            img.onload = () => {
+                try {
+                    const canvas = document.createElement('canvas')
+                    canvas.width = img.naturalWidth
+                    canvas.height = img.naturalHeight
+                    const ctx = canvas.getContext('2d')
+                    ctx.drawImage(img, 0, 0)
+                    canvas.toBlob((blob) => {
+                        if (blob) {
+                            blob.arrayBuffer().then(resolve).catch(reject)
+                        } else {
+                            reject(new Error('Canvas to blob failed'))
+                        }
+                    }, 'image/png')
+                } catch (e) {
+                    reject(e)
+                }
+            }
+            img.onerror = () => reject(new Error('이미지 로드 실패'))
+            img.src = url
+        })
+    }
+
     const handleSaveAsWord = async (worklog) => {
         const imageElements = []
+        const failedImages = []
         if (worklog.file_urls && worklog.file_urls.length > 0) {
             const imageUrls = worklog.file_urls.filter(item => isImageFile({ url: getUrl(item) }))
             for (const item of imageUrls) {
                 try {
                     const url = getUrl(item)
-                    const response = await fetch(url)
-                    const arrayBuffer = await response.arrayBuffer()
+                    const arrayBuffer = await loadImageAsArrayBuffer(url)
+
+                    // 원본 이미지 크기 계산
+                    const img = new Image()
+                    img.src = url
+                    await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+
+                    const maxWidth = 500
+                    const maxHeight = 400
+                    let width = img.naturalWidth || 400
+                    let height = img.naturalHeight || 300
+
+                    if (width > maxWidth) {
+                        height = (height * maxWidth) / width
+                        width = maxWidth
+                    }
+                    if (height > maxHeight) {
+                        width = (width * maxHeight) / height
+                        height = maxHeight
+                    }
+
                     imageElements.push(
                         new Paragraph({ text: '' }),
                         new Paragraph({
                             children: [
                                 new ImageRun({
                                     data: arrayBuffer,
-                                    transformation: { width: 400, height: 300 },
-                                    type: 'jpg',
+                                    transformation: { width: Math.round(width), height: Math.round(height) },
+                                    type: 'png',
                                 }),
                             ],
                         })
                     )
                 } catch (error) {
                     console.error('이미지 로드 실패:', error)
+                    const fileName = typeof item === 'string' ? item.split('/').pop() : (item.name || '이미지')
+                    failedImages.push(fileName)
                 }
             }
+        }
+
+        if (failedImages.length > 0) {
+            alert(`일부 이미지(${failedImages.length}개)를 Word에 포함시키지 못했습니다.`)
         }
 
         const doc = new Document({
