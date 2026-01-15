@@ -5,6 +5,17 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { uploadMultipleToDropbox } from '../lib/dropbox'
 
+// Dropbox URL을 직접 이미지 링크로 변환 (Safari 호환)
+const convertDropboxUrl = (url) => {
+    if (!url) return ''
+    return url
+        .replace('www.dropbox.com', 'dl.dropboxusercontent.com')
+        .replace('?dl=0', '')
+        .replace('&dl=0', '')
+        .replace('?dl=1', '')
+        .replace('&dl=1', '')
+}
+
 // 이미지 파일인지 확인하는 함수
 const isImageFile = (url) => {
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg']
@@ -19,8 +30,14 @@ const MeetingImageGallery = ({ files }) => {
     const [canScrollRight, setCanScrollRight] = useState(false)
     const [selectedImage, setSelectedImage] = useState(null)
 
-    const imageFiles = files.filter(f => isImageFile(f.url))
-    const otherFiles = files.filter(f => !isImageFile(f.url))
+    const imageFiles = files.filter(f => isImageFile(f.url)).map(f => ({
+        ...f,
+        url: convertDropboxUrl(f.url)
+    }))
+    const otherFiles = files.filter(f => !isImageFile(f.url)).map(f => ({
+        ...f,
+        url: convertDropboxUrl(f.url)
+    }))
 
     const checkScroll = () => {
         if (scrollRef.current) {
@@ -78,13 +95,14 @@ const MeetingImageGallery = ({ files }) => {
                             {imageFiles.map((file, index) => (
                                 <div
                                     key={index}
-                                    className="flex-shrink-0 cursor-pointer w-32 h-32 rounded-xl overflow-hidden bg-toss-gray-100"
+                                    className="flex-shrink-0 cursor-pointer w-24 h-24 sm:w-32 sm:h-32 rounded-xl overflow-hidden bg-toss-gray-100"
                                     onClick={() => setSelectedImage(file.url)}
                                 >
                                     <img
                                         src={file.url}
                                         alt={file.name || `첨부 이미지 ${index + 1}`}
                                         className="w-full h-full object-cover hover:opacity-90 transition-opacity"
+                                        loading="lazy"
                                         onError={(e) => {
                                             e.target.style.display = 'none'
                                         }}
@@ -130,14 +148,16 @@ const MeetingImageGallery = ({ files }) => {
                 </div>
             )}
 
-            {/* 이미지 확대 모달 */}
+            {/* 이미지 확대 모달 - Portal처럼 동작하도록 z-index 높임 */}
             {selectedImage && (
                 <div
-                    className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+                    className="fixed inset-0 bg-black/80 flex items-center justify-center p-4"
+                    style={{ zIndex: 9999 }}
                     onClick={() => setSelectedImage(null)}
                 >
                     <button
                         className="absolute top-4 right-4 text-white hover:text-gray-300"
+                        style={{ zIndex: 10000 }}
                         onClick={() => setSelectedImage(null)}
                     >
                         <X size={32} />
@@ -145,7 +165,7 @@ const MeetingImageGallery = ({ files }) => {
                     <img
                         src={selectedImage}
                         alt="확대 이미지"
-                        className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"
+                        className="max-h-[85vh] max-w-[95vw] object-contain rounded-lg"
                         onClick={(e) => e.stopPropagation()}
                     />
                 </div>
@@ -217,17 +237,14 @@ const MeetingPage = () => {
         setSelectedDate(date)
         const existingMeeting = meetings.find(m => m.meeting_date === date)
         if (existingMeeting) {
-            setFormData({
-                title: existingMeeting.title || '',
-                content: existingMeeting.content || '',
-                participants: existingMeeting.participants || '',
-                files: [],
-                existingFileUrls: existingMeeting.file_urls || []
-            })
+            // 회의록이 있으면 상세보기 모달 열기
+            setSelectedMeeting(existingMeeting)
+            setIsDetailModalOpen(true)
         } else {
+            // 회의록이 없으면 작성 모달 열기
             setFormData({ title: '', content: '', participants: '', files: [], existingFileUrls: [] })
+            setIsModalOpen(true)
         }
-        setIsModalOpen(true)
     }
 
     const handleFileSelect = (e) => {
@@ -702,7 +719,7 @@ const MeetingPage = () => {
                 title="회의록 상세"
             >
                 {selectedMeeting && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 max-h-[70vh] overflow-y-auto -mx-2 px-2">
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-toss-gray-500 mb-1">회의 날짜</label>
