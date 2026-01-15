@@ -1,14 +1,32 @@
-import { NavLink } from 'react-router-dom'
-import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar, ExternalLink } from 'lucide-react'
-import { useState } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
+import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar, ExternalLink, ChevronDown } from 'lucide-react'
+import { useState, useEffect } from 'react'
 
 const Sidebar = () => {
     const [isOpen, setIsOpen] = useState(false)
+    const [worklogOpen, setWorklogOpen] = useState(false)
+    const location = useLocation()
+
+    // 업무일지 관련 페이지에 있으면 서브메뉴 열기
+    useEffect(() => {
+        if (location.pathname.startsWith('/worklogs')) {
+            setWorklogOpen(true)
+        }
+    }, [location.pathname])
 
     const navItems = [
         { to: '/', icon: Home, label: '대시보드' },
         { to: '/notices', icon: Megaphone, label: '공지사항' },
-        { to: '/worklogs', icon: ClipboardList, label: '업무일지' },
+        {
+            icon: ClipboardList,
+            label: '업무일지',
+            isSubmenu: true,
+            subItems: [
+                { to: '/worklogs/daily', label: '일일 업무일지' },
+                { to: '/worklogs/weekly', label: '주간 업무일지' },
+                { to: '/worklogs/monthly', label: '월간 업무일지' },
+            ]
+        },
         { to: '/rescue', icon: AlertTriangle, label: '구조현황' },
         { to: '/meetings', icon: Calendar, label: '회의록' },
         { to: '/mypage', icon: User, label: '마이페이지' },
@@ -76,7 +94,50 @@ const Sidebar = () => {
 
                 <nav className="p-4 space-y-2">
                     {navItems.map((item) => (
-                        <NavItem key={item.to} {...item} />
+                        item.isSubmenu ? (
+                            <div key={item.label}>
+                                <button
+                                    onClick={() => setWorklogOpen(!worklogOpen)}
+                                    className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-toss transition-all ${
+                                        location.pathname.startsWith('/worklogs')
+                                            ? 'bg-toss-blue/10 text-toss-blue'
+                                            : 'text-toss-gray-900 hover:bg-toss-blue/10 hover:text-toss-blue'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <item.icon size={20} />
+                                        <span className="font-medium">{item.label}</span>
+                                    </div>
+                                    <ChevronDown
+                                        size={16}
+                                        className={`transition-transform ${worklogOpen ? 'rotate-180' : ''}`}
+                                    />
+                                </button>
+                                {worklogOpen && (
+                                    <div className="ml-4 mt-1 space-y-1">
+                                        {item.subItems.map((subItem) => (
+                                            <NavLink
+                                                key={subItem.to}
+                                                to={subItem.to}
+                                                onClick={() => setIsOpen(false)}
+                                                className={({ isActive }) =>
+                                                    `flex items-center gap-3 px-4 py-2 rounded-toss transition-all text-sm ${
+                                                        isActive
+                                                            ? 'bg-toss-blue text-white'
+                                                            : 'text-toss-gray-700 hover:bg-toss-blue/10 hover:text-toss-blue'
+                                                    }`
+                                                }
+                                            >
+                                                <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                                                <span className="font-medium">{subItem.label}</span>
+                                            </NavLink>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <NavItem key={item.to} {...item} />
+                        )
                     ))}
 
                     {/* 외부 링크 */}

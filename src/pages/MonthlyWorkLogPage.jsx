@@ -7,7 +7,7 @@ import { uploadMultipleToDropbox } from '../lib/dropbox'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun } from 'docx'
 import { saveAs } from 'file-saver'
 
-// Dropbox URL을 직접 이미지 링크로 변환 (Safari 호환)
+// Dropbox URL을 직접 이미지 링크로 변환
 const convertDropboxUrl = (url) => {
     if (!url) return ''
     return url
@@ -18,7 +18,6 @@ const convertDropboxUrl = (url) => {
         .replace('&dl=1', '')
 }
 
-// URL 추출 함수 (문자열 또는 {url, name} 객체 모두 지원)
 const getUrl = (item) => {
     let url = ''
     if (typeof item === 'string') url = item
@@ -26,7 +25,6 @@ const getUrl = (item) => {
     return convertDropboxUrl(url)
 }
 
-// 이미지 파일인지 확인하는 함수
 const isImageFile = (item) => {
     const url = getUrl(item)
     if (!url) return false
@@ -35,7 +33,7 @@ const isImageFile = (item) => {
     return imageExtensions.some(ext => lowerUrl.includes(ext))
 }
 
-// 이미지 갤러리 컴포넌트 (드래그 스크롤 지원)
+// 이미지 갤러리 컴포넌트
 const ImageGallery = ({ urls }) => {
     const scrollRef = useRef(null)
     const [canScrollLeft, setCanScrollLeft] = useState(false)
@@ -74,14 +72,12 @@ const ImageGallery = ({ urls }) => {
 
     return (
         <div className="space-y-3">
-            {/* 이미지 갤러리 */}
             {imageUrls.length > 0 && (
                 <div>
                     <label className="block text-sm font-medium text-toss-gray-500 mb-2">
                         사진 ({imageUrls.length}장)
                     </label>
                     <div className="relative">
-                        {/* 왼쪽 스크롤 버튼 */}
                         {canScrollLeft && (
                             <button
                                 onClick={() => scroll('left')}
@@ -90,8 +86,6 @@ const ImageGallery = ({ urls }) => {
                                 <ChevronLeft size={20} />
                             </button>
                         )}
-
-                        {/* 이미지 스크롤 컨테이너 */}
                         <div
                             ref={scrollRef}
                             onScroll={checkScroll}
@@ -111,16 +105,12 @@ const ImageGallery = ({ urls }) => {
                                             alt={`첨부 이미지 ${index + 1}`}
                                             className="w-full h-full object-cover hover:opacity-90 transition-opacity"
                                             loading="lazy"
-                                            onError={(e) => {
-                                                e.target.style.display = 'none'
-                                            }}
+                                            onError={(e) => { e.target.style.display = 'none' }}
                                         />
                                     </div>
                                 )
                             })}
                         </div>
-
-                        {/* 오른쪽 스크롤 버튼 */}
                         {canScrollRight && (
                             <button
                                 onClick={() => scroll('right')}
@@ -133,7 +123,6 @@ const ImageGallery = ({ urls }) => {
                 </div>
             )}
 
-            {/* 기타 파일 */}
             {otherUrls.length > 0 && (
                 <div>
                     <label className="block text-sm font-medium text-toss-gray-500 mb-2">
@@ -161,7 +150,6 @@ const ImageGallery = ({ urls }) => {
                 </div>
             )}
 
-            {/* 이미지 확대 모달 - Portal처럼 동작하도록 z-index 높임 */}
             {selectedImage && (
                 <div
                     className="fixed inset-0 bg-black/80 flex items-center justify-center p-4"
@@ -187,7 +175,7 @@ const ImageGallery = ({ urls }) => {
     )
 }
 
-const WorkLogPage = () => {
+const MonthlyWorkLogPage = () => {
     const { profile, isAdmin } = useAuth()
     const [worklogs, setWorklogs] = useState([])
     const [filteredWorklogs, setFilteredWorklogs] = useState([])
@@ -197,7 +185,6 @@ const WorkLogPage = () => {
     const [uploading, setUploading] = useState(false)
     const [selectedWorklog, setSelectedWorklog] = useState(null)
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
     const [selectedUserId, setSelectedUserId] = useState('all')
     const [currentPage, setCurrentPage] = useState(1)
     const itemsPerPage = 15
@@ -205,19 +192,15 @@ const WorkLogPage = () => {
 
     const [formData, setFormData] = useState({
         work_date: new Date().toISOString().split('T')[0],
-        morning_work: '',
-        afternoon_work: '',
-        next_day_work: '',
+        monthly_work: '',
         special_notes: '',
         files: [],
         existingFileUrls: []
     })
 
-    // 연도 목록 생성 (2026년부터 현재 연도까지)
     const startYear = 2026
     const currentYear = new Date().getFullYear()
     const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i)
-    const months = Array.from({ length: 12 }, (_, i) => i + 1)
 
     useEffect(() => {
         fetchWorklogs()
@@ -225,20 +208,19 @@ const WorkLogPage = () => {
 
     useEffect(() => {
         filterWorklogsByDate()
-    }, [worklogs, selectedYear, selectedMonth, selectedUserId])
+    }, [worklogs, selectedYear, selectedUserId])
 
     const filterWorklogsByDate = () => {
         const filtered = worklogs.filter(log => {
             const logDate = new Date(log.work_date)
-            const dateMatch = logDate.getFullYear() === selectedYear && logDate.getMonth() + 1 === selectedMonth
+            const dateMatch = logDate.getFullYear() === selectedYear
             const userMatch = selectedUserId === 'all' || log.user_id === selectedUserId
             return dateMatch && userMatch
         })
         setFilteredWorklogs(filtered)
-        setCurrentPage(1) // 필터 변경 시 첫 페이지로 이동
+        setCurrentPage(1)
     }
 
-    // 고유한 사용자 목록 추출
     const uniqueUsers = Array.from(new Set(worklogs.map(log => log.user_id)))
         .map(userId => {
             const log = worklogs.find(l => l.user_id === userId)
@@ -251,7 +233,7 @@ const WorkLogPage = () => {
             let query = supabase
                 .from('work_logs')
                 .select('*')
-                .neq('type', 'rescue')
+                .eq('type', 'monthly')
                 .order('work_date', { ascending: false })
 
             if (!isAdmin && profile) {
@@ -268,7 +250,7 @@ const WorkLogPage = () => {
 
             if (usersError) throw usersError
 
-            const worklogsWithUsers = worklogsData.map(worklog => {
+            const worklogsWithUsers = (worklogsData || []).map(worklog => {
                 const user = usersData.find(u => u.user_id === worklog.user_id)
                 return {
                     ...worklog,
@@ -276,7 +258,7 @@ const WorkLogPage = () => {
                 }
             })
 
-            setWorklogs(worklogsWithUsers || [])
+            setWorklogs(worklogsWithUsers)
         } catch (error) {
             console.error('Error fetching worklogs:', error)
         } finally {
@@ -312,8 +294,7 @@ const WorkLogPage = () => {
     }
 
     const uploadFiles = async (files) => {
-        // Dropbox에 업로드
-        const folder = `/intranet/worklogs/${profile.user_id}`
+        const folder = `/intranet/worklogs/monthly/${profile.user_id}`
         const results = await uploadMultipleToDropbox(
             files.map(f => f.file),
             folder
@@ -322,8 +303,8 @@ const WorkLogPage = () => {
     }
 
     const handleCreate = async () => {
-        if (!formData.morning_work && !formData.afternoon_work) {
-            alert('오전 또는 오후 업무 중 하나는 입력해주세요.')
+        if (!formData.monthly_work) {
+            alert('월간 업무를 입력해주세요.')
             return
         }
 
@@ -337,12 +318,11 @@ const WorkLogPage = () => {
 
             const { error } = await supabase.from('work_logs').insert({
                 work_date: formData.work_date,
-                morning_work: formData.morning_work,
-                afternoon_work: formData.afternoon_work,
-                next_day_work: formData.next_day_work,
+                morning_work: formData.monthly_work,
                 special_notes: formData.special_notes,
                 file_urls: fileUrls,
                 user_id: profile.user_id,
+                type: 'monthly',
                 is_read: false
             })
 
@@ -351,27 +331,26 @@ const WorkLogPage = () => {
             setIsModalOpen(false)
             resetForm()
             fetchWorklogs()
-            alert('업무일지가 저장되었습니다.')
+            alert('월간 업무일지가 저장되었습니다.')
         } catch (error) {
             console.error('Error creating worklog:', error)
-            alert('업무일지 저장에 실패했습니다: ' + error.message)
+            alert('월간 업무일지 저장에 실패했습니다: ' + error.message)
         } finally {
             setUploading(false)
         }
     }
 
     const handleEdit = async () => {
-        if (!formData.morning_work && !formData.afternoon_work) {
-            alert('오전 또는 오후 업무 중 하나는 입력해주세요.')
+        if (!formData.monthly_work) {
+            alert('월간 업무를 입력해주세요.')
             return
         }
 
         if (!selectedWorklog?.id) {
-            alert('수정할 업무일지를 찾을 수 없습니다. 다시 시도해주세요.')
+            alert('수정할 업무일지를 찾을 수 없습니다.')
             return
         }
 
-        // 수정 중 selectedWorklog가 변경되지 않도록 ID를 미리 저장
         const worklogId = selectedWorklog.id
 
         try {
@@ -388,9 +367,7 @@ const WorkLogPage = () => {
                 .from('work_logs')
                 .update({
                     work_date: formData.work_date,
-                    morning_work: formData.morning_work,
-                    afternoon_work: formData.afternoon_work,
-                    next_day_work: formData.next_day_work,
+                    morning_work: formData.monthly_work,
                     special_notes: formData.special_notes,
                     file_urls: allFileUrls
                 })
@@ -401,10 +378,10 @@ const WorkLogPage = () => {
             setIsModalOpen(false)
             resetForm()
             fetchWorklogs()
-            alert('업무일지가 수정되었습니다.')
+            alert('월간 업무일지가 수정되었습니다.')
         } catch (error) {
             console.error('Error updating worklog:', error)
-            alert('업무일지 수정에 실패했습니다: ' + error.message)
+            alert('월간 업무일지 수정에 실패했습니다: ' + error.message)
         } finally {
             setUploading(false)
         }
@@ -413,9 +390,7 @@ const WorkLogPage = () => {
     const resetForm = () => {
         setFormData({
             work_date: new Date().toISOString().split('T')[0],
-            morning_work: '',
-            afternoon_work: '',
-            next_day_work: '',
+            monthly_work: '',
             special_notes: '',
             files: [],
             existingFileUrls: []
@@ -427,9 +402,7 @@ const WorkLogPage = () => {
     const openEditModal = (worklog) => {
         setFormData({
             work_date: worklog.work_date,
-            morning_work: worklog.morning_work || '',
-            afternoon_work: worklog.afternoon_work || '',
-            next_day_work: worklog.next_day_work || '',
+            monthly_work: worklog.morning_work || '',
             special_notes: worklog.special_notes || '',
             files: [],
             existingFileUrls: worklog.file_urls || []
@@ -470,59 +443,45 @@ const WorkLogPage = () => {
         }
     }
 
-    // Word 파일로 저장
+    const getMonthLabel = (dateString) => {
+        const date = new Date(dateString)
+        return `${date.getFullYear()}년 ${date.getMonth() + 1}월`
+    }
+
+    const formatDate = (dateString) => {
+        const date = new Date(dateString)
+        return date.toLocaleDateString('ko-KR', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        })
+    }
+
     const handleSaveAsWord = async (worklog) => {
-        // 이미지 파일들 가져오기
         const imageElements = []
-        const failedImages = []
-
         if (worklog.file_urls && worklog.file_urls.length > 0) {
-            const imageUrls = worklog.file_urls.filter(item => {
-                const url = getUrl(item)
-                return isImageFile({ url })
-            })
-
+            const imageUrls = worklog.file_urls.filter(item => isImageFile({ url: getUrl(item) }))
             for (const item of imageUrls) {
                 try {
                     const url = getUrl(item)
-                    // CORS 우회를 위해 mode: 'cors' 추가
-                    const response = await fetch(url, { mode: 'cors' })
-                    if (!response.ok) throw new Error('이미지 로드 실패')
+                    const response = await fetch(url)
                     const arrayBuffer = await response.arrayBuffer()
-
-                    // 이미지 타입 감지
-                    const urlLower = url.toLowerCase()
-                    let imageType = 'jpg'
-                    if (urlLower.includes('.png')) imageType = 'png'
-                    else if (urlLower.includes('.gif')) imageType = 'gif'
-                    else if (urlLower.includes('.webp')) imageType = 'png' // webp는 png로 처리
-
                     imageElements.push(
                         new Paragraph({ text: '' }),
                         new Paragraph({
                             children: [
                                 new ImageRun({
                                     data: arrayBuffer,
-                                    transformation: {
-                                        width: 400,
-                                        height: 300,
-                                    },
-                                    type: imageType,
+                                    transformation: { width: 400, height: 300 },
+                                    type: 'jpg',
                                 }),
                             ],
                         })
                     )
                 } catch (error) {
                     console.error('이미지 로드 실패:', error)
-                    const fileName = typeof item === 'string' ? item.split('/').pop() : (item.name || '이미지')
-                    failedImages.push(fileName)
                 }
             }
-        }
-
-        // 로드 실패한 이미지가 있으면 알림
-        if (failedImages.length > 0) {
-            console.warn('일부 이미지를 Word에 포함시키지 못했습니다:', failedImages)
         }
 
         const doc = new Document({
@@ -530,7 +489,7 @@ const WorkLogPage = () => {
                 properties: {},
                 children: [
                     new Paragraph({
-                        text: '업무일지',
+                        text: '월간 업무일지',
                         heading: HeadingLevel.TITLE,
                         alignment: AlignmentType.CENTER,
                     }),
@@ -543,33 +502,23 @@ const WorkLogPage = () => {
                     }),
                     new Paragraph({
                         children: [
+                            new TextRun({ text: '해당 월: ', bold: true }),
+                            new TextRun(getMonthLabel(worklog.work_date)),
+                        ],
+                    }),
+                    new Paragraph({
+                        children: [
                             new TextRun({ text: '작성자: ', bold: true }),
                             new TextRun(`${worklog.user?.name || '-'} (${worklog.user?.team || '팀 미설정'})`),
                         ],
                     }),
                     new Paragraph({ text: '' }),
                     new Paragraph({
-                        text: '오전 업무',
+                        text: '월간 업무',
                         heading: HeadingLevel.HEADING_2,
                     }),
                     new Paragraph({
                         text: worklog.morning_work || '-',
-                    }),
-                    new Paragraph({ text: '' }),
-                    new Paragraph({
-                        text: '오후 업무',
-                        heading: HeadingLevel.HEADING_2,
-                    }),
-                    new Paragraph({
-                        text: worklog.afternoon_work || '-',
-                    }),
-                    new Paragraph({ text: '' }),
-                    new Paragraph({
-                        text: '익일 업무',
-                        heading: HeadingLevel.HEADING_2,
-                    }),
-                    new Paragraph({
-                        text: worklog.next_day_work || '-',
                     }),
                     ...(worklog.special_notes ? [
                         new Paragraph({ text: '' }),
@@ -581,7 +530,6 @@ const WorkLogPage = () => {
                             text: worklog.special_notes,
                         }),
                     ] : []),
-                    // 이미지 첨부
                     ...(imageElements.length > 0 ? [
                         new Paragraph({ text: '' }),
                         new Paragraph({
@@ -595,25 +543,9 @@ const WorkLogPage = () => {
         })
 
         const blob = await Packer.toBlob(doc)
-        saveAs(blob, `업무일지_${worklog.work_date}_${worklog.user?.name || '작성자'}.docx`)
+        saveAs(blob, `월간업무일지_${getMonthLabel(worklog.work_date)}_${worklog.user?.name || '작성자'}.docx`)
     }
 
-    const getWeekday = (dateString) => {
-        const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일']
-        const date = new Date(dateString)
-        return days[date.getDay()]
-    }
-
-    const formatDate = (dateString) => {
-        const date = new Date(dateString)
-        return date.toLocaleDateString('ko-KR', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        }) + ` (${getWeekday(dateString)})`
-    }
-
-    // 페이지네이션
     const indexOfLastItem = currentPage * itemsPerPage
     const indexOfFirstItem = indexOfLastItem - itemsPerPage
     const currentItems = filteredWorklogs.slice(indexOfFirstItem, indexOfLastItem)
@@ -625,29 +557,26 @@ const WorkLogPage = () => {
 
     return (
         <div className="space-y-6">
-            {/* User Info Header */}
-            <Card className="bg-gradient-to-r from-toss-blue to-blue-600 text-white">
+            <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
                 <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
                         <FileText size={24} />
                     </div>
                     <div>
                         <h2 className="text-xl font-bold mb-1">
-                            {isAdmin ? '전체 일일 업무일지' : `${profile?.name || '사용자'}님의 일일 업무일지`}
+                            {isAdmin ? '전체 월간 업무일지' : `${profile?.name || '사용자'}님의 월간 업무일지`}
                         </h2>
                         <p className="text-white/90">
-                            {isAdmin ? '관리자 권한으로 모든 직원의 일일 업무일지를 확인할 수 있습니다' :
+                            {isAdmin ? '관리자 권한으로 모든 직원의 월간 업무일지를 확인할 수 있습니다' :
                              `${profile?.team ? `${profile.team} · ` : ''}${profile?.rank || '직급 미설정'}`}
                         </p>
                     </div>
                 </div>
             </Card>
 
-            {/* Header with Filters */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <h1 className="text-2xl font-bold text-toss-gray-900">일일 업무일지</h1>
+                <h1 className="text-2xl font-bold text-toss-gray-900">월간 업무일지</h1>
                 <div className="flex flex-wrap items-center gap-3">
-                    {/* Year Filter */}
                     <select
                         value={selectedYear}
                         onChange={(e) => setSelectedYear(Number(e.target.value))}
@@ -658,18 +587,6 @@ const WorkLogPage = () => {
                         ))}
                     </select>
 
-                    {/* Month Filter */}
-                    <select
-                        value={selectedMonth}
-                        onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                        className="px-4 py-2 bg-white border border-toss-gray-300 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
-                    >
-                        {months.map(month => (
-                            <option key={month} value={month}>{month}월</option>
-                        ))}
-                    </select>
-
-                    {/* User Filter (관리자만) */}
                     {isAdmin && uniqueUsers.length > 0 && (
                         <select
                             value={selectedUserId}
@@ -683,34 +600,31 @@ const WorkLogPage = () => {
                         </select>
                     )}
 
-                    <Button onClick={openCreateModal}>
+                    <Button onClick={openCreateModal} className="bg-purple-500 hover:bg-purple-600">
                         <Plus size={18} />
-                        새 일일 업무일지
+                        새 월간 업무일지
                     </Button>
                 </div>
             </div>
 
-            {/* Board-style Table */}
             <Card padding="p-0 sm:p-6">
                 {loading ? (
                     <div className="text-center text-toss-gray-500 py-8">로딩 중...</div>
                 ) : currentItems.length > 0 ? (
                     <>
-                        {/* Desktop Table */}
                         <div className="hidden md:block overflow-x-auto">
                             <table className="w-full">
                                 <thead className="bg-toss-gray-100 border-b-2 border-toss-gray-300">
                                     <tr>
                                         <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700 w-16">No</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">작업일</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">해당 월</th>
                                         {isAdmin && (
                                             <>
                                                 <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">작성자</th>
                                                 <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">팀</th>
                                             </>
                                         )}
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">오전 업무</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">오후 업무</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">월간 업무</th>
                                         <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700 w-24">관리</th>
                                     </tr>
                                 </thead>
@@ -719,21 +633,21 @@ const WorkLogPage = () => {
                                         <tr
                                             key={log.id}
                                             className={`hover:bg-toss-gray-50 transition-colors ${
-                                                isAdmin && !log.is_read ? 'bg-blue-50' : ''
+                                                isAdmin && !log.is_read ? 'bg-purple-50' : ''
                                             }`}
                                         >
                                             <td className="px-4 py-3 text-sm text-center text-toss-gray-600">
                                                 {indexOfFirstItem + index + 1}
                                             </td>
                                             <td
-                                                className="px-4 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-toss-blue"
+                                                className="px-4 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-purple-600"
                                                 onClick={() => viewWorklogDetail(log)}
                                             >
                                                 <div className="flex items-center gap-2">
                                                     <Calendar size={14} className="text-toss-gray-400" />
-                                                    {new Date(log.work_date).toLocaleDateString('ko-KR')}
+                                                    {getMonthLabel(log.work_date)}
                                                     {isAdmin && !log.is_read && (
-                                                        <span className="inline-block bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium ml-2">
+                                                        <span className="inline-block bg-purple-500 text-white px-2 py-0.5 rounded-full text-xs font-medium ml-2">
                                                             NEW
                                                         </span>
                                                     )}
@@ -741,13 +655,7 @@ const WorkLogPage = () => {
                                             </td>
                                             {isAdmin && (
                                                 <>
-                                                    <td
-                                                        className="px-4 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-toss-blue hover:underline"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            setSelectedUserId(log.user_id)
-                                                        }}
-                                                    >
+                                                    <td className="px-4 py-3 text-sm text-toss-gray-900">
                                                         {log.user?.name || '-'}
                                                     </td>
                                                     <td className="px-4 py-3 text-sm text-toss-gray-600">{log.user?.team || '-'}</td>
@@ -758,12 +666,6 @@ const WorkLogPage = () => {
                                                 onClick={() => viewWorklogDetail(log)}
                                             >
                                                 {log.morning_work || '-'}
-                                            </td>
-                                            <td
-                                                className="px-4 py-3 text-sm text-toss-gray-700 max-w-xs truncate cursor-pointer"
-                                                onClick={() => viewWorklogDetail(log)}
-                                            >
-                                                {log.afternoon_work || '-'}
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <div className="flex items-center justify-center gap-1">
@@ -781,7 +683,7 @@ const WorkLogPage = () => {
                                                         <>
                                                             <button
                                                                 onClick={() => openEditModal(log)}
-                                                                className="p-2 text-blue-500 hover:bg-blue-100 rounded-lg transition-colors"
+                                                                className="p-2 text-purple-500 hover:bg-purple-100 rounded-lg transition-colors"
                                                                 title="수정"
                                                             >
                                                                 <Edit2 size={16} />
@@ -808,7 +710,7 @@ const WorkLogPage = () => {
                             {currentItems.map((log, index) => (
                                 <div
                                     key={log.id}
-                                    className={`p-4 ${isAdmin && !log.is_read ? 'bg-blue-50' : ''}`}
+                                    className={`p-4 ${isAdmin && !log.is_read ? 'bg-purple-50' : ''}`}
                                     onClick={() => viewWorklogDetail(log)}
                                 >
                                     <div className="flex items-center justify-between mb-2">
@@ -816,10 +718,10 @@ const WorkLogPage = () => {
                                             <span className="text-xs text-toss-gray-500">#{indexOfFirstItem + index + 1}</span>
                                             <Calendar size={14} className="text-toss-gray-400" />
                                             <span className="text-sm font-medium text-toss-gray-900">
-                                                {new Date(log.work_date).toLocaleDateString('ko-KR')}
+                                                {getMonthLabel(log.work_date)}
                                             </span>
                                             {isAdmin && !log.is_read && (
-                                                <span className="bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">
+                                                <span className="bg-purple-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">
                                                     NEW
                                                 </span>
                                             )}
@@ -828,7 +730,6 @@ const WorkLogPage = () => {
                                             <button
                                                 onClick={() => handleSaveAsWord(log)}
                                                 className="p-1.5 text-toss-gray-600 hover:bg-toss-gray-100 rounded-lg"
-                                                title="Word 다운로드"
                                             >
                                                 <Download size={14} />
                                             </button>
@@ -836,7 +737,7 @@ const WorkLogPage = () => {
                                                 <>
                                                     <button
                                                         onClick={() => openEditModal(log)}
-                                                        className="p-1.5 text-blue-500 hover:bg-blue-100 rounded-lg"
+                                                        className="p-1.5 text-purple-500 hover:bg-purple-100 rounded-lg"
                                                     >
                                                         <Edit2 size={14} />
                                                     </button>
@@ -857,21 +758,13 @@ const WorkLogPage = () => {
                                             <span>{log.user?.team || '-'}</span>
                                         </div>
                                     )}
-                                    <div className="space-y-1">
-                                        <p className="text-sm text-toss-gray-700 line-clamp-1">
-                                            <span className="text-toss-gray-500 mr-1">오전:</span>
-                                            {log.morning_work || '-'}
-                                        </p>
-                                        <p className="text-sm text-toss-gray-700 line-clamp-1">
-                                            <span className="text-toss-gray-500 mr-1">오후:</span>
-                                            {log.afternoon_work || '-'}
-                                        </p>
-                                    </div>
+                                    <p className="text-sm text-toss-gray-700 line-clamp-2">
+                                        {log.morning_work || '-'}
+                                    </p>
                                 </div>
                             ))}
                         </div>
 
-                        {/* Pagination */}
                         {totalPages > 1 && (
                             <div className="flex items-center justify-center gap-2 mt-6 pt-4 border-t border-toss-gray-200">
                                 <button
@@ -887,7 +780,7 @@ const WorkLogPage = () => {
                                         onClick={() => goToPage(i + 1)}
                                         className={`px-3 py-1 rounded-lg text-sm font-medium ${
                                             currentPage === i + 1
-                                                ? 'bg-toss-blue text-white'
+                                                ? 'bg-purple-500 text-white'
                                                 : 'text-toss-gray-700 hover:bg-toss-gray-100'
                                         }`}
                                     >
@@ -906,7 +799,7 @@ const WorkLogPage = () => {
                     </>
                 ) : (
                     <div className="text-center text-toss-gray-500 py-8">
-                        {selectedYear}년 {selectedMonth}월에 등록된 업무일지가 없습니다
+                        {selectedYear}년에 등록된 월간 업무일지가 없습니다
                     </div>
                 )}
             </Card>
@@ -918,68 +811,37 @@ const WorkLogPage = () => {
                     setIsModalOpen(false)
                     resetForm()
                 }}
-                title={isEditMode ? '일일 업무일지 수정' : '새 일일 업무일지 작성'}
+                title={isEditMode ? '월간 업무일지 수정' : '새 월간 업무일지 작성'}
             >
                 <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
-                    {/* 작업일 */}
                     <div>
                         <label className="block text-sm font-medium text-toss-gray-700 mb-2">
-                            작업일 *
+                            작성일 *
                         </label>
                         <input
                             type="date"
                             value={formData.work_date}
                             onChange={(e) => setFormData({ ...formData, work_date: e.target.value })}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
+                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                         />
                         <p className="text-sm text-toss-gray-500 mt-1">
-                            {formatDate(formData.work_date)}
+                            {getMonthLabel(formData.work_date)} 업무일지
                         </p>
                     </div>
 
-                    {/* 오전 업무 */}
                     <div>
                         <label className="block text-sm font-medium text-toss-gray-700 mb-2">
-                            오전 업무
+                            월간 업무 *
                         </label>
                         <textarea
-                            value={formData.morning_work}
-                            onChange={(e) => setFormData({ ...formData, morning_work: e.target.value })}
-                            rows={4}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all"
-                            placeholder="오전에 수행한 업무를 입력하세요"
+                            value={formData.monthly_work}
+                            onChange={(e) => setFormData({ ...formData, monthly_work: e.target.value })}
+                            rows={6}
+                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none transition-all"
+                            placeholder="이번 달에 수행한 업무를 입력하세요"
                         />
                     </div>
 
-                    {/* 오후 업무 */}
-                    <div>
-                        <label className="block text-sm font-medium text-toss-gray-700 mb-2">
-                            오후 업무
-                        </label>
-                        <textarea
-                            value={formData.afternoon_work}
-                            onChange={(e) => setFormData({ ...formData, afternoon_work: e.target.value })}
-                            rows={4}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all"
-                            placeholder="오후에 수행한 업무를 입력하세요"
-                        />
-                    </div>
-
-                    {/* 익일 업무 */}
-                    <div>
-                        <label className="block text-sm font-medium text-toss-gray-700 mb-2">
-                            익일 업무
-                        </label>
-                        <textarea
-                            value={formData.next_day_work}
-                            onChange={(e) => setFormData({ ...formData, next_day_work: e.target.value })}
-                            rows={3}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all"
-                            placeholder="다음날 수행할 업무를 입력하세요"
-                        />
-                    </div>
-
-                    {/* 특이사항(비고) */}
                     <div>
                         <label className="block text-sm font-medium text-toss-gray-700 mb-2">
                             특이사항(비고)
@@ -988,12 +850,11 @@ const WorkLogPage = () => {
                             value={formData.special_notes}
                             onChange={(e) => setFormData({ ...formData, special_notes: e.target.value })}
                             rows={3}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all"
+                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none transition-all"
                             placeholder="특이사항이나 비고사항을 입력하세요"
                         />
                     </div>
 
-                    {/* 기존 파일 목록 (수정 모드일 때만) */}
                     {isEditMode && formData.existingFileUrls.length > 0 && (
                         <div>
                             <label className="block text-sm font-medium text-toss-gray-700 mb-2">
@@ -1021,10 +882,9 @@ const WorkLogPage = () => {
                         </div>
                     )}
 
-                    {/* 파일 첨부 */}
                     <div>
                         <label className="block text-sm font-medium text-toss-gray-700 mb-2">
-                            파일 첨부 (모든 파일 형식)
+                            파일 첨부
                         </label>
                         <input
                             type="file"
@@ -1036,7 +896,7 @@ const WorkLogPage = () => {
                         <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="w-full p-6 border-2 border-dashed border-toss-gray-300 rounded-2xl hover:border-toss-blue hover:bg-toss-blue/5 transition-all"
+                            className="w-full p-6 border-2 border-dashed border-toss-gray-300 rounded-2xl hover:border-purple-500 hover:bg-purple-50/50 transition-all"
                         >
                             <div className="flex flex-col items-center gap-2 text-toss-gray-600">
                                 <Upload size={28} />
@@ -1079,7 +939,7 @@ const WorkLogPage = () => {
                         </Button>
                         <Button
                             onClick={isEditMode ? handleEdit : handleCreate}
-                            className="flex-1"
+                            className="flex-1 bg-purple-500 hover:bg-purple-600"
                             loading={uploading}
                             disabled={uploading}
                         >
@@ -1093,14 +953,14 @@ const WorkLogPage = () => {
             <Modal
                 isOpen={!!selectedWorklog && !isModalOpen}
                 onClose={() => setSelectedWorklog(null)}
-                title="일일 업무일지 상세"
+                title="월간 업무일지 상세"
             >
                 {selectedWorklog && (
                     <div className="space-y-4 max-h-[70vh] overflow-y-auto -mx-2 px-2">
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-toss-gray-500 mb-1">작성일</label>
-                                <p className="text-toss-gray-900">{formatDate(selectedWorklog.work_date)}</p>
+                                <label className="block text-sm font-medium text-toss-gray-500 mb-1">해당 월</label>
+                                <p className="text-toss-gray-900">{getMonthLabel(selectedWorklog.work_date)}</p>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-toss-gray-500 mb-1">작성자</label>
@@ -1111,23 +971,9 @@ const WorkLogPage = () => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-toss-gray-500 mb-2">오전 업무</label>
-                            <div className="bg-toss-gray-50 rounded-xl p-4 min-h-[80px] whitespace-pre-wrap text-toss-gray-900">
+                            <label className="block text-sm font-medium text-toss-gray-500 mb-2">월간 업무</label>
+                            <div className="bg-toss-gray-50 rounded-xl p-4 min-h-[100px] whitespace-pre-wrap text-toss-gray-900">
                                 {selectedWorklog.morning_work || '-'}
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-toss-gray-500 mb-2">오후 업무</label>
-                            <div className="bg-toss-gray-50 rounded-xl p-4 min-h-[80px] whitespace-pre-wrap text-toss-gray-900">
-                                {selectedWorklog.afternoon_work || '-'}
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-toss-gray-500 mb-2">익일 업무</label>
-                            <div className="bg-toss-gray-50 rounded-xl p-4 min-h-[80px] whitespace-pre-wrap text-toss-gray-900">
-                                {selectedWorklog.next_day_work || '-'}
                             </div>
                         </div>
 
@@ -1144,11 +990,10 @@ const WorkLogPage = () => {
                             <ImageGallery urls={selectedWorklog.file_urls} />
                         )}
 
-                        {/* 저장 버튼 */}
                         <div className="flex gap-2 pt-2">
                             <button
                                 onClick={() => handleSaveAsWord(selectedWorklog)}
-                                className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors text-sm font-medium"
+                                className="flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-100 transition-colors text-sm font-medium"
                             >
                                 <FileDown size={16} />
                                 Word 저장
@@ -1165,7 +1010,7 @@ const WorkLogPage = () => {
                             </Button>
                             <Button
                                 onClick={() => openEditModal(selectedWorklog)}
-                                className="flex-1"
+                                className="flex-1 bg-purple-500 hover:bg-purple-600"
                             >
                                 수정하기
                             </Button>
@@ -1177,4 +1022,4 @@ const WorkLogPage = () => {
     )
 }
 
-export default WorkLogPage
+export default MonthlyWorkLogPage
