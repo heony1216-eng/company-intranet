@@ -6,6 +6,8 @@ import RegisterPage from './pages/RegisterPage'
 import Dashboard from './pages/Dashboard'
 import NoticePage from './pages/NoticePage'
 import WorkLogPage from './pages/WorkLogPage'
+import WeeklyWorkLogPage from './pages/WeeklyWorkLogPage'
+import MonthlyWorkLogPage from './pages/MonthlyWorkLogPage'
 import RescuePage from './pages/RescuePage'
 import MeetingPage from './pages/MeetingPage'
 import MyPage from './pages/MyPage'
@@ -80,7 +82,10 @@ function AppRoutes() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/notices" element={<NoticePage />} />
         <Route path="/notices/:id" element={<NoticePage />} />
-        <Route path="/worklogs" element={<WorkLogPage />} />
+        <Route path="/worklogs" element={<Navigate to="/worklogs/daily" replace />} />
+        <Route path="/worklogs/daily" element={<WorkLogPage />} />
+        <Route path="/worklogs/weekly" element={<WeeklyWorkLogPage />} />
+        <Route path="/worklogs/monthly" element={<MonthlyWorkLogPage />} />
         <Route path="/rescue" element={<RescuePage />} />
         <Route path="/meetings" element={<MeetingPage />} />
         <Route path="/mypage" element={<MyPage />} />
