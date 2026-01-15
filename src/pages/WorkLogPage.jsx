@@ -1,15 +1,29 @@
 import { useState, useEffect, useRef } from 'react'
 import { Card, Button, Modal } from '../components/common'
-import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, Printer, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, FileDown } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { uploadMultipleToDropbox } from '../lib/dropbox'
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun } from 'docx'
+import { saveAs } from 'file-saver'
+
+// Dropbox URL을 직접 이미지 링크로 변환 (Safari 호환)
+const convertDropboxUrl = (url) => {
+    if (!url) return ''
+    return url
+        .replace('www.dropbox.com', 'dl.dropboxusercontent.com')
+        .replace('?dl=0', '')
+        .replace('&dl=0', '')
+        .replace('?dl=1', '')
+        .replace('&dl=1', '')
+}
 
 // URL 추출 함수 (문자열 또는 {url, name} 객체 모두 지원)
 const getUrl = (item) => {
-    if (typeof item === 'string') return item
-    if (item && item.url) return item.url
-    return ''
+    let url = ''
+    if (typeof item === 'string') url = item
+    else if (item && item.url) url = item.url
+    return convertDropboxUrl(url)
 }
 
 // 이미지 파일인지 확인하는 함수
@@ -89,13 +103,14 @@ const ImageGallery = ({ urls }) => {
                                 return (
                                     <div
                                         key={index}
-                                        className="flex-shrink-0 cursor-pointer w-32 h-32 rounded-xl overflow-hidden bg-toss-gray-100"
+                                        className="flex-shrink-0 cursor-pointer w-24 h-24 sm:w-32 sm:h-32 rounded-xl overflow-hidden bg-toss-gray-100"
                                         onClick={() => setSelectedImage(url)}
                                     >
                                         <img
                                             src={url}
                                             alt={`첨부 이미지 ${index + 1}`}
                                             className="w-full h-full object-cover hover:opacity-90 transition-opacity"
+                                            loading="lazy"
                                             onError={(e) => {
                                                 e.target.style.display = 'none'
                                             }}
@@ -146,14 +161,16 @@ const ImageGallery = ({ urls }) => {
                 </div>
             )}
 
-            {/* 이미지 확대 모달 */}
+            {/* 이미지 확대 모달 - Portal처럼 동작하도록 z-index 높임 */}
             {selectedImage && (
                 <div
-                    className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+                    className="fixed inset-0 bg-black/80 flex items-center justify-center p-4"
+                    style={{ zIndex: 9999 }}
                     onClick={() => setSelectedImage(null)}
                 >
                     <button
                         className="absolute top-4 right-4 text-white hover:text-gray-300"
+                        style={{ zIndex: 10000 }}
                         onClick={() => setSelectedImage(null)}
                     >
                         <X size={32} />
@@ -161,7 +178,7 @@ const ImageGallery = ({ urls }) => {
                     <img
                         src={selectedImage}
                         alt="확대 이미지"
-                        className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"
+                        className="max-h-[85vh] max-w-[95vw] object-contain rounded-lg"
                         onClick={(e) => e.stopPropagation()}
                     />
                 </div>
@@ -349,6 +366,14 @@ const WorkLogPage = () => {
             return
         }
 
+        if (!selectedWorklog?.id) {
+            alert('수정할 업무일지를 찾을 수 없습니다. 다시 시도해주세요.')
+            return
+        }
+
+        // 수정 중 selectedWorklog가 변경되지 않도록 ID를 미리 저장
+        const worklogId = selectedWorklog.id
+
         try {
             setUploading(true)
             let newFileUrls = []
@@ -369,7 +394,7 @@ const WorkLogPage = () => {
                     special_notes: formData.special_notes,
                     file_urls: allFileUrls
                 })
-                .eq('id', selectedWorklog.id)
+                .eq('id', worklogId)
 
             if (error) throw error
 
@@ -445,33 +470,114 @@ const WorkLogPage = () => {
         }
     }
 
-    const handlePrint = (worklog) => {
-        const printWindow = window.open('', '_blank')
-        printWindow.document.write(`
-            <html>
-                <head>
-                    <title>업무일지 - ${formatDate(worklog.work_date)}</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; padding: 20px; }
-                        h1 { border-bottom: 2px solid #333; padding-bottom: 10px; }
-                        .section { margin: 20px 0; }
-                        .section h2 { background: #f0f0f0; padding: 8px; margin-bottom: 10px; }
-                        .section p { margin: 10px 0; white-space: pre-wrap; }
-                    </style>
-                </head>
-                <body>
-                    <h1>업무일지</h1>
-                    <p><strong>날짜:</strong> ${formatDate(worklog.work_date)}</p>
-                    <p><strong>작성자:</strong> ${worklog.user?.name} (${worklog.user?.team})</p>
-                    ${worklog.morning_work ? `<div class="section"><h2>오전 업무</h2><p>${worklog.morning_work}</p></div>` : ''}
-                    ${worklog.afternoon_work ? `<div class="section"><h2>오후 업무</h2><p>${worklog.afternoon_work}</p></div>` : ''}
-                    ${worklog.next_day_work ? `<div class="section"><h2>익일 업무</h2><p>${worklog.next_day_work}</p></div>` : ''}
-                    ${worklog.special_notes ? `<div class="section"><h2>특이사항</h2><p>${worklog.special_notes}</p></div>` : ''}
-                </body>
-            </html>
-        `)
-        printWindow.document.close()
-        printWindow.print()
+    // Word 파일로 저장
+    const handleSaveAsWord = async (worklog) => {
+        // 이미지 파일들 가져오기
+        const imageElements = []
+        if (worklog.file_urls && worklog.file_urls.length > 0) {
+            const imageUrls = worklog.file_urls.filter(item => {
+                const url = getUrl(item)
+                return isImageFile({ url })
+            })
+
+            for (const item of imageUrls) {
+                try {
+                    const url = getUrl(item)
+                    const response = await fetch(url)
+                    const arrayBuffer = await response.arrayBuffer()
+
+                    imageElements.push(
+                        new Paragraph({ text: '' }),
+                        new Paragraph({
+                            children: [
+                                new ImageRun({
+                                    data: arrayBuffer,
+                                    transformation: {
+                                        width: 400,
+                                        height: 300,
+                                    },
+                                    type: 'jpg',
+                                }),
+                            ],
+                        })
+                    )
+                } catch (error) {
+                    console.error('이미지 로드 실패:', error)
+                }
+            }
+        }
+
+        const doc = new Document({
+            sections: [{
+                properties: {},
+                children: [
+                    new Paragraph({
+                        text: '업무일지',
+                        heading: HeadingLevel.TITLE,
+                        alignment: AlignmentType.CENTER,
+                    }),
+                    new Paragraph({ text: '' }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: '작성일: ', bold: true }),
+                            new TextRun(formatDate(worklog.work_date)),
+                        ],
+                    }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: '작성자: ', bold: true }),
+                            new TextRun(`${worklog.user?.name || '-'} (${worklog.user?.team || '팀 미설정'})`),
+                        ],
+                    }),
+                    new Paragraph({ text: '' }),
+                    new Paragraph({
+                        text: '오전 업무',
+                        heading: HeadingLevel.HEADING_2,
+                    }),
+                    new Paragraph({
+                        text: worklog.morning_work || '-',
+                    }),
+                    new Paragraph({ text: '' }),
+                    new Paragraph({
+                        text: '오후 업무',
+                        heading: HeadingLevel.HEADING_2,
+                    }),
+                    new Paragraph({
+                        text: worklog.afternoon_work || '-',
+                    }),
+                    new Paragraph({ text: '' }),
+                    new Paragraph({
+                        text: '익일 업무',
+                        heading: HeadingLevel.HEADING_2,
+                    }),
+                    new Paragraph({
+                        text: worklog.next_day_work || '-',
+                    }),
+                    ...(worklog.special_notes ? [
+                        new Paragraph({ text: '' }),
+                        new Paragraph({
+                            text: '특이사항',
+                            heading: HeadingLevel.HEADING_2,
+                        }),
+                        new Paragraph({
+                            text: worklog.special_notes,
+                        }),
+                    ] : []),
+                    // 이미지 첨부
+                    ...(imageElements.length > 0 ? [
+                        new Paragraph({ text: '' }),
+                        new Paragraph({
+                            text: '첨부 사진',
+                            heading: HeadingLevel.HEADING_2,
+                        }),
+                        ...imageElements,
+                    ] : []),
+                ],
+            }],
+        })
+
+        const blob = await Packer.toBlob(doc)
+        saveAs(blob, `업무일지_${worklog.work_date}_${worklog.user?.name || '작성자'}.docx`)
     }
 
     const getWeekday = (dateString) => {
@@ -644,11 +750,14 @@ const WorkLogPage = () => {
                                             <td className="px-4 py-3 text-center">
                                                 <div className="flex items-center justify-center gap-1">
                                                     <button
-                                                        onClick={() => handlePrint(log)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            handleSaveAsWord(log)
+                                                        }}
                                                         className="p-2 text-toss-gray-600 hover:bg-toss-gray-100 rounded-lg transition-colors"
-                                                        title="인쇄"
+                                                        title="Word 다운로드"
                                                     >
-                                                        <Printer size={16} />
+                                                        <Download size={16} />
                                                     </button>
                                                     {(profile?.user_id === log.user_id || isAdmin) && (
                                                         <>
@@ -699,10 +808,11 @@ const WorkLogPage = () => {
                                         </div>
                                         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                             <button
-                                                onClick={() => handlePrint(log)}
+                                                onClick={() => handleSaveAsWord(log)}
                                                 className="p-1.5 text-toss-gray-600 hover:bg-toss-gray-100 rounded-lg"
+                                                title="Word 다운로드"
                                             >
-                                                <Printer size={14} />
+                                                <Download size={14} />
                                             </button>
                                             {(profile?.user_id === log.user_id || isAdmin) && (
                                                 <>
@@ -968,7 +1078,7 @@ const WorkLogPage = () => {
                 title="업무일지 상세"
             >
                 {selectedWorklog && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 max-h-[70vh] overflow-y-auto -mx-2 px-2">
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-toss-gray-500 mb-1">작성일</label>
@@ -1016,6 +1126,17 @@ const WorkLogPage = () => {
                             <ImageGallery urls={selectedWorklog.file_urls} />
                         )}
 
+                        {/* 저장 버튼 */}
+                        <div className="flex gap-2 pt-2">
+                            <button
+                                onClick={() => handleSaveAsWord(selectedWorklog)}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors text-sm font-medium"
+                            >
+                                <FileDown size={16} />
+                                Word 저장
+                            </button>
+                        </div>
+
                         <div className="flex gap-3 pt-4">
                             <Button
                                 variant="secondary"
@@ -1025,10 +1146,7 @@ const WorkLogPage = () => {
                                 닫기
                             </Button>
                             <Button
-                                onClick={() => {
-                                    openEditModal(selectedWorklog)
-                                    setSelectedWorklog(null)
-                                }}
+                                onClick={() => openEditModal(selectedWorklog)}
                                 className="flex-1"
                             >
                                 수정하기

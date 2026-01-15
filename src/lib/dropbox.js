@@ -1,9 +1,60 @@
 import { Dropbox } from 'dropbox'
 
-const DROPBOX_ACCESS_TOKEN = import.meta.env.VITE_DROPBOX_ACCESS_TOKEN
+// Dropbox OAuth 설정
+const DROPBOX_APP_KEY = import.meta.env.VITE_DROPBOX_APP_KEY
+const DROPBOX_APP_SECRET = import.meta.env.VITE_DROPBOX_APP_SECRET
+const DROPBOX_REFRESH_TOKEN = import.meta.env.VITE_DROPBOX_REFRESH_TOKEN
 
-// Dropbox 클라이언트 생성
-const dbx = new Dropbox({ accessToken: DROPBOX_ACCESS_TOKEN })
+// Access Token 캐시 (메모리에 저장)
+let cachedAccessToken = null
+let tokenExpiresAt = null
+
+/**
+ * Refresh Token을 사용하여 새 Access Token을 가져옴
+ * @returns {Promise<string>} - Access Token
+ */
+const getAccessToken = async () => {
+    // 캐시된 토큰이 있고 아직 유효한 경우 (만료 10분 전까지)
+    if (cachedAccessToken && tokenExpiresAt && Date.now() < tokenExpiresAt - 600000) {
+        return cachedAccessToken
+    }
+
+    // Refresh Token으로 새 Access Token 요청
+    const response = await fetch('https://api.dropbox.com/oauth2/token', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: DROPBOX_REFRESH_TOKEN,
+            client_id: DROPBOX_APP_KEY,
+            client_secret: DROPBOX_APP_SECRET,
+        }),
+    })
+
+    if (!response.ok) {
+        const errorData = await response.json()
+        console.error('Token refresh error:', errorData)
+        throw new Error('Access Token 갱신에 실패했습니다: ' + (errorData.error_description || errorData.error))
+    }
+
+    const data = await response.json()
+    cachedAccessToken = data.access_token
+    // expires_in은 초 단위, 밀리초로 변환
+    tokenExpiresAt = Date.now() + (data.expires_in * 1000)
+
+    return cachedAccessToken
+}
+
+/**
+ * Dropbox 클라이언트 생성 (토큰 자동 갱신)
+ * @returns {Promise<Dropbox>}
+ */
+const getDropboxClient = async () => {
+    const accessToken = await getAccessToken()
+    return new Dropbox({ accessToken })
+}
 
 /**
  * 파일을 Dropbox에 업로드하고 공유 링크를 반환
@@ -13,6 +64,8 @@ const dbx = new Dropbox({ accessToken: DROPBOX_ACCESS_TOKEN })
  */
 export const uploadToDropbox = async (file, folder = '/intranet') => {
     try {
+        const dbx = await getDropboxClient()
+
         // 파일명에 타임스탬프 추가 (중복 방지)
         const timestamp = Date.now()
         const fileName = `${timestamp}_${file.name}`
@@ -53,8 +106,12 @@ export const uploadToDropbox = async (file, folder = '/intranet') => {
             }
         }
 
-        // dl=0 을 dl=1로 변경하면 직접 다운로드 링크가 됨
-        const directLink = sharedLink.replace('dl=0', 'dl=1')
+        // Dropbox 직접 이미지 링크로 변환 (Safari 호환)
+        // www.dropbox.com → dl.dropboxusercontent.com, dl=0 제거
+        const directLink = sharedLink
+            .replace('www.dropbox.com', 'dl.dropboxusercontent.com')
+            .replace('?dl=0', '')
+            .replace('&dl=0', '')
 
         return {
             url: directLink,
@@ -95,6 +152,7 @@ export const uploadMultipleToDropbox = async (files, folder = '/intranet') => {
  */
 export const deleteFromDropbox = async (path) => {
     try {
+        const dbx = await getDropboxClient()
         await dbx.filesDeleteV2({ path })
         return true
     } catch (error) {
@@ -103,4 +161,5 @@ export const deleteFromDropbox = async (path) => {
     }
 }
 
-export default dbx
+// 기본 export는 getDropboxClient 함수로 변경
+export default getDropboxClient

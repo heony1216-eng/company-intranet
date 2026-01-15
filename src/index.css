@@ -4,6 +4,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 다크모드 완전 비활성화 */
+html, html.dark, html[data-theme="dark"] {
+  color-scheme: light only !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  html, body, * {
+    color-scheme: light only !important;
+  }
+}
+
 /* Base Styles - Toss Style */
 * {
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
@@ -11,11 +22,34 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+html {
+  background-color: #F9FAFB !important;
+  color: #191F28 !important;
+}
+
 body {
-  background-color: #F9FAFB;
-  color: #191F28;
+  background-color: #F9FAFB !important;
+  color: #191F28 !important;
   line-height: 1.6;
   letter-spacing: -0.02em;
+  min-height: 100vh;
+}
+
+/* 반응형 텍스트 크기 */
+html {
+  font-size: 16px;
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 1920px) {
+  html {
+    font-size: 18px;
+  }
 }
 
 /* Smooth Transitions */

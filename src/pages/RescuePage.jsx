@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, Button, Modal } from '../components/common'
-import { Plus, Trash2, Edit2, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, Edit2, AlertTriangle, Download, Camera, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle } from 'docx'
+import { saveAs } from 'file-saver'
+import { uploadToDropbox } from '../lib/dropbox'
 
 const RescuePage = () => {
     const { profile, isAdmin } = useAuth()
@@ -14,6 +17,9 @@ const RescuePage = () => {
     const [loading, setLoading] = useState(true)
     const [currentPage, setCurrentPage] = useState(1)
     const itemsPerPage = 15
+    const [selectedIds, setSelectedIds] = useState(new Set())
+    const [uploading, setUploading] = useState(false)
+    const photoInputRef = useRef(null)
 
     const [formData, setFormData] = useState({
         location: '',
@@ -21,7 +27,9 @@ const RescuePage = () => {
         request_date: '',
         status: '',
         details: '',
-        is_completed: false
+        is_completed: false,
+        photo_url: '',
+        photo_file: null
     })
 
     useEffect(() => {
@@ -53,10 +61,30 @@ const RescuePage = () => {
             request_date: '',
             status: '',
             details: '',
-            is_completed: false
+            is_completed: false,
+            photo_url: '',
+            photo_file: null
         })
         setIsEditMode(false)
         setSelectedRescue(null)
+    }
+
+    const handlePhotoSelect = (e) => {
+        const file = e.target.files[0]
+        if (file) {
+            if (!file.type.startsWith('image/')) {
+                alert('이미지 파일만 업로드 가능합니다.')
+                return
+            }
+            setFormData({ ...formData, photo_file: file })
+        }
+    }
+
+    const removePhoto = () => {
+        setFormData({ ...formData, photo_file: null, photo_url: '' })
+        if (photoInputRef.current) {
+            photoInputRef.current.value = ''
+        }
     }
 
     const handleCreate = async () => {
@@ -66,6 +94,15 @@ const RescuePage = () => {
         }
 
         try {
+            setUploading(true)
+            let photoUrl = ''
+
+            // 사진 업로드
+            if (formData.photo_file) {
+                const result = await uploadToDropbox(formData.photo_file, '/rescue')
+                photoUrl = result.url
+            }
+
             const { error } = await supabase
                 .from('rescue_situations')
                 .insert({
@@ -75,6 +112,7 @@ const RescuePage = () => {
                     status: formData.status,
                     details: formData.details,
                     is_completed: formData.is_completed,
+                    photo_url: photoUrl,
                     user_id: profile.user_id
                 })
 
@@ -87,6 +125,8 @@ const RescuePage = () => {
         } catch (error) {
             console.error('Error creating rescue situation:', error)
             alert('구조현황 저장에 실패했습니다: ' + error.message)
+        } finally {
+            setUploading(false)
         }
     }
 
@@ -97,6 +137,15 @@ const RescuePage = () => {
         }
 
         try {
+            setUploading(true)
+            let photoUrl = formData.photo_url
+
+            // 새 사진이 있으면 업로드
+            if (formData.photo_file) {
+                const result = await uploadToDropbox(formData.photo_file, '/rescue')
+                photoUrl = result.url
+            }
+
             const { error } = await supabase
                 .from('rescue_situations')
                 .update({
@@ -105,7 +154,8 @@ const RescuePage = () => {
                     request_date: formData.request_date,
                     status: formData.status,
                     details: formData.details,
-                    is_completed: formData.is_completed
+                    is_completed: formData.is_completed,
+                    photo_url: photoUrl
                 })
                 .eq('id', selectedRescue.id)
 
@@ -118,6 +168,8 @@ const RescuePage = () => {
         } catch (error) {
             console.error('Error updating rescue situation:', error)
             alert('구조현황 수정에 실패했습니다: ' + error.message)
+        } finally {
+            setUploading(false)
         }
     }
 
@@ -162,7 +214,9 @@ const RescuePage = () => {
             request_date: rescue.request_date || '',
             status: rescue.status || '',
             details: rescue.details || '',
-            is_completed: rescue.is_completed || false
+            is_completed: rescue.is_completed || false,
+            photo_url: rescue.photo_url || '',
+            photo_file: null
         })
         setSelectedRescue(rescue)
         setIsEditMode(true)
@@ -189,6 +243,144 @@ const RescuePage = () => {
         setCurrentPage(pageNumber)
     }
 
+    // 선택 토글 함수
+    const toggleSelect = (id) => {
+        setSelectedIds(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(id)) {
+                newSet.delete(id)
+            } else {
+                newSet.add(id)
+            }
+            return newSet
+        })
+    }
+
+    // 전체 선택/해제 (현재 페이지만)
+    const toggleSelectAll = () => {
+        const currentPageIds = currentItems.map(item => item.id)
+        const allSelected = currentPageIds.every(id => selectedIds.has(id))
+
+        setSelectedIds(prev => {
+            const newSet = new Set(prev)
+            if (allSelected) {
+                currentPageIds.forEach(id => newSet.delete(id))
+            } else {
+                currentPageIds.forEach(id => newSet.add(id))
+            }
+            return newSet
+        })
+    }
+
+    // Word 표로 다운로드
+    const handleDownloadWord = async () => {
+        if (selectedIds.size === 0) {
+            alert('다운로드할 항목을 선택해주세요.')
+            return
+        }
+
+        const selectedItems = rescueSituations.filter(item => selectedIds.has(item.id))
+
+        // 테이블 행 생성
+        const tableRows = [
+            // 헤더 행
+            new TableRow({
+                tableHeader: true,
+                children: [
+                    new TableCell({
+                        width: { size: 800, type: WidthType.DXA },
+                        shading: { fill: 'E8F0FE' },
+                        children: [new Paragraph({
+                            children: [new TextRun({ text: 'No', bold: true })],
+                            alignment: AlignmentType.CENTER
+                        })]
+                    }),
+                    new TableCell({
+                        width: { size: 2000, type: WidthType.DXA },
+                        shading: { fill: 'E8F0FE' },
+                        children: [new Paragraph({
+                            children: [new TextRun({ text: '체류지', bold: true })],
+                            alignment: AlignmentType.CENTER
+                        })]
+                    }),
+                    new TableCell({
+                        width: { size: 1500, type: WidthType.DXA },
+                        shading: { fill: 'E8F0FE' },
+                        children: [new Paragraph({
+                            children: [new TextRun({ text: '성명', bold: true })],
+                            alignment: AlignmentType.CENTER
+                        })]
+                    }),
+                    new TableCell({
+                        width: { size: 1500, type: WidthType.DXA },
+                        shading: { fill: 'E8F0FE' },
+                        children: [new Paragraph({
+                            children: [new TextRun({ text: '구조요청', bold: true })],
+                            alignment: AlignmentType.CENTER
+                        })]
+                    }),
+                    new TableCell({
+                        width: { size: 4200, type: WidthType.DXA },
+                        shading: { fill: 'E8F0FE' },
+                        children: [new Paragraph({
+                            children: [new TextRun({ text: '상세 구조진행상황', bold: true })],
+                            alignment: AlignmentType.CENTER
+                        })]
+                    }),
+                ]
+            }),
+            // 데이터 행들
+            ...selectedItems.map((item, index) =>
+                new TableRow({
+                    children: [
+                        new TableCell({
+                            children: [new Paragraph({
+                                text: String(index + 1),
+                                alignment: AlignmentType.CENTER
+                            })]
+                        }),
+                        new TableCell({
+                            children: [new Paragraph({ text: item.location || '-' })]
+                        }),
+                        new TableCell({
+                            children: [new Paragraph({ text: item.name || '-' })]
+                        }),
+                        new TableCell({
+                            children: [new Paragraph({ text: item.request_date || '-' })]
+                        }),
+                        new TableCell({
+                            children: [new Paragraph({ text: item.details || '-' })]
+                        }),
+                    ]
+                })
+            )
+        ]
+
+        const doc = new Document({
+            sections: [{
+                properties: {},
+                children: [
+                    new Paragraph({
+                        children: [new TextRun({ text: '구조현황', bold: true, size: 32 })],
+                        alignment: AlignmentType.CENTER,
+                    }),
+                    new Paragraph({ text: '' }),
+                    new Table({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        rows: tableRows,
+                    }),
+                ],
+            }],
+        })
+
+        const blob = await Packer.toBlob(doc)
+        const today = new Date().toISOString().split('T')[0]
+        saveAs(blob, `구조현황_${today}.docx`)
+
+        // 선택 초기화
+        setSelectedIds(new Set())
+    }
+
     return (
         <div className="space-y-6">
             {/* Header Card */}
@@ -209,10 +401,16 @@ const RescuePage = () => {
             {/* Header */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <h1 className="text-2xl font-bold text-toss-gray-900">구조현황</h1>
-                <Button onClick={openCreateModal}>
-                    <Plus size={18} />
-                    새 구조현황 등록
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button variant="secondary" onClick={handleDownloadWord} disabled={selectedIds.size === 0}>
+                        <Download size={18} />
+                        Word 다운로드 {selectedIds.size > 0 && `(${selectedIds.size})`}
+                    </Button>
+                    <Button onClick={openCreateModal}>
+                        <Plus size={18} />
+                        새 구조현황 등록
+                    </Button>
+                </div>
             </div>
 
             {/* Table */}
@@ -226,6 +424,14 @@ const RescuePage = () => {
                             <table className="w-full">
                                 <thead className="bg-toss-blue/10 border-b-2 border-toss-blue/20">
                                     <tr>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-900 w-12">
+                                            <input
+                                                type="checkbox"
+                                                checked={currentItems.length > 0 && currentItems.every(item => selectedIds.has(item.id))}
+                                                onChange={toggleSelectAll}
+                                                className="w-4 h-4 text-toss-blue border-gray-300 rounded focus:ring-toss-blue cursor-pointer"
+                                            />
+                                        </th>
                                         <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-900 w-16">No</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900">체류지</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900">성명</th>
@@ -239,9 +445,17 @@ const RescuePage = () => {
                                     {currentItems.map((rescue, index) => (
                                         <tr
                                             key={rescue.id}
-                                            className={`hover:bg-toss-gray-50 transition-colors cursor-pointer ${rescue.is_completed ? 'opacity-60' : ''}`}
+                                            className={`hover:bg-toss-gray-50 transition-colors cursor-pointer ${rescue.is_completed ? 'opacity-60' : ''} ${selectedIds.has(rescue.id) ? 'bg-blue-50' : ''}`}
                                             onClick={() => openDetailModal(rescue)}
                                         >
+                                            <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.has(rescue.id)}
+                                                    onChange={() => toggleSelect(rescue.id)}
+                                                    className="w-4 h-4 text-toss-blue border-gray-300 rounded focus:ring-toss-blue cursor-pointer"
+                                                />
+                                            </td>
                                             <td className="px-4 py-3 text-sm text-center text-toss-gray-600">
                                                 {indexOfFirstItem + index + 1}
                                             </td>
@@ -286,11 +500,18 @@ const RescuePage = () => {
                             {currentItems.map((rescue, index) => (
                                 <div
                                     key={rescue.id}
-                                    className={`p-4 ${rescue.is_completed ? 'opacity-60' : ''}`}
+                                    className={`p-4 ${rescue.is_completed ? 'opacity-60' : ''} ${selectedIds.has(rescue.id) ? 'bg-blue-50' : ''}`}
                                     onClick={() => openDetailModal(rescue)}
                                 >
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.has(rescue.id)}
+                                                onChange={() => toggleSelect(rescue.id)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="w-4 h-4 text-toss-blue border-gray-300 rounded focus:ring-toss-blue cursor-pointer"
+                                            />
                                             <span className="text-xs text-toss-gray-500">#{indexOfFirstItem + index + 1}</span>
                                             <span className="text-sm font-medium text-toss-gray-900">{rescue.name || '-'}</span>
                                             <span className={`text-xs px-2 py-0.5 rounded-full ${rescue.is_completed ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
@@ -302,7 +523,8 @@ const RescuePage = () => {
                                                 type="checkbox"
                                                 checked={rescue.is_completed || false}
                                                 onChange={() => toggleComplete(rescue)}
-                                                className="w-4 h-4 text-toss-blue border-gray-300 rounded focus:ring-toss-blue cursor-pointer"
+                                                className="w-4 h-4 text-green-500 border-gray-300 rounded focus:ring-green-500 cursor-pointer"
+                                                title="완료 체크"
                                             />
                                             <button
                                                 onClick={() => openEditModal(rescue)}
@@ -464,6 +686,44 @@ const RescuePage = () => {
                         </label>
                     </div>
 
+                    <div>
+                        <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                            사진 첨부 (1장)
+                        </label>
+                        <input
+                            type="file"
+                            ref={photoInputRef}
+                            accept="image/*"
+                            onChange={handlePhotoSelect}
+                            className="hidden"
+                        />
+                        {formData.photo_file || formData.photo_url ? (
+                            <div className="relative">
+                                <img
+                                    src={formData.photo_file ? URL.createObjectURL(formData.photo_file) : formData.photo_url}
+                                    alt="첨부 사진"
+                                    className="w-full max-h-48 object-contain rounded-xl bg-toss-gray-50"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={removePhoto}
+                                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => photoInputRef.current?.click()}
+                                className="w-full py-8 border-2 border-dashed border-toss-gray-300 rounded-xl text-toss-gray-500 hover:border-toss-blue hover:text-toss-blue transition-colors flex flex-col items-center justify-center gap-2"
+                            >
+                                <Camera size={24} />
+                                <span className="text-sm">클릭하여 사진 첨부</span>
+                            </button>
+                        )}
+                    </div>
+
                     <div className="flex gap-3 pt-4">
                         <Button
                             variant="secondary"
@@ -472,14 +732,16 @@ const RescuePage = () => {
                                 resetForm()
                             }}
                             className="flex-1"
+                            disabled={uploading}
                         >
                             취소
                         </Button>
                         <Button
                             onClick={isEditMode ? handleEdit : handleCreate}
                             className="flex-1"
+                            disabled={uploading}
                         >
-                            {isEditMode ? '수정하기' : '저장하기'}
+                            {uploading ? '업로드 중...' : (isEditMode ? '수정하기' : '저장하기')}
                         </Button>
                     </div>
                 </div>
@@ -496,25 +758,45 @@ const RescuePage = () => {
             >
                 {selectedRescue && (
                     <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-toss-gray-500 mb-1">체류지</label>
-                                <p className="text-toss-gray-900">{selectedRescue.location || '-'}</p>
+                        {/* 상단: 정보 + 사진 */}
+                        <div className="flex gap-4">
+                            {/* 왼쪽: 기본 정보 */}
+                            <div className="flex-1 space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-sm font-medium text-toss-gray-500 mb-1">체류지</label>
+                                        <p className="text-toss-gray-900">{selectedRescue.location || '-'}</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-toss-gray-500 mb-1">성명</label>
+                                        <p className="text-toss-gray-900 font-medium">{selectedRescue.name || '-'}</p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-sm font-medium text-toss-gray-500 mb-1">구조요청 일자</label>
+                                        <p className="text-toss-gray-900">{selectedRescue.request_date || '-'}</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-toss-gray-500 mb-1">완료 여부</label>
+                                        <p className={`font-medium ${selectedRescue.is_completed ? 'text-green-600' : 'text-orange-500'}`}>
+                                            {selectedRescue.is_completed ? '완료' : '진행중'}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-toss-gray-500 mb-1">성명</label>
-                                <p className="text-toss-gray-900 font-medium">{selectedRescue.name || '-'}</p>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-toss-gray-500 mb-1">구조요청 일자</label>
-                                <p className="text-toss-gray-900">{selectedRescue.request_date || '-'}</p>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-toss-gray-500 mb-1">완료 여부</label>
-                                <p className={`font-medium ${selectedRescue.is_completed ? 'text-green-600' : 'text-orange-500'}`}>
-                                    {selectedRescue.is_completed ? '완료' : '진행중'}
-                                </p>
-                            </div>
+
+                            {/* 오른쪽: 사진 */}
+                            {selectedRescue.photo_url && (
+                                <div className="w-32 h-32 flex-shrink-0">
+                                    <img
+                                        src={selectedRescue.photo_url}
+                                        alt="첨부 사진"
+                                        className="w-full h-full object-cover rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
+                                        onClick={() => window.open(selectedRescue.photo_url, '_blank')}
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         <div>
