@@ -1,44 +1,31 @@
 import { useAuth } from '../hooks/useAuth'
 import { Card } from '../components/common'
-import { Megaphone, ClipboardList, Users, AlertTriangle } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const Dashboard = () => {
     const { profile, isAdmin } = useAuth()
-    const [stats, setStats] = useState({
-        notices: 0,
-        worklogs: 0,
-        users: 0,
-        rescues: 0
-    })
+    const [rescueCount, setRescueCount] = useState(0)
     const [recentNotices, setRecentNotices] = useState([])
     const [activeRescues, setActiveRescues] = useState([])
 
     useEffect(() => {
-        fetchStats()
+        fetchRescueCount()
         fetchRecentNotices()
         fetchActiveRescues()
     }, [])
 
-    const fetchStats = async () => {
+    const fetchRescueCount = async () => {
         try {
-            const [noticesRes, worklogsRes, usersRes, rescuesRes] = await Promise.all([
-                supabase.from('notices').select('id', { count: 'exact' }),
-                supabase.from('work_logs').select('id', { count: 'exact' }).neq('type', 'rescue'),
-                supabase.from('users').select('id', { count: 'exact' }),
-                supabase.from('rescue_situations').select('id', { count: 'exact' }).eq('is_completed', false)
-            ])
-
-            setStats({
-                notices: noticesRes.count || 0,
-                worklogs: worklogsRes.count || 0,
-                users: usersRes.count || 0,
-                rescues: rescuesRes.count || 0
-            })
+            const { count } = await supabase
+                .from('rescue_situations')
+                .select('id', { count: 'exact' })
+                .eq('is_completed', false)
+            setRescueCount(count || 0)
         } catch (error) {
-            console.error('Error fetching stats:', error)
+            console.error('Error fetching rescue count:', error)
         }
     }
 
@@ -99,59 +86,16 @@ const Dashboard = () => {
                 </div>
             </Card>
 
-            {/* 3-Column Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left Column - Stats */}
-                <div className="space-y-4">
-                    <Link to="/notices" className="block">
-                        <Card>
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
-                                    <Megaphone size={24} className="text-white" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-toss-gray-600">공지사항</p>
-                                    <p className="text-2xl font-bold text-toss-gray-900">{stats.notices}</p>
-                                </div>
-                            </div>
-                        </Card>
-                    </Link>
-
-                    <Link to="/worklogs" className="block">
-                        <Card>
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
-                                    <ClipboardList size={24} className="text-white" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-toss-gray-600">업무일지</p>
-                                    <p className="text-2xl font-bold text-toss-gray-900">{stats.worklogs}</p>
-                                </div>
-                            </div>
-                        </Card>
-                    </Link>
-
-                    <Card>
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center">
-                                <Users size={24} className="text-white" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-toss-gray-600">사용자</p>
-                                <p className="text-2xl font-bold text-toss-gray-900">{stats.users}</p>
-                            </div>
-                        </div>
-                    </Card>
-                </div>
-
-                {/* Center Column - Active Rescue Situations */}
-                <Card className="lg:col-span-1">
+            {/* 2-Column Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Active Rescue Situations */}
+                <Card>
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
                             <AlertTriangle size={18} className="text-orange-500" />
                             <h3 className="text-base font-bold text-toss-gray-900">진행중인 구조현황</h3>
                             <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium">
-                                {stats.rescues}건
+                                {rescueCount}건
                             </span>
                         </div>
                         <Link to="/rescue" className="text-sm text-toss-blue hover:underline">
@@ -160,7 +104,7 @@ const Dashboard = () => {
                     </div>
 
                     {activeRescues.length > 0 ? (
-                        <div className="space-y-2 max-h-[280px] overflow-y-auto">
+                        <div className="space-y-2 max-h-[320px] overflow-y-auto">
                             {activeRescues.map((rescue) => (
                                 <Link
                                     key={rescue.id}
@@ -186,8 +130,8 @@ const Dashboard = () => {
                     )}
                 </Card>
 
-                {/* Right Column - Recent Notices */}
-                <Card className="lg:col-span-1">
+                {/* Recent Notices */}
+                <Card>
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-base font-bold text-toss-gray-900">최근 공지사항</h3>
                         <Link to="/notices" className="text-sm text-toss-blue hover:underline">
@@ -196,7 +140,7 @@ const Dashboard = () => {
                     </div>
 
                     {recentNotices.length > 0 ? (
-                        <div className="space-y-2 max-h-[280px] overflow-y-auto">
+                        <div className="space-y-2 max-h-[320px] overflow-y-auto">
                             {recentNotices.map((notice) => (
                                 <Link
                                     key={notice.id}
