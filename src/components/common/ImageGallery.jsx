@@ -1,29 +1,96 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { X, ChevronLeft, ChevronRight, ZoomIn } from 'lucide-react'
 
 /**
- * 이미지 갤러리 컴포넌트 - 클릭 시 확대 모달
+ * 이미지 갤러리 컴포넌트 - 클릭 시 확대 모달 + 드래그/스와이프 지원
  */
 const ImageGallery = ({ images = [], className = '' }) => {
     const [selectedIndex, setSelectedIndex] = useState(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
 
+    // 드래그/스와이프 관련 상태
+    const [isDragging, setIsDragging] = useState(false)
+    const [startX, setStartX] = useState(0)
+    const [translateX, setTranslateX] = useState(0)
+    const containerRef = useRef(null)
+
     const openImage = (index) => {
         setSelectedIndex(index)
         setIsModalOpen(true)
+        setTranslateX(0)
     }
 
     const closeModal = () => {
         setIsModalOpen(false)
         setSelectedIndex(null)
+        setTranslateX(0)
     }
 
     const goToPrevious = () => {
+        setTranslateX(0)
         setSelectedIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1))
     }
 
     const goToNext = () => {
+        setTranslateX(0)
         setSelectedIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0))
+    }
+
+    // 키보드 네비게이션
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (!isModalOpen) return
+            if (e.key === 'ArrowLeft') goToPrevious()
+            if (e.key === 'ArrowRight') goToNext()
+            if (e.key === 'Escape') closeModal()
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [isModalOpen])
+
+    // 마우스 드래그 시작
+    const handleMouseDown = (e) => {
+        if (images.length <= 1) return
+        setIsDragging(true)
+        setStartX(e.clientX)
+    }
+
+    // 터치 드래그 시작
+    const handleTouchStart = (e) => {
+        if (images.length <= 1) return
+        setIsDragging(true)
+        setStartX(e.touches[0].clientX)
+    }
+
+    // 마우스/터치 드래그 중
+    const handleMove = (clientX) => {
+        if (!isDragging) return
+        const diff = clientX - startX
+        setTranslateX(diff)
+    }
+
+    const handleMouseMove = (e) => {
+        handleMove(e.clientX)
+    }
+
+    const handleTouchMove = (e) => {
+        handleMove(e.touches[0].clientX)
+    }
+
+    // 드래그 종료
+    const handleDragEnd = () => {
+        if (!isDragging) return
+        setIsDragging(false)
+
+        const threshold = 100 // 스와이프 감지 임계값
+
+        if (translateX > threshold) {
+            goToPrevious()
+        } else if (translateX < -threshold) {
+            goToNext()
+        } else {
+            setTranslateX(0)
+        }
     }
 
     if (!images || images.length === 0) return null
@@ -54,8 +121,11 @@ const ImageGallery = ({ images = [], className = '' }) => {
             {/* 확대 모달 */}
             {isModalOpen && selectedIndex !== null && (
                 <div
-                    className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+                    className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center select-none"
                     onClick={closeModal}
+                    onMouseUp={handleDragEnd}
+                    onMouseLeave={handleDragEnd}
+                    onTouchEnd={handleDragEnd}
                 >
                     {/* 닫기 버튼 */}
                     <button
@@ -88,17 +158,41 @@ const ImageGallery = ({ images = [], className = '' }) => {
                         {selectedIndex + 1} / {images.length}
                     </div>
 
-                    {/* 확대된 이미지 */}
+                    {/* 확대된 이미지 (드래그/스와이프 지원) */}
                     <div
+                        ref={containerRef}
                         onClick={(e) => e.stopPropagation()}
-                        className="max-w-[90vw] max-h-[90vh] relative"
+                        onMouseDown={handleMouseDown}
+                        onMouseMove={handleMouseMove}
+                        onTouchStart={handleTouchStart}
+                        onTouchMove={handleTouchMove}
+                        className="max-w-[90vw] max-h-[90vh] relative cursor-grab active:cursor-grabbing"
+                        style={{
+                            transform: `translateX(${translateX}px)`,
+                            transition: isDragging ? 'none' : 'transform 0.3s ease-out',
+                        }}
                     >
                         <img
                             src={images[selectedIndex]}
                             alt={`Image ${selectedIndex + 1}`}
-                            className="max-w-full max-h-[90vh] object-contain rounded-lg"
+                            className="max-w-full max-h-[90vh] object-contain rounded-lg pointer-events-none"
+                            draggable={false}
                         />
                     </div>
+
+                    {/* 스와이프 힌트 (이미지 2개 이상일 때) */}
+                    {images.length > 1 && (
+                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
+                            {images.map((_, index) => (
+                                <div
+                                    key={index}
+                                    className={`w-2 h-2 rounded-full transition-colors ${
+                                        index === selectedIndex ? 'bg-white' : 'bg-white/30'
+                                    }`}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
         </>
