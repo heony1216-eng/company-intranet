@@ -35,12 +35,17 @@ const isImageFile = (item) => {
     return imageExtensions.some(ext => lowerUrl.includes(ext))
 }
 
-// 이미지 갤러리 컴포넌트 (드래그 스크롤 지원)
+// 이미지 갤러리 컴포넌트 (드래그 스크롤 + 스와이프 지원)
 const ImageGallery = ({ urls }) => {
     const scrollRef = useRef(null)
     const [canScrollLeft, setCanScrollLeft] = useState(false)
     const [canScrollRight, setCanScrollRight] = useState(false)
-    const [selectedImage, setSelectedImage] = useState(null)
+    const [selectedIndex, setSelectedIndex] = useState(null)
+
+    // 드래그/스와이프 관련 상태
+    const [isDragging, setIsDragging] = useState(false)
+    const [startX, setStartX] = useState(0)
+    const [translateX, setTranslateX] = useState(0)
 
     const imageUrls = urls.filter(isImageFile)
     const otherUrls = urls.filter(item => !isImageFile(item))
@@ -59,6 +64,18 @@ const ImageGallery = ({ urls }) => {
         return () => window.removeEventListener('resize', checkScroll)
     }, [urls])
 
+    // 키보드 네비게이션
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (selectedIndex === null) return
+            if (e.key === 'ArrowLeft') goToPrevious()
+            if (e.key === 'ArrowRight') goToNext()
+            if (e.key === 'Escape') closeModal()
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [selectedIndex, imageUrls.length])
+
     const scroll = (direction) => {
         if (scrollRef.current) {
             const scrollAmount = 200
@@ -67,6 +84,71 @@ const ImageGallery = ({ urls }) => {
                 behavior: 'smooth'
             })
             setTimeout(checkScroll, 300)
+        }
+    }
+
+    const openImage = (index) => {
+        setSelectedIndex(index)
+        setTranslateX(0)
+    }
+
+    const closeModal = () => {
+        setSelectedIndex(null)
+        setTranslateX(0)
+    }
+
+    const goToPrevious = () => {
+        setTranslateX(0)
+        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : imageUrls.length - 1))
+    }
+
+    const goToNext = () => {
+        setTranslateX(0)
+        setSelectedIndex((prev) => (prev < imageUrls.length - 1 ? prev + 1 : 0))
+    }
+
+    // 마우스 드래그 시작
+    const handleMouseDown = (e) => {
+        if (imageUrls.length <= 1) return
+        setIsDragging(true)
+        setStartX(e.clientX)
+    }
+
+    // 터치 드래그 시작
+    const handleTouchStart = (e) => {
+        if (imageUrls.length <= 1) return
+        setIsDragging(true)
+        setStartX(e.touches[0].clientX)
+    }
+
+    // 마우스/터치 드래그 중
+    const handleMove = (clientX) => {
+        if (!isDragging) return
+        const diff = clientX - startX
+        setTranslateX(diff)
+    }
+
+    const handleMouseMove = (e) => {
+        handleMove(e.clientX)
+    }
+
+    const handleTouchMove = (e) => {
+        handleMove(e.touches[0].clientX)
+    }
+
+    // 드래그 종료
+    const handleDragEnd = () => {
+        if (!isDragging) return
+        setIsDragging(false)
+
+        const threshold = 100 // 스와이프 감지 임계값
+
+        if (translateX > threshold) {
+            goToPrevious()
+        } else if (translateX < -threshold) {
+            goToNext()
+        } else {
+            setTranslateX(0)
         }
     }
 
@@ -104,7 +186,7 @@ const ImageGallery = ({ urls }) => {
                                     <div
                                         key={index}
                                         className="flex-shrink-0 cursor-pointer w-24 h-24 sm:w-32 sm:h-32 rounded-xl overflow-hidden bg-toss-gray-100"
-                                        onClick={() => setSelectedImage(url)}
+                                        onClick={() => openImage(index)}
                                     >
                                         <img
                                             src={url}
@@ -161,26 +243,86 @@ const ImageGallery = ({ urls }) => {
                 </div>
             )}
 
-            {/* 이미지 확대 모달 - Portal처럼 동작하도록 z-index 높임 */}
-            {selectedImage && (
+            {/* 이미지 확대 모달 - 드래그/스와이프 지원 */}
+            {selectedIndex !== null && (
                 <div
-                    className="fixed inset-0 bg-black/80 flex items-center justify-center p-4"
+                    className="fixed inset-0 bg-black/95 flex items-center justify-center select-none"
                     style={{ zIndex: 9999 }}
-                    onClick={() => setSelectedImage(null)}
+                    onClick={closeModal}
+                    onMouseUp={handleDragEnd}
+                    onMouseLeave={handleDragEnd}
+                    onTouchEnd={handleDragEnd}
                 >
+                    {/* 닫기 버튼 */}
                     <button
-                        className="absolute top-4 right-4 text-white hover:text-gray-300"
-                        style={{ zIndex: 10000 }}
-                        onClick={() => setSelectedImage(null)}
+                        className="absolute top-4 right-4 z-10 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                        onClick={closeModal}
                     >
-                        <X size={32} />
+                        <X size={24} />
                     </button>
-                    <img
-                        src={selectedImage}
-                        alt="확대 이미지"
-                        className="max-h-[85vh] max-w-[95vw] object-contain rounded-lg"
-                        onClick={(e) => e.stopPropagation()}
-                    />
+
+                    {/* 이미지 카운터 */}
+                    <div className="absolute top-4 left-4 z-10 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full text-white text-sm font-medium">
+                        {selectedIndex + 1} / {imageUrls.length}
+                    </div>
+
+                    {/* 이미지 + 화살표 컨테이너 */}
+                    <div className="flex items-center gap-2 sm:gap-4">
+                        {/* 이전 버튼 */}
+                        {imageUrls.length > 1 && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
+                                className="flex-shrink-0 p-2 sm:p-3 text-white/80 hover:text-white transition-colors"
+                            >
+                                <ChevronLeft size={36} strokeWidth={3} />
+                            </button>
+                        )}
+
+                        {/* 확대된 이미지 (드래그/스와이프 지원) */}
+                        <div
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={handleMouseDown}
+                            onMouseMove={handleMouseMove}
+                            onTouchStart={handleTouchStart}
+                            onTouchMove={handleTouchMove}
+                            className="max-w-[70vw] sm:max-w-[80vw] max-h-[90vh] relative cursor-grab active:cursor-grabbing"
+                            style={{
+                                transform: `translateX(${translateX}px)`,
+                                transition: isDragging ? 'none' : 'transform 0.3s ease-out',
+                            }}
+                        >
+                            <img
+                                src={getUrl(imageUrls[selectedIndex])}
+                                alt={`확대 이미지 ${selectedIndex + 1}`}
+                                className="max-w-full max-h-[90vh] object-contain rounded-lg pointer-events-none"
+                                draggable={false}
+                            />
+                        </div>
+
+                        {/* 다음 버튼 */}
+                        {imageUrls.length > 1 && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); goToNext(); }}
+                                className="flex-shrink-0 p-2 sm:p-3 text-white/80 hover:text-white transition-colors"
+                            >
+                                <ChevronRight size={36} strokeWidth={3} />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* 페이지 인디케이터 (이미지 2개 이상일 때) */}
+                    {imageUrls.length > 1 && (
+                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
+                            {imageUrls.map((_, index) => (
+                                <div
+                                    key={index}
+                                    className={`w-2 h-2 rounded-full transition-colors ${
+                                        index === selectedIndex ? 'bg-white' : 'bg-white/30'
+                                    }`}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
         </div>

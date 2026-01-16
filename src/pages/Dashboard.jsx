@@ -1,6 +1,6 @@
 import { useAuth } from '../hooks/useAuth'
-import { Card } from '../components/common'
-import { AlertTriangle } from 'lucide-react'
+import { Card, Modal } from '../components/common'
+import { AlertTriangle, MapPin, Phone, User, Calendar, FileText, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
@@ -10,6 +10,8 @@ const Dashboard = () => {
     const [rescueCount, setRescueCount] = useState(0)
     const [recentNotices, setRecentNotices] = useState([])
     const [activeRescues, setActiveRescues] = useState([])
+    const [selectedRescue, setSelectedRescue] = useState(null)
+    const [isRescueModalOpen, setIsRescueModalOpen] = useState(false)
 
     useEffect(() => {
         fetchRescueCount()
@@ -33,7 +35,7 @@ const Dashboard = () => {
         try {
             const { data } = await supabase
                 .from('rescue_situations')
-                .select('id, location, name, status, request_date')
+                .select('*')
                 .eq('is_completed', false)
                 .order('created_at', { ascending: false })
                 .limit(10)
@@ -42,6 +44,16 @@ const Dashboard = () => {
         } catch (error) {
             console.error('Error fetching rescues:', error)
         }
+    }
+
+    const handleRescueClick = (rescue) => {
+        setSelectedRescue(rescue)
+        setIsRescueModalOpen(true)
+    }
+
+    const closeRescueModal = () => {
+        setIsRescueModalOpen(false)
+        setSelectedRescue(null)
     }
 
     const fetchRecentNotices = async () => {
@@ -106,10 +118,10 @@ const Dashboard = () => {
                     {activeRescues.length > 0 ? (
                         <div className="space-y-2 max-h-[320px] overflow-y-auto">
                             {activeRescues.map((rescue) => (
-                                <Link
+                                <div
                                     key={rescue.id}
-                                    to="/rescue"
-                                    className="block p-3 rounded-lg hover:bg-toss-gray-50 transition-colors border border-toss-gray-100"
+                                    onClick={() => handleRescueClick(rescue)}
+                                    className="block p-3 rounded-lg hover:bg-toss-gray-50 transition-colors border border-toss-gray-100 cursor-pointer"
                                 >
                                     <div className="flex items-center justify-between gap-2 mb-1">
                                         <div className="flex items-center gap-2">
@@ -120,7 +132,7 @@ const Dashboard = () => {
                                         <p className="text-xs text-toss-gray-400">{rescue.request_date || '-'}</p>
                                     </div>
                                     <p className="text-sm text-toss-gray-700 line-clamp-2">{rescue.status || '-'}</p>
-                                </Link>
+                                </div>
                             ))}
                         </div>
                     ) : (
@@ -170,6 +182,92 @@ const Dashboard = () => {
                     )}
                 </Card>
             </div>
+
+            {/* Rescue Detail Modal (읽기 전용) */}
+            <Modal
+                isOpen={isRescueModalOpen}
+                onClose={closeRescueModal}
+                title="구조현황 상세"
+            >
+                {selectedRescue && (
+                    <div className="space-y-4">
+                        {/* 기본 정보 */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="flex items-center gap-2">
+                                <User size={16} className="text-toss-gray-400" />
+                                <div>
+                                    <p className="text-xs text-toss-gray-500">이름</p>
+                                    <p className="font-medium text-toss-gray-900">{selectedRescue.name || '-'}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <MapPin size={16} className="text-toss-gray-400" />
+                                <div>
+                                    <p className="text-xs text-toss-gray-500">위치</p>
+                                    <p className="font-medium text-toss-gray-900">{selectedRescue.location || '-'}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Phone size={16} className="text-toss-gray-400" />
+                                <div>
+                                    <p className="text-xs text-toss-gray-500">연락처</p>
+                                    <p className="font-medium text-toss-gray-900">{selectedRescue.contact || '-'}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Calendar size={16} className="text-toss-gray-400" />
+                                <div>
+                                    <p className="text-xs text-toss-gray-500">요청일</p>
+                                    <p className="font-medium text-toss-gray-900">{selectedRescue.request_date || '-'}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 동물 정보 */}
+                        {(selectedRescue.animal_type || selectedRescue.animal_count) && (
+                            <div className="p-3 bg-toss-gray-50 rounded-lg">
+                                <p className="text-xs text-toss-gray-500 mb-1">동물 정보</p>
+                                <p className="text-toss-gray-900">
+                                    {selectedRescue.animal_type || '-'}
+                                    {selectedRescue.animal_count && ` (${selectedRescue.animal_count}마리)`}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* 현재 상태 */}
+                        <div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <FileText size={16} className="text-toss-gray-400" />
+                                <p className="text-sm font-medium text-toss-gray-700">현재 상태</p>
+                            </div>
+                            <div className="p-3 bg-orange-50 rounded-lg">
+                                <p className="text-toss-gray-900 whitespace-pre-wrap">{selectedRescue.status || '상태 정보 없음'}</p>
+                            </div>
+                        </div>
+
+                        {/* 비고 */}
+                        {selectedRescue.notes && (
+                            <div>
+                                <p className="text-sm font-medium text-toss-gray-700 mb-2">비고</p>
+                                <div className="p-3 bg-toss-gray-50 rounded-lg">
+                                    <p className="text-toss-gray-900 whitespace-pre-wrap">{selectedRescue.notes}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 구조 페이지로 이동 */}
+                        <div className="pt-4 border-t border-toss-gray-100">
+                            <Link
+                                to="/rescue"
+                                onClick={closeRescueModal}
+                                className="block w-full text-center py-3 bg-toss-blue text-white rounded-lg hover:bg-blue-600 transition-colors"
+                            >
+                                구조현황 페이지로 이동
+                            </Link>
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </div>
     )
 }
