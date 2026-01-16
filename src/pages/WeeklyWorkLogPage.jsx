@@ -466,32 +466,14 @@ const WeeklyWorkLogPage = () => {
         })
     }
 
-    // 이미지를 img 태그로 로드 후 canvas를 통해 ArrayBuffer로 변환 (CORS 우회)
-    const loadImageAsArrayBuffer = (url) => {
-        return new Promise((resolve, reject) => {
-            const img = new Image()
-            img.crossOrigin = 'anonymous'
-            img.onload = () => {
-                try {
-                    const canvas = document.createElement('canvas')
-                    canvas.width = img.naturalWidth
-                    canvas.height = img.naturalHeight
-                    const ctx = canvas.getContext('2d')
-                    ctx.drawImage(img, 0, 0)
-                    canvas.toBlob((blob) => {
-                        if (blob) {
-                            blob.arrayBuffer().then(resolve).catch(reject)
-                        } else {
-                            reject(new Error('Canvas to blob failed'))
-                        }
-                    }, 'image/png')
-                } catch (e) {
-                    reject(e)
-                }
-            }
-            img.onerror = () => reject(new Error('이미지 로드 실패'))
-            img.src = url
-        })
+    // Supabase Edge Function 프록시를 통해 이미지를 ArrayBuffer로 가져오기
+    const loadImageAsArrayBuffer = async (url) => {
+        const proxyUrl = `https://khwzdwewgadvpglptvua.supabase.co/functions/v1/image-proxy?url=${encodeURIComponent(url)}`
+        const response = await fetch(proxyUrl)
+        if (!response.ok) {
+            throw new Error(`이미지 로드 실패: ${response.status}`)
+        }
+        return await response.arrayBuffer()
     }
 
     const handleSaveAsWord = async (worklog) => {
