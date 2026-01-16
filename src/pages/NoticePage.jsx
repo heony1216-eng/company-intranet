@@ -90,6 +90,11 @@ const NoticePage = () => {
     }
 
     const handleUpdate = async () => {
+        if (!editingNotice) {
+            alert('수정할 공지사항을 찾을 수 없습니다.')
+            return
+        }
+
         try {
             const { error } = await supabase
                 .from('notices')
@@ -99,14 +104,19 @@ const NoticePage = () => {
                     is_pinned: formData.is_pinned,
                     updated_at: new Date().toISOString()
                 })
-                .eq('id', selectedNotice.id)
+                .eq('id', editingNotice.id)
 
             if (error) throw error
             setIsModalOpen(false)
+            setEditingNotice(null)
             fetchNotices()
-            fetchNoticeDetail(selectedNotice.id)
+            if (selectedNotice && selectedNotice.id === editingNotice.id) {
+                fetchNoticeDetail(editingNotice.id)
+            }
+            alert('공지사항이 수정되었습니다.')
         } catch (error) {
             console.error('Error updating notice:', error)
+            alert('공지사항 수정에 실패했습니다.')
         }
     }
 
@@ -123,7 +133,10 @@ const NoticePage = () => {
         }
     }
 
+    const [editingNotice, setEditingNotice] = useState(null)
+
     const openEditModal = (notice) => {
+        setEditingNotice(notice)
         setFormData({
             title: notice.title,
             content: notice.content,
@@ -163,13 +176,21 @@ const NoticePage = () => {
                         {(isAdmin || isSubAdmin) && (
                             <div className="flex gap-2">
                                 <button
-                                    onClick={() => openEditModal(selectedNotice)}
+                                    onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        openEditModal(selectedNotice)
+                                    }}
                                     className="p-2 text-toss-gray-500 hover:bg-toss-gray-100 rounded-toss"
                                 >
                                     <Edit size={18} />
                                 </button>
                                 <button
-                                    onClick={() => handleDelete(selectedNotice.id)}
+                                    onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        handleDelete(selectedNotice.id)
+                                    }}
                                     className="p-2 text-red-500 hover:bg-red-50 rounded-toss"
                                 >
                                     <Trash2 size={18} />
@@ -195,6 +216,67 @@ const NoticePage = () => {
                         {selectedNotice.content}
                     </div>
                 </Card>
+
+                {/* Edit Modal for Detail View */}
+                <Modal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    title="공지 수정"
+                >
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                제목
+                            </label>
+                            <input
+                                type="text"
+                                value={formData.title}
+                                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                className="w-full px-4 py-3 bg-toss-gray-100 border-0 rounded-toss focus:ring-2 focus:ring-toss-blue"
+                                placeholder="공지 제목을 입력하세요"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                내용
+                            </label>
+                            <textarea
+                                value={formData.content}
+                                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                                rows={6}
+                                className="w-full px-4 py-3 bg-toss-gray-100 border-0 rounded-toss focus:ring-2 focus:ring-toss-blue resize-none"
+                                placeholder="공지 내용을 입력하세요"
+                            />
+                        </div>
+
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={formData.is_pinned}
+                                onChange={(e) => setFormData({ ...formData, is_pinned: e.target.checked })}
+                                className="w-5 h-5 rounded border-toss-gray-300 text-toss-blue focus:ring-toss-blue"
+                            />
+                            <span className="text-sm text-toss-gray-700">상단 고정</span>
+                        </label>
+
+                        <div className="flex gap-3 pt-4">
+                            <Button
+                                variant="secondary"
+                                onClick={() => setIsModalOpen(false)}
+                                className="flex-1"
+                            >
+                                취소
+                            </Button>
+                            <Button
+                                onClick={handleUpdate}
+                                className="flex-1"
+                            >
+                                수정하기
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
             </div>
         )
     }
