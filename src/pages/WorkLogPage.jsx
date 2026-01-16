@@ -4,7 +4,7 @@ import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, Che
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { uploadMultipleToDropbox, deleteMultipleFilesByUrl } from '../lib/dropbox'
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun } from 'docx'
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, Table, TableRow, TableCell, WidthType, BorderStyle } from 'docx'
 import { saveAs } from 'file-saver'
 
 // Dropbox URL을 직접 이미지 링크로 변환 (Safari 호환)
@@ -488,7 +488,7 @@ const WorkLogPage = () => {
     // Word 파일로 저장
     const handleSaveAsWord = async (worklog) => {
         // 이미지 파일들 가져오기
-        const imageElements = []
+        const processedImages = [] // {data, width, height} 배열
         const failedImages = []
 
         if (worklog.file_urls && worklog.file_urls.length > 0) {
@@ -502,41 +502,62 @@ const WorkLogPage = () => {
                     const url = getUrl(item)
                     const arrayBuffer = await loadImageAsArrayBuffer(url)
 
-                    // 원본 이미지 크기 계산을 위한 임시 이미지 로드
+                    // ArrayBuffer를 Blob으로 변환하여 이미지 로드
+                    const blob = new Blob([arrayBuffer])
+                    const blobUrl = URL.createObjectURL(blob)
                     const img = new Image()
-                    img.src = url
-                    await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+                    img.src = blobUrl
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve
+                        img.onerror = reject
+                    })
 
-                    // 이미지 크기 계산 (최대 500px 너비, 비율 유지)
-                    const maxWidth = 500
-                    const maxHeight = 400
-                    let width = img.naturalWidth || 400
-                    let height = img.naturalHeight || 300
+                    // 이미지 크기 계산 (2열 배치를 위해 최대 240px 너비)
+                    const maxWidth = 240
+                    const maxHeight = 320
 
-                    if (width > maxWidth) {
-                        height = (height * maxWidth) / width
-                        width = maxWidth
-                    }
-                    if (height > maxHeight) {
-                        width = (width * maxHeight) / height
-                        height = maxHeight
-                    }
+                    // 원본 크기에서 비율 계산
+                    let width = img.width
+                    let height = img.height
+                    const ratio = Math.min(maxWidth / width, maxHeight / height, 1)
+                    width = Math.round(width * ratio)
+                    height = Math.round(height * ratio)
 
-                    imageElements.push(
-                        new Paragraph({ text: '' }),
-                        new Paragraph({
-                            children: [
-                                new ImageRun({
-                                    data: arrayBuffer,
-                                    transformation: {
-                                        width: Math.round(width),
-                                        height: Math.round(height),
-                                    },
-                                    type: 'png',
-                                }),
-                            ],
+                    // Canvas를 사용하여 리사이즈 + EXIF 회전 적용 + 압축
+                    const canvas = document.createElement('canvas')
+                    const ctx = canvas.getContext('2d')
+
+                    // 리사이즈된 크기로 Canvas 설정
+                    canvas.width = width
+                    canvas.height = height
+                    ctx.drawImage(img, 0, 0, width, height)
+
+                    // JPEG로 변환하여 용량 압축 (품질 0.7 = 약 70%)
+                    let quality = 0.7
+                    let compressedBlob = await new Promise(resolve => {
+                        canvas.toBlob(resolve, 'image/jpeg', quality)
+                    })
+
+                    // 300KB 초과시 품질 낮춰서 재압축
+                    const targetSize = 300 * 1024
+                    while (compressedBlob.size > targetSize && quality > 0.3) {
+                        quality -= 0.1
+                        compressedBlob = await new Promise(resolve => {
+                            canvas.toBlob(resolve, 'image/jpeg', quality)
                         })
-                    )
+                    }
+
+                    const compressedArrayBuffer = await compressedBlob.arrayBuffer()
+                    console.log(`이미지 압축: ${width}x${height}, 품질: ${(quality * 100).toFixed(0)}%, 크기: ${(compressedBlob.size / 1024).toFixed(0)}KB`)
+
+                    // Blob URL 해제
+                    URL.revokeObjectURL(blobUrl)
+
+                    processedImages.push({
+                        data: compressedArrayBuffer,
+                        width,
+                        height
+                    })
                 } catch (error) {
                     console.error('이미지 로드 실패:', error)
                     const fileName = typeof item === 'string' ? item.split('/').pop() : (item.name || '이미지')
@@ -544,6 +565,93 @@ const WorkLogPage = () => {
                 }
             }
         }
+
+        // 이미지를 2열 테이블로 배치
+        const imageTableRows = []
+        for (let i = 0; i < processedImages.length; i += 2) {
+            const cells = []
+
+            // 첫 번째 이미지
+            cells.push(
+                new TableCell({
+                    children: [
+                        new Paragraph({
+                            children: [
+                                new ImageRun({
+                                    data: processedImages[i].data,
+                                    transformation: {
+                                        width: processedImages[i].width,
+                                        height: processedImages[i].height,
+                                    },
+                                    type: 'jpg',
+                                }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                        }),
+                    ],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                    borders: {
+                        top: { style: BorderStyle.NONE },
+                        bottom: { style: BorderStyle.NONE },
+                        left: { style: BorderStyle.NONE },
+                        right: { style: BorderStyle.NONE },
+                    },
+                })
+            )
+
+            // 두 번째 이미지 (있으면)
+            if (i + 1 < processedImages.length) {
+                cells.push(
+                    new TableCell({
+                        children: [
+                            new Paragraph({
+                                children: [
+                                    new ImageRun({
+                                        data: processedImages[i + 1].data,
+                                        transformation: {
+                                            width: processedImages[i + 1].width,
+                                            height: processedImages[i + 1].height,
+                                        },
+                                        type: 'jpg',
+                                    }),
+                                ],
+                                alignment: AlignmentType.CENTER,
+                            }),
+                        ],
+                        width: { size: 50, type: WidthType.PERCENTAGE },
+                        borders: {
+                            top: { style: BorderStyle.NONE },
+                            bottom: { style: BorderStyle.NONE },
+                            left: { style: BorderStyle.NONE },
+                            right: { style: BorderStyle.NONE },
+                        },
+                    })
+                )
+            } else {
+                // 빈 셀
+                cells.push(
+                    new TableCell({
+                        children: [new Paragraph({ text: '' })],
+                        width: { size: 50, type: WidthType.PERCENTAGE },
+                        borders: {
+                            top: { style: BorderStyle.NONE },
+                            bottom: { style: BorderStyle.NONE },
+                            left: { style: BorderStyle.NONE },
+                            right: { style: BorderStyle.NONE },
+                        },
+                    })
+                )
+            }
+
+            imageTableRows.push(new TableRow({ children: cells }))
+        }
+
+        const imageTable = processedImages.length > 0 ? [
+            new Table({
+                rows: imageTableRows,
+                width: { size: 100, type: WidthType.PERCENTAGE },
+            })
+        ] : []
 
         // 실패한 이미지는 링크로 표시
         const failedImageLinks = failedImages.length > 0 ? [
@@ -618,14 +726,14 @@ const WorkLogPage = () => {
                             text: worklog.special_notes,
                         }),
                     ] : []),
-                    // 이미지 첨부
-                    ...(imageElements.length > 0 || failedImages.length > 0 ? [
+                    // 이미지 첨부 (2열 테이블 배치)
+                    ...(processedImages.length > 0 || failedImages.length > 0 ? [
                         new Paragraph({ text: '' }),
                         new Paragraph({
                             text: '첨부 사진',
                             heading: HeadingLevel.HEADING_2,
                         }),
-                        ...imageElements,
+                        ...imageTable,
                         ...failedImageLinks,
                     ] : []),
                 ],
