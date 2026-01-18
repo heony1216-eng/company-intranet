@@ -11,7 +11,6 @@ import MonthlyWorkLogPage from './pages/MonthlyWorkLogPage'
 import RescuePage from './pages/RescuePage'
 import MeetingPage from './pages/MeetingPage'
 import MyPage from './pages/MyPage'
-import LeavePage from './pages/LeavePage'
 import DocumentPage from './pages/DocumentPage'
 import AdminPage from './pages/AdminPage'
 
@@ -91,7 +90,6 @@ function AppRoutes() {
         <Route path="/worklogs/monthly" element={<MonthlyWorkLogPage />} />
         <Route path="/rescue" element={<RescuePage />} />
         <Route path="/meetings" element={<MeetingPage />} />
-        <Route path="/leave" element={<LeavePage />} />
         <Route path="/document" element={<DocumentPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/mypage" element={<MyPage />} />
