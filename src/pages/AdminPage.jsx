@@ -6,7 +6,7 @@ import { Card, Button } from '../components/common'
 import {
     Calendar, ArrowLeft, CheckCircle, XCircle, AlertCircle, Users, Clock, Search,
     Trash2, History, Edit3, Save, X, FileText, Tag, Plus, Paperclip, ExternalLink,
-    Settings
+    Settings, Download, ChevronLeft, ChevronRight, Image
 } from 'lucide-react'
 import { Link, Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -88,6 +88,11 @@ const AdminPage = () => {
     const [editingUserId, setEditingUserId] = useState(null)
     const [editTotalDays, setEditTotalDays] = useState('')
     const [savingUserId, setSavingUserId] = useState(null)
+
+    // 이미지 갤러리 상태
+    const [galleryOpen, setGalleryOpen] = useState(false)
+    const [galleryImages, setGalleryImages] = useState([])
+    const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
     // 관리자/부관리자가 아니면 리다이렉트
     if (!isAdmin && !isSubAdmin) {
@@ -384,6 +389,46 @@ const AdminPage = () => {
 
     const totalPending = pendingDocuments.length + pendingLeaveRequests.length
 
+    // 첨부파일 관련 유틸리티
+    const isImageFile = (filename) => {
+        const ext = filename.split('.').pop().toLowerCase()
+        return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)
+    }
+
+    const openGallery = (attachments, startIndex = 0) => {
+        const images = attachments.filter(file => isImageFile(file.name))
+        if (images.length > 0) {
+            setGalleryImages(images)
+            setCurrentImageIndex(startIndex)
+            setGalleryOpen(true)
+        }
+    }
+
+    const handleDownloadFile = async (file) => {
+        try {
+            const response = await fetch(file.url)
+            const blob = await response.blob()
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = file.name
+            document.body.appendChild(a)
+            a.click()
+            window.URL.revokeObjectURL(url)
+            document.body.removeChild(a)
+        } catch (error) {
+            console.error('Download failed:', error)
+            window.open(file.url, '_blank')
+        }
+    }
+
+    const handleDownloadAll = async (attachments) => {
+        for (const file of attachments) {
+            await handleDownloadFile(file)
+            await new Promise(resolve => setTimeout(resolve, 500))
+        }
+    }
+
     return (
         <div className="max-w-7xl mx-auto space-y-6">
             {/* Back Button */}
@@ -560,6 +605,64 @@ const AdminPage = () => {
                                                         <p className="text-sm text-toss-blue mb-3">
                                                             추가근무: {doc.extra_work_hours}시간 (대체휴무 {(doc.extra_work_hours / 8).toFixed(1)}일)
                                                         </p>
+                                                    )}
+
+                                                    {/* 휴가 정보 */}
+                                                    {doc.attendance_type === 'leave' && doc.leave_type && (
+                                                        <div className="p-2 bg-emerald-50 rounded-lg mb-3">
+                                                            <p className="text-sm text-emerald-700 font-medium">
+                                                                {LEAVE_TYPES[doc.leave_type]?.label || doc.leave_type} 신청
+                                                                <span className="ml-2">
+                                                                    {doc.leave_start_date === doc.leave_end_date
+                                                                        ? formatDate(doc.leave_start_date)
+                                                                        : `${formatDate(doc.leave_start_date)} ~ ${formatDate(doc.leave_end_date)}`
+                                                                    }
+                                                                    {doc.leave_days && ` (${doc.leave_days}일)`}
+                                                                </span>
+                                                            </p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* 첨부파일 표시 */}
+                                                    {doc.attachments && doc.attachments.length > 0 && (
+                                                        <div className="mb-3">
+                                                            <p className="text-xs text-toss-gray-500 mb-2 flex items-center gap-1">
+                                                                <Paperclip size={12} />
+                                                                첨부파일 ({doc.attachments.length}개)
+                                                            </p>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {doc.attachments.map((file, idx) => {
+                                                                    const isImage = isImageFile(file.name)
+                                                                    const imageIndex = doc.attachments.filter(f => isImageFile(f.name)).findIndex(f => f.name === file.name)
+                                                                    return (
+                                                                        <div key={idx} className="relative group">
+                                                                            {isImage ? (
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation()
+                                                                                        openGallery(doc.attachments, imageIndex)
+                                                                                    }}
+                                                                                    className="w-16 h-16 rounded-lg overflow-hidden border border-toss-gray-200 hover:border-toss-blue transition-colors"
+                                                                                >
+                                                                                    <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
+                                                                                </button>
+                                                                            ) : (
+                                                                                <a
+                                                                                    href={file.url}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                    onClick={(e) => e.stopPropagation()}
+                                                                                    className="flex items-center gap-1 px-2 py-1 bg-toss-gray-100 rounded-lg text-xs text-toss-gray-700 hover:bg-toss-gray-200 transition-colors"
+                                                                                >
+                                                                                    <FileText size={12} />
+                                                                                    <span className="max-w-[100px] truncate">{file.name}</span>
+                                                                                </a>
+                                                                            )}
+                                                                        </div>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                        </div>
                                                     )}
 
                                                     <div className="flex items-center gap-1 text-xs text-toss-gray-400">
@@ -1202,6 +1305,82 @@ const AdminPage = () => {
                                         <p className="text-sm text-toss-blue font-medium">추가근무: {selectedDoc.extra_work_hours}시간 (대체휴무 {(selectedDoc.extra_work_hours / 8).toFixed(1)}일)</p>
                                     </div>
                                 )}
+
+                                {/* 휴가 정보 */}
+                                {selectedDoc.attendance_type === 'leave' && selectedDoc.leave_type && (
+                                    <div className="p-3 bg-emerald-50 rounded-lg">
+                                        <p className="text-sm text-emerald-700 font-medium mb-1">
+                                            {LEAVE_TYPES[selectedDoc.leave_type]?.label || selectedDoc.leave_type} 신청
+                                        </p>
+                                        <p className="text-sm text-emerald-600">
+                                            {selectedDoc.leave_start_date === selectedDoc.leave_end_date
+                                                ? new Date(selectedDoc.leave_start_date).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })
+                                                : `${new Date(selectedDoc.leave_start_date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })} ~ ${new Date(selectedDoc.leave_end_date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}`
+                                            }
+                                            {selectedDoc.leave_days && ` (${selectedDoc.leave_days}일)`}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* 첨부파일 */}
+                                {selectedDoc.attachments && selectedDoc.attachments.length > 0 && (
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <p className="text-sm text-toss-gray-500 flex items-center gap-1">
+                                                <Paperclip size={14} />
+                                                첨부파일 ({selectedDoc.attachments.length}개)
+                                            </p>
+                                            <button
+                                                onClick={() => handleDownloadAll(selectedDoc.attachments)}
+                                                className="flex items-center gap-1 text-xs text-toss-blue hover:underline"
+                                            >
+                                                <Download size={12} />
+                                                모두 다운로드
+                                            </button>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {/* 이미지 파일 그리드 */}
+                                            {selectedDoc.attachments.filter(f => isImageFile(f.name)).length > 0 && (
+                                                <div className="grid grid-cols-4 gap-2 mb-2">
+                                                    {selectedDoc.attachments.filter(f => isImageFile(f.name)).map((file, idx) => (
+                                                        <button
+                                                            key={idx}
+                                                            onClick={() => openGallery(selectedDoc.attachments, idx)}
+                                                            className="aspect-square rounded-lg overflow-hidden border border-toss-gray-200 hover:border-toss-blue transition-colors relative group"
+                                                        >
+                                                            <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
+                                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                                                <Image size={20} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {/* 기타 파일 목록 */}
+                                            {selectedDoc.attachments.filter(f => !isImageFile(f.name)).map((file, idx) => (
+                                                <div key={idx} className="flex items-center justify-between p-2 bg-toss-gray-50 rounded-lg">
+                                                    <a
+                                                        href={file.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="flex items-center gap-2 text-sm text-toss-gray-700 hover:text-toss-blue transition-colors flex-1 min-w-0"
+                                                    >
+                                                        <FileText size={16} className="flex-shrink-0" />
+                                                        <span className="truncate">{file.name}</span>
+                                                        <ExternalLink size={12} className="flex-shrink-0" />
+                                                    </a>
+                                                    <button
+                                                        onClick={() => handleDownloadFile(file)}
+                                                        className="p-1.5 text-toss-gray-500 hover:text-toss-blue hover:bg-toss-gray-100 rounded-lg transition-colors"
+                                                    >
+                                                        <Download size={14} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {selectedDoc.status === 'rejected' && selectedDoc.rejected_reason && (
                                     <div className="p-3 bg-red-50 rounded-lg">
                                         <p className="text-sm text-red-600 font-medium mb-1">반려 사유</p>
@@ -1275,6 +1454,80 @@ const AdminPage = () => {
                                 <Button onClick={() => setSelectedRequest(null)} variant="secondary" className="flex-1">닫기</Button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 이미지 갤러리 모달 */}
+            {galleryOpen && galleryImages.length > 0 && (
+                <div
+                    className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center"
+                    onClick={() => setGalleryOpen(false)}
+                >
+                    {/* 닫기 버튼 */}
+                    <button
+                        onClick={() => setGalleryOpen(false)}
+                        className="absolute top-4 right-4 p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors z-10"
+                    >
+                        <X size={28} />
+                    </button>
+
+                    {/* 다운로드 버튼 */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            handleDownloadFile(galleryImages[currentImageIndex])
+                        }}
+                        className="absolute top-4 right-16 p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors z-10"
+                    >
+                        <Download size={24} />
+                    </button>
+
+                    {/* 이전 버튼 */}
+                    {galleryImages.length > 1 && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                setCurrentImageIndex(prev => prev === 0 ? galleryImages.length - 1 : prev - 1)
+                            }}
+                            className="absolute left-4 p-3 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                        >
+                            <ChevronLeft size={32} />
+                        </button>
+                    )}
+
+                    {/* 이미지 */}
+                    <div className="max-w-[90vw] max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
+                        <img
+                            src={galleryImages[currentImageIndex].url}
+                            alt={galleryImages[currentImageIndex].name}
+                            className="max-w-full max-h-[85vh] object-contain"
+                        />
+                    </div>
+
+                    {/* 다음 버튼 */}
+                    {galleryImages.length > 1 && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                setCurrentImageIndex(prev => prev === galleryImages.length - 1 ? 0 : prev + 1)
+                            }}
+                            className="absolute right-4 p-3 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                        >
+                            <ChevronRight size={32} />
+                        </button>
+                    )}
+
+                    {/* 이미지 카운터 */}
+                    {galleryImages.length > 1 && (
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/50 rounded-full text-white text-sm">
+                            {currentImageIndex + 1} / {galleryImages.length}
+                        </div>
+                    )}
+
+                    {/* 파일명 */}
+                    <div className="absolute bottom-4 left-4 px-3 py-1.5 bg-black/50 rounded-lg text-white/80 text-sm">
+                        {galleryImages[currentImageIndex].name}
                     </div>
                 </div>
             )}
