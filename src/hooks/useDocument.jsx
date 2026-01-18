@@ -5,8 +5,10 @@ import { useAuth } from './useAuth'
 export const useDocument = () => {
     const { user, isAdmin, isSubAdmin } = useAuth()
     const [documents, setDocuments] = useState([])
+    const [allDocuments, setAllDocuments] = useState([])
     const [pendingDocuments, setPendingDocuments] = useState([])
     const [labels, setLabels] = useState([])
+    const [users, setUsers] = useState([])
     const [loading, setLoading] = useState(true)
 
     const canManage = isAdmin || isSubAdmin
@@ -20,6 +22,18 @@ export const useDocument = () => {
 
         if (data) {
             setLabels(data)
+        }
+    }, [])
+
+    // 사용자 목록 조회
+    const fetchUsers = useCallback(async () => {
+        const { data } = await supabase
+            .from('users')
+            .select('user_id, name, rank, team')
+            .order('name')
+
+        if (data) {
+            setUsers(data)
         }
     }, [])
 
@@ -38,6 +52,16 @@ export const useDocument = () => {
 
         if (myDocs) {
             setDocuments(myDocs)
+        }
+
+        // 전체 기안서 조회 (is_private이 true면 관리자만 볼 수 있음)
+        const { data: all } = await supabase
+            .from('documents')
+            .select('*, document_labels(*)')
+            .order('created_at', { ascending: false })
+
+        if (all) {
+            setAllDocuments(all)
         }
 
         // 관리자인 경우 대기중인 기안서도 조회 (pending + chairman_approved)
@@ -59,7 +83,8 @@ export const useDocument = () => {
     useEffect(() => {
         fetchLabels()
         fetchDocuments()
-    }, [fetchLabels, fetchDocuments])
+        fetchUsers()
+    }, [fetchLabels, fetchDocuments, fetchUsers])
 
     // 기안서 작성
     const createDocument = async (documentData) => {
@@ -97,7 +122,9 @@ export const useDocument = () => {
                 leave_type: documentData.leave_type || null,
                 leave_start_date: documentData.leave_start_date || null,
                 leave_end_date: documentData.leave_end_date || null,
-                leave_days: documentData.leave_days || null
+                leave_days: documentData.leave_days || null,
+                // 비공개 설정
+                is_private: documentData.is_private || false
             })
             .select()
             .single()
@@ -132,6 +159,7 @@ export const useDocument = () => {
                 leave_start_date: documentData.leave_start_date || null,
                 leave_end_date: documentData.leave_end_date || null,
                 leave_days: documentData.leave_days || null,
+                is_private: documentData.is_private || false,
                 updated_at: new Date().toISOString()
             })
             .eq('id', documentId)
@@ -409,8 +437,10 @@ export const useDocument = () => {
 
     return {
         documents,
+        allDocuments,
         pendingDocuments,
         labels,
+        users,
         loading,
         canManage,
         createDocument,
