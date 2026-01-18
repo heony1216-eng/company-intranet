@@ -1,19 +1,28 @@
 import { Dropbox } from 'dropbox'
 
-// Dropbox OAuth 설정
+// Dropbox 설정
+const DROPBOX_ACCESS_TOKEN = import.meta.env.VITE_DROPBOX_ACCESS_TOKEN
 const DROPBOX_APP_KEY = import.meta.env.VITE_DROPBOX_APP_KEY
 const DROPBOX_APP_SECRET = import.meta.env.VITE_DROPBOX_APP_SECRET
 const DROPBOX_REFRESH_TOKEN = import.meta.env.VITE_DROPBOX_REFRESH_TOKEN
 
 // Access Token 캐시 (메모리에 저장)
-let cachedAccessToken = null
+let cachedAccessToken = DROPBOX_ACCESS_TOKEN || null
 let tokenExpiresAt = null
 
 /**
- * Refresh Token을 사용하여 새 Access Token을 가져옴
+ * Access Token을 가져옴 (Refresh Token이 있으면 자동 갱신, 없으면 직접 토큰 사용)
  * @returns {Promise<string>} - Access Token
  */
 const getAccessToken = async () => {
+    // Refresh Token 방식이 설정되어 있지 않으면 직접 Access Token 사용
+    if (!DROPBOX_REFRESH_TOKEN || !DROPBOX_APP_KEY || !DROPBOX_APP_SECRET) {
+        if (!DROPBOX_ACCESS_TOKEN) {
+            throw new Error('Dropbox Access Token이 설정되지 않았습니다.')
+        }
+        return DROPBOX_ACCESS_TOKEN
+    }
+
     // 캐시된 토큰이 있고 아직 유효한 경우 (만료 10분 전까지)
     if (cachedAccessToken && tokenExpiresAt && Date.now() < tokenExpiresAt - 600000) {
         return cachedAccessToken
@@ -48,7 +57,7 @@ const getAccessToken = async () => {
 }
 
 /**
- * Dropbox 클라이언트 생성 (토큰 자동 갱신)
+ * Dropbox 클라이언트 생성
  * @returns {Promise<Dropbox>}
  */
 const getDropboxClient = async () => {
