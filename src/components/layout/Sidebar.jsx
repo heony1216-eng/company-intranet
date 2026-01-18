@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar, ExternalLink, ChevronDown, CalendarDays, Settings } from 'lucide-react'
+import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar, ExternalLink, ChevronDown, Settings } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -33,7 +33,6 @@ const Sidebar = () => {
         { to: '/rescue', icon: AlertTriangle, label: '구조현황' },
         { to: '/meetings', icon: Calendar, label: '회의록' },
         { to: '/document', icon: FileText, label: '기안서' },
-        { to: '/leave', icon: CalendarDays, label: '연차' },
         ...(canManageLeave ? [{ to: '/admin', icon: Settings, label: '관리' }] : []),
         { to: '/mypage', icon: User, label: '마이페이지' },
     ]
