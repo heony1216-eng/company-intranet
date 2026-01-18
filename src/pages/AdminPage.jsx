@@ -387,7 +387,12 @@ const AdminPage = () => {
 
     const colorOptions = ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#06B6D4', '#6B7280']
 
-    const totalPending = pendingDocuments.length + pendingLeaveRequests.length
+    // 근태 라벨(code=4) 기안서 필터링 (연차 관리에서 승인)
+    const pendingAttendanceDocs = pendingDocuments.filter(doc => doc.document_labels?.code === 4)
+    // 기안서 관리에서 표시할 목록 (근태 제외)
+    const pendingNonAttendanceDocs = pendingDocuments.filter(doc => doc.document_labels?.code !== 4)
+
+    const totalPending = pendingNonAttendanceDocs.length + pendingLeaveRequests.length + pendingAttendanceDocs.length
 
     // 첨부파일 관련 유틸리티
     const isImageFile = (filename) => {
@@ -470,11 +475,11 @@ const AdminPage = () => {
                 >
                     <FileText size={20} className="inline mr-2" />
                     기안서 관리
-                    {pendingDocuments.length > 0 && (
+                    {pendingNonAttendanceDocs.length > 0 && (
                         <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
                             activeSection === 'document' ? 'bg-white/20' : 'bg-red-500 text-white'
                         }`}>
-                            {pendingDocuments.length}
+                            {pendingNonAttendanceDocs.length}
                         </span>
                     )}
                 </button>
@@ -488,11 +493,11 @@ const AdminPage = () => {
                 >
                     <Calendar size={20} className="inline mr-2" />
                     연차 관리
-                    {pendingLeaveRequests.length > 0 && (
+                    {(pendingLeaveRequests.length + pendingAttendanceDocs.length) > 0 && (
                         <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
                             activeSection === 'leave' ? 'bg-white/20' : 'bg-red-500 text-white'
                         }`}>
-                            {pendingLeaveRequests.length}
+                            {pendingLeaveRequests.length + pendingAttendanceDocs.length}
                         </span>
                     )}
                 </button>
@@ -510,8 +515,8 @@ const AdminPage = () => {
                             }`}
                         >
                             승인 대기
-                            {pendingDocuments.length > 0 && (
-                                <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">{pendingDocuments.length}</span>
+                            {pendingNonAttendanceDocs.length > 0 && (
+                                <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">{pendingNonAttendanceDocs.length}</span>
                             )}
                         </button>
                         <button
@@ -544,14 +549,14 @@ const AdminPage = () => {
                                 <div className="py-12 flex items-center justify-center">
                                     <div className="animate-spin rounded-full h-8 w-8 border-2 border-indigo-500 border-t-transparent"></div>
                                 </div>
-                            ) : pendingDocuments.length === 0 ? (
+                            ) : pendingNonAttendanceDocs.length === 0 ? (
                                 <div className="py-12 text-center text-toss-gray-500">
                                     <CheckCircle className="mx-auto mb-3 text-emerald-400" size={48} />
                                     <p>대기중인 기안서가 없습니다</p>
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    {pendingDocuments.map((doc) => {
+                                    {pendingNonAttendanceDocs.map((doc) => {
                                         const userInfo = getUserInfo(doc.drafter_id)
                                         const isRejecting = docRejectingId === doc.id
                                         const isProcessing = docProcessingId === doc.id
@@ -586,9 +591,9 @@ const AdminPage = () => {
                                                             </div>
                                                             <p className="font-bold text-toss-gray-900">{doc.title}</p>
                                                         </div>
-                                                        <div className="text-right text-sm text-toss-gray-500">
-                                                            <p>{userInfo.name} {userInfo.rank}</p>
-                                                            <p>{userInfo.team}</p>
+                                                        <div className="text-right">
+                                                            <p className="text-base font-semibold text-toss-gray-900">{userInfo.name} <span className="font-normal text-toss-gray-600">{userInfo.rank}</span></p>
+                                                            <p className="text-sm text-toss-gray-500">{userInfo.team}</p>
                                                         </div>
                                                     </div>
 
@@ -939,8 +944,8 @@ const AdminPage = () => {
                             }`}
                         >
                             승인 대기
-                            {pendingLeaveRequests.length > 0 && (
-                                <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">{pendingLeaveRequests.length}</span>
+                            {(pendingLeaveRequests.length + pendingAttendanceDocs.length) > 0 && (
+                                <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">{pendingLeaveRequests.length + pendingAttendanceDocs.length}</span>
                             )}
                         </button>
                         <button
@@ -963,24 +968,161 @@ const AdminPage = () => {
 
                     {/* 연차 승인 대기 */}
                     {leaveActiveTab === 'pending' && (
-                        <Card>
-                            <h2 className="text-lg font-bold text-toss-gray-900 mb-4 flex items-center gap-2">
-                                <AlertCircle className="text-amber-500" size={20} />
-                                승인 대기중인 연차 신청
-                            </h2>
+                        <div className="space-y-6">
+                            {/* 근태 기안서 섹션 */}
+                            {pendingAttendanceDocs.length > 0 && (
+                                <Card>
+                                    <h2 className="text-lg font-bold text-toss-gray-900 mb-4 flex items-center gap-2">
+                                        <FileText className="text-purple-500" size={20} />
+                                        승인 대기중인 근태 기안서
+                                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">{pendingAttendanceDocs.length}</span>
+                                    </h2>
+                                    <div className="space-y-4">
+                                        {pendingAttendanceDocs.map((doc) => {
+                                            const userInfo = getUserInfo(doc.drafter_id)
+                                            const isRejecting = docRejectingId === doc.id
+                                            const isProcessing = docProcessingId === doc.id
+                                            const totalAmount = getDocumentTotalAmount(doc)
+                                            const needsDirectorApproval = totalAmount >= 1000000
+                                            const isChairmanApproved = doc.status === 'chairman_approved'
 
-                            {leaveLoading ? (
-                                <div className="py-12 flex items-center justify-center">
-                                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-purple-500 border-t-transparent"></div>
-                                </div>
-                            ) : pendingLeaveRequests.length === 0 ? (
-                                <div className="py-12 text-center text-toss-gray-500">
-                                    <CheckCircle className="mx-auto mb-3 text-emerald-400" size={48} />
-                                    <p>대기중인 연차 신청이 없습니다</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {pendingLeaveRequests.map((request) => {
+                                            return (
+                                                <div key={doc.id} className="p-5 bg-toss-gray-50 rounded-xl">
+                                                    <div
+                                                        onClick={() => setSelectedDoc({ ...doc, userInfo })}
+                                                        className="cursor-pointer hover:bg-toss-gray-100 -mx-5 -mt-5 px-5 pt-5 pb-3 rounded-t-xl transition-colors"
+                                                    >
+                                                        <div className="flex items-start justify-between mb-3">
+                                                            <div>
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    {doc.document_labels && (
+                                                                        <span
+                                                                            className="px-2.5 py-1 rounded-full text-xs font-medium"
+                                                                            style={{ backgroundColor: doc.document_labels.color + '20', color: doc.document_labels.color }}
+                                                                        >
+                                                                            {doc.document_labels.name}
+                                                                        </span>
+                                                                    )}
+                                                                    {doc.attendance_type && (
+                                                                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                                                                            doc.attendance_type === 'overtime' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                                                                        }`}>
+                                                                            {doc.attendance_type === 'overtime' ? '추가근무' : '휴가'}
+                                                                        </span>
+                                                                    )}
+                                                                    {isChairmanApproved && (
+                                                                        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                                                            회장승인완료
+                                                                        </span>
+                                                                    )}
+                                                                    <span className="text-sm text-toss-gray-500">{doc.doc_number}</span>
+                                                                </div>
+                                                                <p className="font-bold text-toss-gray-900">{doc.title}</p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="text-base font-semibold text-toss-gray-900">{userInfo.name} <span className="font-normal text-toss-gray-600">{userInfo.rank}</span></p>
+                                                                <p className="text-sm text-toss-gray-500">{userInfo.team}</p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* 휴가 정보 표시 */}
+                                                        {doc.leave_type && (
+                                                            <div className="mb-3 p-3 bg-green-50 rounded-lg">
+                                                                <p className="text-sm text-green-800">
+                                                                    <span className="font-medium">휴가 유형:</span> {LEAVE_TYPES[doc.leave_type]?.label || doc.leave_type}
+                                                                </p>
+                                                                {doc.leave_start_date && (
+                                                                    <p className="text-sm text-green-800">
+                                                                        <span className="font-medium">기간:</span> {formatDate(doc.leave_start_date)}
+                                                                        {doc.leave_end_date && doc.leave_start_date !== doc.leave_end_date && <> ~ {formatDate(doc.leave_end_date)}</>}
+                                                                    </p>
+                                                                )}
+                                                                {doc.leave_days && (
+                                                                    <p className="text-sm text-green-800">
+                                                                        <span className="font-medium">일수:</span> {doc.leave_days}일
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        {doc.content && <p className="text-sm text-toss-gray-600 mb-3 line-clamp-2">{doc.content}</p>}
+
+                                                        <div className="flex items-center gap-1 text-xs text-toss-gray-400">
+                                                            <Clock size={12} />
+                                                            {new Date(doc.created_at).toLocaleString('ko-KR')} 작성
+                                                        </div>
+                                                    </div>
+
+                                                    {isRejecting ? (
+                                                        <div className="space-y-3 mt-4">
+                                                            <textarea
+                                                                value={docRejectReason}
+                                                                onChange={(e) => setDocRejectReason(e.target.value)}
+                                                                placeholder="반려 사유를 입력하세요"
+                                                                rows={2}
+                                                                className="w-full px-3 py-2 bg-white border border-toss-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                                                autoFocus
+                                                            />
+                                                            <div className="flex gap-2">
+                                                                <Button onClick={() => handleDocReject(doc.id)} className="flex-1 bg-red-500 hover:bg-red-600" loading={isProcessing} disabled={isProcessing}>
+                                                                    반려 확인
+                                                                </Button>
+                                                                <Button onClick={() => { setDocRejectingId(null); setDocRejectReason('') }} variant="secondary" className="flex-1" disabled={isProcessing}>
+                                                                    취소
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex gap-2 mt-4">
+                                                            {needsDirectorApproval && !isChairmanApproved && isChairman && (
+                                                                <Button onClick={() => handleDocApprove(doc.id, 'chairman')} className="flex-1 bg-blue-500 hover:bg-blue-600" loading={isProcessing} disabled={isProcessing}>
+                                                                    <CheckCircle size={16} className="mr-1" />회장 승인
+                                                                </Button>
+                                                            )}
+                                                            {needsDirectorApproval && isChairmanApproved && isDirector && (
+                                                                <Button onClick={() => handleDocApprove(doc.id, 'director')} className="flex-1 bg-emerald-500 hover:bg-emerald-600" loading={isProcessing} disabled={isProcessing}>
+                                                                    <CheckCircle size={16} className="mr-1" />이사장 결재
+                                                                </Button>
+                                                            )}
+                                                            {!needsDirectorApproval && (
+                                                                <Button onClick={() => handleDocApprove(doc.id, 'chairman')} className="flex-1 bg-emerald-500 hover:bg-emerald-600" loading={isProcessing} disabled={isProcessing}>
+                                                                    <CheckCircle size={16} className="mr-1" />승인
+                                                                </Button>
+                                                            )}
+                                                            <Button onClick={() => setDocRejectingId(doc.id)} variant="secondary" className="flex-1 text-red-500 border-red-200 hover:bg-red-50" disabled={isProcessing}>
+                                                                <XCircle size={16} className="mr-1" />반려
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </Card>
+                            )}
+
+                            {/* 연차 신청 섹션 */}
+                            <Card>
+                                <h2 className="text-lg font-bold text-toss-gray-900 mb-4 flex items-center gap-2">
+                                    <AlertCircle className="text-amber-500" size={20} />
+                                    승인 대기중인 연차 신청
+                                    {pendingLeaveRequests.length > 0 && (
+                                        <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">{pendingLeaveRequests.length}</span>
+                                    )}
+                                </h2>
+
+                                {leaveLoading ? (
+                                    <div className="py-12 flex items-center justify-center">
+                                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-purple-500 border-t-transparent"></div>
+                                    </div>
+                                ) : pendingLeaveRequests.length === 0 ? (
+                                    <div className="py-12 text-center text-toss-gray-500">
+                                        <CheckCircle className="mx-auto mb-3 text-emerald-400" size={48} />
+                                        <p>대기중인 연차 신청이 없습니다</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {pendingLeaveRequests.map((request) => {
                                         const userInfo = getUserInfo(request.user_id)
                                         const isRejecting = leaveRejectingId === request.id
                                         const isProcessing = leaveProcessingId === request.id
@@ -989,9 +1131,9 @@ const AdminPage = () => {
                                             <div key={request.id} className="p-5 bg-toss-gray-50 rounded-xl">
                                                 <div className="flex items-start justify-between mb-3">
                                                     <div>
-                                                        <p className="font-bold text-toss-gray-900">
+                                                        <p className="text-lg font-bold text-toss-gray-900">
                                                             {userInfo.name}
-                                                            {userInfo.rank && <span className="text-sm font-normal text-toss-gray-500 ml-1">{userInfo.rank}</span>}
+                                                            {userInfo.rank && <span className="text-base font-normal text-toss-gray-600 ml-1">{userInfo.rank}</span>}
                                                         </p>
                                                         {userInfo.team && <p className="text-sm text-toss-gray-500">{userInfo.team}</p>}
                                                     </div>
@@ -1048,7 +1190,8 @@ const AdminPage = () => {
                                     })}
                                 </div>
                             )}
-                        </Card>
+                            </Card>
+                        </div>
                     )}
 
                     {/* 처리 내역 */}
