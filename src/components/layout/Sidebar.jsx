@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar, ExternalLink, ChevronDown, Settings } from 'lucide-react'
+import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar, CalendarDays, ExternalLink, ChevronDown, Settings } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -20,6 +20,7 @@ const Sidebar = () => {
     const navItems = [
         { to: '/', icon: Home, label: '대시보드' },
         { to: '/notices', icon: Megaphone, label: '공지사항' },
+        { to: '/events', icon: CalendarDays, label: '일정' },
         {
             icon: ClipboardList,
             label: '업무일지',

@@ -10,6 +10,7 @@ import WeeklyWorkLogPage from './pages/WeeklyWorkLogPage'
 import MonthlyWorkLogPage from './pages/MonthlyWorkLogPage'
 import RescuePage from './pages/RescuePage'
 import MeetingPage from './pages/MeetingPage'
+import EventPage from './pages/EventPage'
 import MyPage from './pages/MyPage'
 import DocumentPage from './pages/DocumentPage'
 import AdminPage from './pages/AdminPage'
@@ -84,6 +85,7 @@ function AppRoutes() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/notices" element={<NoticePage />} />
         <Route path="/notices/:id" element={<NoticePage />} />
+        <Route path="/events" element={<EventPage />} />
         <Route path="/worklogs" element={<Navigate to="/worklogs/daily" replace />} />
         <Route path="/worklogs/daily" element={<WorkLogPage />} />
         <Route path="/worklogs/weekly" element={<WeeklyWorkLogPage />} />
