@@ -91,7 +91,13 @@ export const useDocument = () => {
                 execution_date: documentData.execution_date || null,
                 payment_method: documentData.payment_method || null,
                 expense_items: documentData.expense_items || null,
-                attachments: documentData.attachments || null
+                attachments: documentData.attachments || null,
+                // 휴가 신청 관련 필드
+                attendance_type: documentData.attendance_type || null,
+                leave_type: documentData.leave_type || null,
+                leave_start_date: documentData.leave_start_date || null,
+                leave_end_date: documentData.leave_end_date || null,
+                leave_days: documentData.leave_days || null
             })
             .select()
             .single()
@@ -120,6 +126,12 @@ export const useDocument = () => {
                 payment_method: documentData.payment_method || null,
                 expense_items: documentData.expense_items || null,
                 attachments: documentData.attachments || null,
+                // 휴가 신청 관련 필드
+                attendance_type: documentData.attendance_type || null,
+                leave_type: documentData.leave_type || null,
+                leave_start_date: documentData.leave_start_date || null,
+                leave_end_date: documentData.leave_end_date || null,
+                leave_days: documentData.leave_days || null,
                 updated_at: new Date().toISOString()
             })
             .eq('id', documentId)
@@ -184,7 +196,7 @@ export const useDocument = () => {
 
         if (error) return { error }
 
-        // 근태관련 라벨(code=4)이고 추가근무 시간이 있으면 대체휴무 생성
+        // 근태관련 라벨(code=4) 처리
         if (doc.label_id) {
             const { data: label } = await supabase
                 .from('document_labels')
@@ -192,36 +204,80 @@ export const useDocument = () => {
                 .eq('id', doc.label_id)
                 .single()
 
-            if (label?.code === 4 && doc.extra_work_hours > 0) {
-                // 기존 대체휴무 조회
-                const { data: existingComp } = await supabase
-                    .from('comp_leaves')
-                    .select('*')
-                    .eq('user_id', doc.drafter_id)
-                    .eq('year', new Date().getFullYear())
-                    .single()
+            if (label?.code === 4) {
+                const currentYear = new Date().getFullYear()
 
-                if (existingComp) {
-                    // 기존 대체휴무에 시간 추가
-                    await supabase
+                // 추가근무 신청인 경우 - 대체휴무 적립
+                if (doc.attendance_type === 'overtime' && doc.extra_work_hours > 0) {
+                    const { data: existingComp } = await supabase
                         .from('comp_leaves')
-                        .update({
-                            total_hours: existingComp.total_hours + doc.extra_work_hours,
-                            updated_at: new Date().toISOString()
-                        })
-                        .eq('id', existingComp.id)
-                } else {
-                    // 새 대체휴무 생성
-                    await supabase
-                        .from('comp_leaves')
-                        .insert({
-                            user_id: doc.drafter_id,
-                            document_id: documentId,
-                            total_hours: doc.extra_work_hours,
-                            used_hours: 0,
-                            year: new Date().getFullYear(),
-                            description: doc.title
-                        })
+                        .select('*')
+                        .eq('user_id', doc.drafter_id)
+                        .eq('year', currentYear)
+                        .single()
+
+                    if (existingComp) {
+                        await supabase
+                            .from('comp_leaves')
+                            .update({
+                                total_hours: existingComp.total_hours + doc.extra_work_hours,
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', existingComp.id)
+                    } else {
+                        await supabase
+                            .from('comp_leaves')
+                            .insert({
+                                user_id: doc.drafter_id,
+                                document_id: documentId,
+                                total_hours: doc.extra_work_hours,
+                                used_hours: 0,
+                                year: currentYear,
+                                description: doc.title
+                            })
+                    }
+                }
+
+                // 휴가 신청인 경우 - 연차/대체휴무 차감
+                if (doc.attendance_type === 'leave' && doc.leave_type && doc.leave_days > 0) {
+                    if (doc.leave_type === 'comp') {
+                        // 대체휴무 차감
+                        const hoursToUse = doc.leave_days * 8
+                        const { data: compLeave } = await supabase
+                            .from('comp_leaves')
+                            .select('*')
+                            .eq('user_id', doc.drafter_id)
+                            .eq('year', currentYear)
+                            .single()
+
+                        if (compLeave) {
+                            await supabase
+                                .from('comp_leaves')
+                                .update({
+                                    used_hours: compLeave.used_hours + hoursToUse,
+                                    updated_at: new Date().toISOString()
+                                })
+                                .eq('id', compLeave.id)
+                        }
+                    } else {
+                        // 연차 차감 (full, half_am, half_pm, out_2h, out_3h)
+                        const { data: annualLeave } = await supabase
+                            .from('annual_leaves')
+                            .select('*')
+                            .eq('user_id', doc.drafter_id)
+                            .eq('year', currentYear)
+                            .single()
+
+                        if (annualLeave) {
+                            await supabase
+                                .from('annual_leaves')
+                                .update({
+                                    used_days: annualLeave.used_days + doc.leave_days,
+                                    updated_at: new Date().toISOString()
+                                })
+                                .eq('id', annualLeave.id)
+                        }
+                    }
                 }
             }
         }

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useDocument } from '../hooks/useDocument'
 import { useAuth } from '../hooks/useAuth'
+import { useAnnualLeave } from '../hooks/useAnnualLeave'
 import { Card, Button } from '../components/common'
-import { FileText, ArrowLeft, Plus, Clock, CheckCircle, XCircle, AlertCircle, Upload, X, Paperclip, ExternalLink, Edit3, Trash2 } from 'lucide-react'
+import { FileText, ArrowLeft, Plus, Clock, CheckCircle, XCircle, AlertCircle, Upload, X, Paperclip, ExternalLink, Edit3, Trash2, Calendar } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { uploadMultipleToDropbox } from '../lib/dropbox'
@@ -17,6 +18,7 @@ const DocumentPage = () => {
         updateDocument,
         deleteDocument
     } = useDocument()
+    const { annualLeave, compLeave } = useAnnualLeave()
 
     const [showForm, setShowForm] = useState(false)
     const [submitting, setSubmitting] = useState(false)
@@ -30,7 +32,12 @@ const DocumentPage = () => {
         content: '',
         extra_work_hours: 0,
         execution_date: '',
-        payment_method: ''
+        payment_method: '',
+        // 근태관련 추가 필드
+        attendance_type: '', // 'overtime' | 'leave'
+        leave_type: '',
+        leave_start_date: '',
+        leave_end_date: ''
     })
     const [expenseItems, setExpenseItems] = useState([
         { item: '', category: '', vendor: '', amount: '', note: '' }
@@ -41,6 +48,25 @@ const DocumentPage = () => {
     const isAttendanceLabel = selectedLabel?.code === 4
     // 지출결의서/사무용품 등 산출내역이 필요한 라벨 (code 1, 2, 3)
     const isExpenseLabel = selectedLabel && [1, 2, 3].includes(selectedLabel.code)
+
+    // 휴가 유형 목록
+    const hasCompLeave = compLeave && (compLeave.total_hours - compLeave.used_hours) >= 8
+    const compLeaveDays = compLeave ? Math.floor((compLeave.total_hours - compLeave.used_hours) / 8) : 0
+    const remainingAnnualDays = annualLeave ? annualLeave.total_days - annualLeave.used_days : 0
+
+    const leaveTypes = [
+        { value: 'full', label: '연차', description: '1일 차감', days: 1 },
+        { value: 'half_am', label: '오전 반차', description: '0.5일 차감', days: 0.5 },
+        { value: 'half_pm', label: '오후 반차', description: '0.5일 차감', days: 0.5 },
+        { value: 'out_2h', label: '외출/조퇴 2시간', description: '0.25일 차감', days: 0.25 },
+        { value: 'out_3h', label: '외출/조퇴 3시간', description: '0.375일 차감', days: 0.375 },
+        { value: 'comp', label: '대체휴무', description: hasCompLeave ? `${compLeaveDays}일 사용가능` : '사용 불가', days: 1, disabled: !hasCompLeave }
+    ]
+
+    const getLeaveTypeLabel = (type) => {
+        const found = leaveTypes.find(t => t.value === type)
+        return found ? found.label : type
+    }
 
     // 산출내역 항목 추가
     const addExpenseItem = () => {
@@ -93,17 +119,54 @@ const DocumentPage = () => {
             return
         }
 
+        // 근태관련 유효성 검사
+        if (isAttendanceLabel) {
+            if (!formData.attendance_type) {
+                alert('신청 유형을 선택해주세요.')
+                return
+            }
+            if (formData.attendance_type === 'leave') {
+                if (!formData.leave_type) {
+                    alert('휴가 유형을 선택해주세요.')
+                    return
+                }
+                if (!formData.leave_start_date) {
+                    alert('시작일을 선택해주세요.')
+                    return
+                }
+            }
+        }
+
         setSubmitting(true)
+
+        // 휴가 신청 시 일수 계산
+        let leaveDays = 0
+        if (isAttendanceLabel && formData.attendance_type === 'leave') {
+            const leaveType = leaveTypes.find(t => t.value === formData.leave_type)
+            if (formData.leave_type === 'full' || formData.leave_type === 'comp') {
+                const start = new Date(formData.leave_start_date)
+                const end = new Date(formData.leave_end_date || formData.leave_start_date)
+                leaveDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
+            } else {
+                leaveDays = leaveType?.days || 0.5
+            }
+        }
 
         const documentData = {
             label_id: parseInt(formData.label_id),
             title: formData.title.trim(),
             content: formData.content.trim(),
-            extra_work_hours: isAttendanceLabel ? parseFloat(formData.extra_work_hours) || 0 : 0,
+            extra_work_hours: isAttendanceLabel && formData.attendance_type === 'overtime' ? parseFloat(formData.extra_work_hours) || 0 : 0,
             attachments: attachments.length > 0 ? attachments : null,
             execution_date: isExpenseLabel ? formData.execution_date : null,
             payment_method: isExpenseLabel ? formData.payment_method : null,
-            expense_items: isExpenseLabel ? expenseItems.filter(item => item.item || item.amount) : null
+            expense_items: isExpenseLabel ? expenseItems.filter(item => item.item || item.amount) : null,
+            // 휴가 신청 정보
+            attendance_type: isAttendanceLabel ? formData.attendance_type : null,
+            leave_type: isAttendanceLabel && formData.attendance_type === 'leave' ? formData.leave_type : null,
+            leave_start_date: isAttendanceLabel && formData.attendance_type === 'leave' ? formData.leave_start_date : null,
+            leave_end_date: isAttendanceLabel && formData.attendance_type === 'leave' ? (formData.leave_end_date || formData.leave_start_date) : null,
+            leave_days: isAttendanceLabel && formData.attendance_type === 'leave' ? leaveDays : null
         }
 
         let error
@@ -134,7 +197,11 @@ const DocumentPage = () => {
             content: doc.content || '',
             extra_work_hours: doc.extra_work_hours || 0,
             execution_date: doc.execution_date || '',
-            payment_method: doc.payment_method || ''
+            payment_method: doc.payment_method || '',
+            attendance_type: doc.attendance_type || '',
+            leave_type: doc.leave_type || '',
+            leave_start_date: doc.leave_start_date || '',
+            leave_end_date: doc.leave_end_date || ''
         })
         setAttachments(doc.attachments || [])
         setExpenseItems(doc.expense_items?.length > 0 ? doc.expense_items : [{ item: '', category: '', vendor: '', amount: '', note: '' }])
@@ -151,7 +218,11 @@ const DocumentPage = () => {
             content: '',
             extra_work_hours: 0,
             execution_date: '',
-            payment_method: ''
+            payment_method: '',
+            attendance_type: '',
+            leave_type: '',
+            leave_start_date: '',
+            leave_end_date: ''
         })
         setAttachments([])
         setExpenseItems([{ item: '', category: '', vendor: '', amount: '', note: '' }])
@@ -277,25 +348,138 @@ const DocumentPage = () => {
                             />
                         </div>
 
-                        {/* 근태관련일 때 추가근무시간 입력 */}
+                        {/* 근태관련일 때 추가근무/휴가 선택 */}
                         {isAttendanceLabel && (
-                            <div>
-                                <label className="block text-sm font-medium text-toss-gray-700 mb-2">
-                                    추가근무시간 (시간)
-                                </label>
-                                <input
-                                    type="number"
-                                    value={formData.extra_work_hours}
-                                    onChange={(e) => setFormData({ ...formData, extra_work_hours: e.target.value })}
-                                    placeholder="0"
-                                    step="0.5"
-                                    min="0"
-                                    className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent"
-                                />
-                                <p className="mt-1 text-xs text-toss-gray-500">
-                                    * 8시간 = 대체휴무 1일
-                                </p>
-                            </div>
+                            <>
+                                {/* 근태 유형 선택 */}
+                                <div>
+                                    <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                        신청 유형 <span className="text-red-500">*</span>
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, attendance_type: 'overtime', leave_type: '', leave_start_date: '', leave_end_date: '' })}
+                                            className={`p-4 rounded-xl border-2 transition-all text-left ${
+                                                formData.attendance_type === 'overtime'
+                                                    ? 'border-toss-blue bg-blue-50'
+                                                    : 'border-toss-gray-200 hover:border-toss-gray-300'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <Clock size={18} className={formData.attendance_type === 'overtime' ? 'text-toss-blue' : 'text-toss-gray-500'} />
+                                                <span className={`font-medium ${formData.attendance_type === 'overtime' ? 'text-toss-blue' : 'text-toss-gray-700'}`}>추가근무 신청</span>
+                                            </div>
+                                            <p className="text-xs text-toss-gray-500">야근, 주말근무 등</p>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, attendance_type: 'leave', extra_work_hours: 0 })}
+                                            className={`p-4 rounded-xl border-2 transition-all text-left ${
+                                                formData.attendance_type === 'leave'
+                                                    ? 'border-toss-blue bg-blue-50'
+                                                    : 'border-toss-gray-200 hover:border-toss-gray-300'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <Calendar size={18} className={formData.attendance_type === 'leave' ? 'text-toss-blue' : 'text-toss-gray-500'} />
+                                                <span className={`font-medium ${formData.attendance_type === 'leave' ? 'text-toss-blue' : 'text-toss-gray-700'}`}>휴가 신청</span>
+                                            </div>
+                                            <p className="text-xs text-toss-gray-500">연차, 반차, 대체휴무</p>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* 추가근무 신청 */}
+                                {formData.attendance_type === 'overtime' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                            추가근무시간 (시간)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={formData.extra_work_hours}
+                                            onChange={(e) => setFormData({ ...formData, extra_work_hours: e.target.value })}
+                                            placeholder="0"
+                                            step="0.5"
+                                            min="0"
+                                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent"
+                                        />
+                                        <p className="mt-1 text-xs text-toss-gray-500">
+                                            * 8시간 = 대체휴무 1일
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* 휴가 신청 */}
+                                {formData.attendance_type === 'leave' && (
+                                    <>
+                                        {/* 잔여 현황 */}
+                                        <div className="p-3 bg-toss-gray-50 rounded-xl">
+                                            <div className="flex gap-4 text-sm">
+                                                <span className="text-toss-gray-600">잔여 연차: <strong className="text-toss-blue">{remainingAnnualDays}일</strong></span>
+                                                <span className="text-toss-gray-600">남은 대체휴무: <strong className="text-amber-600">{compLeaveDays}일</strong></span>
+                                            </div>
+                                        </div>
+
+                                        {/* 휴가 유형 선택 */}
+                                        <div>
+                                            <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                                휴가 유형 <span className="text-red-500">*</span>
+                                            </label>
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                {leaveTypes.map((type) => (
+                                                    <button
+                                                        key={type.value}
+                                                        type="button"
+                                                        disabled={type.disabled}
+                                                        onClick={() => setFormData({ ...formData, leave_type: type.value })}
+                                                        className={`p-3 rounded-xl border transition-all text-left ${
+                                                            type.disabled
+                                                                ? 'border-toss-gray-100 bg-toss-gray-50 text-toss-gray-400 cursor-not-allowed'
+                                                                : formData.leave_type === type.value
+                                                                    ? 'border-toss-blue bg-blue-50'
+                                                                    : 'border-toss-gray-200 hover:border-toss-gray-300'
+                                                        }`}
+                                                    >
+                                                        <p className={`font-medium text-sm ${
+                                                            type.disabled ? 'text-toss-gray-400' : formData.leave_type === type.value ? 'text-toss-blue' : 'text-toss-gray-700'
+                                                        }`}>{type.label}</p>
+                                                        <p className="text-xs text-toss-gray-500">{type.description}</p>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* 휴가 날짜 선택 */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                                    시작일 <span className="text-red-500">*</span>
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    value={formData.leave_start_date}
+                                                    onChange={(e) => setFormData({ ...formData, leave_start_date: e.target.value, leave_end_date: formData.leave_end_date || e.target.value })}
+                                                    className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                                    종료일
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    value={formData.leave_end_date}
+                                                    min={formData.leave_start_date}
+                                                    onChange={(e) => setFormData({ ...formData, leave_end_date: e.target.value })}
+                                                    className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent"
+                                                />
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </>
                         )}
 
                         {/* 지출 관련 필드 */}
@@ -663,6 +847,22 @@ const DocumentPage = () => {
                                     <div className="p-3 bg-blue-50 rounded-lg">
                                         <p className="text-sm text-toss-blue font-medium">
                                             추가근무: {selectedDoc.extra_work_hours}시간 (대체휴무 {(selectedDoc.extra_work_hours / 8).toFixed(1)}일)
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* 휴가 정보 */}
+                                {selectedDoc.attendance_type === 'leave' && selectedDoc.leave_type && (
+                                    <div className="p-3 bg-emerald-50 rounded-lg">
+                                        <p className="text-sm text-emerald-700 font-medium mb-1">
+                                            {getLeaveTypeLabel(selectedDoc.leave_type)} 신청
+                                        </p>
+                                        <p className="text-sm text-emerald-600">
+                                            {selectedDoc.leave_start_date === selectedDoc.leave_end_date
+                                                ? new Date(selectedDoc.leave_start_date).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })
+                                                : `${new Date(selectedDoc.leave_start_date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })} ~ ${new Date(selectedDoc.leave_end_date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}`
+                                            }
+                                            {selectedDoc.leave_days && ` (${selectedDoc.leave_days}일)`}
                                         </p>
                                     </div>
                                 )}
