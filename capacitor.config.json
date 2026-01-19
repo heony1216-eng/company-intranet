@@ -1,0 +1,24 @@
+{
+  "appId": "com.haningujodan.intranet",
+  "appName": "한인구조단 인트라넷",
+  "webDir": "dist",
+  "server": {
+    "url": "https://heony1216-eng.github.io/company-intranet",
+    "cleartext": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#1A73E8",
+      "showSpinner": true,
+      "spinnerColor": "#FFFFFF"
+    },
+    "LiveUpdate": {
+      "enabled": true,
+      "autoDeleteBundles": true
+    }
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

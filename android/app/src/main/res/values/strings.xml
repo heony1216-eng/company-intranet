@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">company-intranet</string>
+    <string name="title_activity_main">company-intranet</string>
+    <string name="package_name">com.haningujodan.intranet</string>
+    <string name="custom_url_scheme">com.haningujodan.intranet</string>
+</resources>
