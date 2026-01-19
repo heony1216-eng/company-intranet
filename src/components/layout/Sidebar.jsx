@@ -10,7 +10,7 @@ const Sidebar = () => {
     const [worklogOpen, setWorklogOpen] = useState(false)
     const location = useLocation()
 
-    // 업무일지 관련 페이지에 있으면 서브메뉴 열기
+    // 업무보고 관련 페이지에 있으면 서브메뉴 열기
     useEffect(() => {
         if (location.pathname.startsWith('/worklogs')) {
             setWorklogOpen(true)
@@ -23,12 +23,12 @@ const Sidebar = () => {
         { to: '/events', icon: CalendarDays, label: '일정' },
         {
             icon: ClipboardList,
-            label: '업무일지',
+            label: '업무보고',
             isSubmenu: true,
             subItems: [
-                { to: '/worklogs/daily', label: '일일 업무일지' },
-                { to: '/worklogs/weekly', label: '주간 업무일지' },
-                { to: '/worklogs/monthly', label: '월간 업무일지' },
+                { to: '/worklogs/daily', label: '일일 업무보고' },
+                { to: '/worklogs/weekly', label: '주간 업무보고' },
+                { to: '/worklogs/monthly', label: '월간 업무보고' },
             ]
         },
         { to: '/rescue', icon: AlertTriangle, label: '구조현황' },

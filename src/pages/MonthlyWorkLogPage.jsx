@@ -471,10 +471,10 @@ const MonthlyWorkLogPage = () => {
             setIsModalOpen(false)
             resetForm()
             fetchWorklogs()
-            alert('월간 업무일지가 저장되었습니다.')
+            alert('월간 업무보고가 저장되었습니다.')
         } catch (error) {
             console.error('Error creating worklog:', error)
-            alert('월간 업무일지 저장에 실패했습니다: ' + error.message)
+            alert('월간 업무보고 저장에 실패했습니다: ' + error.message)
         } finally {
             setUploading(false)
         }
@@ -487,7 +487,7 @@ const MonthlyWorkLogPage = () => {
         }
 
         if (!selectedWorklog?.id) {
-            alert('수정할 업무일지를 찾을 수 없습니다.')
+            alert('수정할 업무보고를 찾을 수 없습니다.')
             return
         }
 
@@ -518,10 +518,10 @@ const MonthlyWorkLogPage = () => {
             setIsModalOpen(false)
             resetForm()
             fetchWorklogs()
-            alert('월간 업무일지가 수정되었습니다.')
+            alert('월간 업무보고가 수정되었습니다.')
         } catch (error) {
             console.error('Error updating worklog:', error)
-            alert('월간 업무일지 수정에 실패했습니다: ' + error.message)
+            alert('월간 업무보고 수정에 실패했습니다: ' + error.message)
         } finally {
             setUploading(false)
         }
@@ -747,7 +747,7 @@ const MonthlyWorkLogPage = () => {
                 properties: {},
                 children: [
                     new Paragraph({
-                        text: '월간 업무일지',
+                        text: '월간 업무보고',
                         heading: HeadingLevel.TITLE,
                         alignment: AlignmentType.CENTER,
                     }),
@@ -801,7 +801,7 @@ const MonthlyWorkLogPage = () => {
         })
 
         const blob = await Packer.toBlob(doc)
-        saveAs(blob, `월간업무일지_${getMonthLabel(worklog.work_date)}_${worklog.user?.name || '작성자'}.docx`)
+        saveAs(blob, `월간업무보고_${getMonthLabel(worklog.work_date)}_${worklog.user?.name || '작성자'}.docx`)
     }
 
     const indexOfLastItem = currentPage * itemsPerPage
@@ -822,10 +822,10 @@ const MonthlyWorkLogPage = () => {
                     </div>
                     <div>
                         <h2 className="text-xl font-bold mb-1">
-                            {isAdmin ? '전체 월간 업무일지' : `${profile?.name || '사용자'}님의 월간 업무일지`}
+                            {isAdmin ? '전체 월간 업무보고' : `${profile?.name || '사용자'}님의 월간 업무보고`}
                         </h2>
                         <p className="text-white/90">
-                            {isAdmin ? '관리자 권한으로 모든 직원의 월간 업무일지를 확인할 수 있습니다' :
+                            {isAdmin ? '관리자 권한으로 모든 직원의 월간 업무보고를 확인할 수 있습니다' :
                              `${profile?.team ? `${profile.team} · ` : ''}${profile?.rank || '직급 미설정'}`}
                         </p>
                     </div>
@@ -833,7 +833,7 @@ const MonthlyWorkLogPage = () => {
             </Card>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <h1 className="text-2xl font-bold text-toss-gray-900">월간 업무일지</h1>
+                <h1 className="text-2xl font-bold text-toss-gray-900">월간 업무보고</h1>
                 <div className="flex flex-wrap items-center gap-3">
                     <select
                         value={selectedYear}
@@ -860,7 +860,7 @@ const MonthlyWorkLogPage = () => {
 
                     <Button onClick={openCreateModal} className="bg-purple-500 hover:bg-purple-600">
                         <Plus size={18} />
-                        새 월간 업무일지
+                        새 월간 업무보고
                     </Button>
                 </div>
             </div>
@@ -1057,7 +1057,7 @@ const MonthlyWorkLogPage = () => {
                     </>
                 ) : (
                     <div className="text-center text-toss-gray-500 py-8">
-                        {selectedYear}년에 등록된 월간 업무일지가 없습니다
+                        {selectedYear}년에 등록된 월간 업무보고가 없습니다
                     </div>
                 )}
             </Card>
@@ -1069,7 +1069,7 @@ const MonthlyWorkLogPage = () => {
                     setIsModalOpen(false)
                     resetForm()
                 }}
-                title={isEditMode ? '월간 업무일지 수정' : '새 월간 업무일지 작성'}
+                title={isEditMode ? '월간 업무보고 수정' : '새 월간 업무보고 작성'}
             >
                 <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
                     <div>
@@ -1083,7 +1083,7 @@ const MonthlyWorkLogPage = () => {
                             className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                         />
                         <p className="text-sm text-toss-gray-500 mt-1">
-                            {getMonthLabel(formData.work_date)} 업무일지
+                            {getMonthLabel(formData.work_date)} 업무보고
                         </p>
                     </div>
 
@@ -1211,7 +1211,7 @@ const MonthlyWorkLogPage = () => {
             <Modal
                 isOpen={!!selectedWorklog && !isModalOpen}
                 onClose={() => setSelectedWorklog(null)}
-                title="월간 업무일지 상세"
+                title="월간 업무보고 상세"
             >
                 {selectedWorklog && (
                     <div className="space-y-4 max-h-[70vh] overflow-y-auto -mx-2 px-2">

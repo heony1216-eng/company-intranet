@@ -78,7 +78,7 @@ const MyPage = () => {
                         <h1 className="text-2xl font-bold mb-1">마이페이지</h1>
                         <p className="text-white/90 flex items-center gap-2">
                             <Mail size={16} />
-                            {profile?.email || '로딩 중...'}
+                            {profile?.team ? `${profile.team} · ${profile.rank || ''}` : (profile?.user_id || '로딩 중...')}
                         </p>
                     </div>
                 </div>
@@ -164,7 +164,7 @@ const MyPage = () => {
                 <div className="mb-6">
                     <h2 className="text-xl font-bold text-toss-gray-900">개인정보 수정</h2>
                     <p className="text-sm text-toss-gray-500 mt-1">
-                        업무일지 및 공지사항에 표시될 정보를 수정할 수 있습니다
+                        업무보고 및 공지사항에 표시될 정보를 수정할 수 있습니다
                     </p>
                 </div>
 
@@ -233,7 +233,7 @@ const MyPage = () => {
                         • 이름은 필수 항목입니다
                     </p>
                     <p className="text-sm text-toss-gray-600 leading-relaxed">
-                        • 팀명과 직급은 선택 사항이며, 업무일지 작성 시 표시됩니다
+                        • 팀명과 직급은 선택 사항이며, 업무보고 작성 시 표시됩니다
                     </p>
                 </div>
             </Card>
