@@ -331,8 +331,20 @@ const WeeklyWorkLogPage = () => {
     const itemsPerPage = 15
     const fileInputRef = useRef(null)
 
+    // 주간 업무일지 기본 날짜 계산 (월요일이면 전 주 금요일로 설정)
+    const getDefaultWeeklyDate = () => {
+        const today = new Date()
+        const dayOfWeek = today.getDay() // 0=일, 1=월, 2=화...
+
+        // 월요일(1)이면 전 주 금요일(-3일)로 설정
+        if (dayOfWeek === 1) {
+            today.setDate(today.getDate() - 3)
+        }
+        return today.toISOString().split('T')[0]
+    }
+
     const [formData, setFormData] = useState({
-        work_date: new Date().toISOString().split('T')[0],
+        work_date: getDefaultWeeklyDate(),
         weekly_work: '',
         special_notes: '',
         files: [],
@@ -531,7 +543,7 @@ const WeeklyWorkLogPage = () => {
 
     const resetForm = () => {
         setFormData({
-            work_date: new Date().toISOString().split('T')[0],
+            work_date: getDefaultWeeklyDate(),
             weekly_work: '',
             special_notes: '',
             files: [],
