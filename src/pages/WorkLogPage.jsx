@@ -393,7 +393,7 @@ const WorkLogPage = () => {
             let query = supabase
                 .from('work_logs')
                 .select('*')
-                .neq('type', 'rescue')
+                .not('type', 'in', '("weekly","monthly","rescue")')
                 .order('work_date', { ascending: false })
 
             if (!isAdmin && profile) {
@@ -485,6 +485,7 @@ const WorkLogPage = () => {
                 special_notes: formData.special_notes,
                 file_urls: fileUrls,
                 user_id: profile.user_id,
+                type: 'daily',
                 is_read: false
             })
 
