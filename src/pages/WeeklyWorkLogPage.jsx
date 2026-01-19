@@ -331,7 +331,7 @@ const WeeklyWorkLogPage = () => {
     const itemsPerPage = 15
     const fileInputRef = useRef(null)
 
-    // 주간 업무일지 기본 날짜 계산 (월요일이면 전 주 금요일로 설정)
+    // 주간 업무보고 기본 날짜 계산 (월요일이면 전 주 금요일로 설정)
     const getDefaultWeeklyDate = () => {
         const today = new Date()
         const dayOfWeek = today.getDay() // 0=일, 1=월, 2=화...
@@ -485,10 +485,10 @@ const WeeklyWorkLogPage = () => {
             setIsModalOpen(false)
             resetForm()
             fetchWorklogs()
-            alert('주간 업무일지가 저장되었습니다.')
+            alert('주간 업무보고가 저장되었습니다.')
         } catch (error) {
             console.error('Error creating worklog:', error)
-            alert('주간 업무일지 저장에 실패했습니다: ' + error.message)
+            alert('주간 업무보고 저장에 실패했습니다: ' + error.message)
         } finally {
             setUploading(false)
         }
@@ -501,7 +501,7 @@ const WeeklyWorkLogPage = () => {
         }
 
         if (!selectedWorklog?.id) {
-            alert('수정할 업무일지를 찾을 수 없습니다.')
+            alert('수정할 업무보고를 찾을 수 없습니다.')
             return
         }
 
@@ -532,10 +532,10 @@ const WeeklyWorkLogPage = () => {
             setIsModalOpen(false)
             resetForm()
             fetchWorklogs()
-            alert('주간 업무일지가 수정되었습니다.')
+            alert('주간 업무보고가 수정되었습니다.')
         } catch (error) {
             console.error('Error updating worklog:', error)
-            alert('주간 업무일지 수정에 실패했습니다: ' + error.message)
+            alert('주간 업무보고 수정에 실패했습니다: ' + error.message)
         } finally {
             setUploading(false)
         }
@@ -763,7 +763,7 @@ const WeeklyWorkLogPage = () => {
                 properties: {},
                 children: [
                     new Paragraph({
-                        text: '주간 업무일지',
+                        text: '주간 업무보고',
                         heading: HeadingLevel.TITLE,
                         alignment: AlignmentType.CENTER,
                     }),
@@ -817,7 +817,7 @@ const WeeklyWorkLogPage = () => {
         })
 
         const blob = await Packer.toBlob(doc)
-        saveAs(blob, `주간업무일지_${getWeekNumber(worklog.work_date)}_${worklog.user?.name || '작성자'}.docx`)
+        saveAs(blob, `주간업무보고_${getWeekNumber(worklog.work_date)}_${worklog.user?.name || '작성자'}.docx`)
     }
 
     const indexOfLastItem = currentPage * itemsPerPage
@@ -838,10 +838,10 @@ const WeeklyWorkLogPage = () => {
                     </div>
                     <div>
                         <h2 className="text-xl font-bold mb-1">
-                            {isAdmin ? '전체 주간 업무일지' : `${profile?.name || '사용자'}님의 주간 업무일지`}
+                            {isAdmin ? '전체 주간 업무보고' : `${profile?.name || '사용자'}님의 주간 업무보고`}
                         </h2>
                         <p className="text-white/90">
-                            {isAdmin ? '관리자 권한으로 모든 직원의 주간 업무일지를 확인할 수 있습니다' :
+                            {isAdmin ? '관리자 권한으로 모든 직원의 주간 업무보고를 확인할 수 있습니다' :
                              `${profile?.team ? `${profile.team} · ` : ''}${profile?.rank || '직급 미설정'}`}
                         </p>
                     </div>
@@ -849,7 +849,7 @@ const WeeklyWorkLogPage = () => {
             </Card>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <h1 className="text-2xl font-bold text-toss-gray-900">주간 업무일지</h1>
+                <h1 className="text-2xl font-bold text-toss-gray-900">주간 업무보고</h1>
                 <div className="flex flex-wrap items-center gap-3">
                     <select
                         value={selectedYear}
@@ -886,7 +886,7 @@ const WeeklyWorkLogPage = () => {
 
                     <Button onClick={openCreateModal} className="bg-green-500 hover:bg-green-600">
                         <Plus size={18} />
-                        새 주간 업무일지
+                        새 주간 업무보고
                     </Button>
                 </div>
             </div>
@@ -1083,7 +1083,7 @@ const WeeklyWorkLogPage = () => {
                     </>
                 ) : (
                     <div className="text-center text-toss-gray-500 py-8">
-                        {selectedYear}년 {selectedMonth}월에 등록된 주간 업무일지가 없습니다
+                        {selectedYear}년 {selectedMonth}월에 등록된 주간 업무보고가 없습니다
                     </div>
                 )}
             </Card>
@@ -1095,7 +1095,7 @@ const WeeklyWorkLogPage = () => {
                     setIsModalOpen(false)
                     resetForm()
                 }}
-                title={isEditMode ? '주간 업무일지 수정' : '새 주간 업무일지 작성'}
+                title={isEditMode ? '주간 업무보고 수정' : '새 주간 업무보고 작성'}
             >
                 <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
                     <div>
@@ -1237,7 +1237,7 @@ const WeeklyWorkLogPage = () => {
             <Modal
                 isOpen={!!selectedWorklog && !isModalOpen}
                 onClose={() => setSelectedWorklog(null)}
-                title="주간 업무일지 상세"
+                title="주간 업무보고 상세"
             >
                 {selectedWorklog && (
                     <div className="space-y-4 max-h-[70vh] overflow-y-auto -mx-2 px-2">

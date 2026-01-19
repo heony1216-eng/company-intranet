@@ -32,7 +32,7 @@ const Header = () => {
                             </p>
                             <p className="text-sm text-toss-gray-500">
                                 {profile?.team && `${profile.team} · `}
-                                {profile?.position || profile?.email}
+                                {profile?.rank || ''}
                             </p>
                         </div>
                     </div>
