@@ -25,6 +25,7 @@ const EventPage = () => {
     const [isEditMode, setIsEditMode] = useState(false)
     const [events, setEvents] = useState([])
     const [recentEvents, setRecentEvents] = useState([])
+    const [holidays, setHolidays] = useState({})
     const [loading, setLoading] = useState(false)
     const [formData, setFormData] = useState({
         title: '',
@@ -34,6 +35,20 @@ const EventPage = () => {
         start_time: '',
         end_time: ''
     })
+
+    // 공휴일 데이터 가져오기
+    useEffect(() => {
+        const fetchHolidays = async () => {
+            try {
+                const response = await fetch('https://holidays.hyunbin.page/basic.json')
+                const data = await response.json()
+                setHolidays(data)
+            } catch (error) {
+                console.error('Error fetching holidays:', error)
+            }
+        }
+        fetchHolidays()
+    }, [])
 
     useEffect(() => {
         fetchEvents()
@@ -233,7 +248,10 @@ const EventPage = () => {
     }
 
     const formatDateString = (date) => {
-        return date.toISOString().split('T')[0]
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        return `${year}-${month}-${day}`
     }
 
     const formatDisplayDate = (dateStr) => {
@@ -244,6 +262,16 @@ const EventPage = () => {
     const getEventsForDate = (date) => {
         const dateStr = formatDateString(date)
         return events.filter(e => e.event_date === dateStr)
+    }
+
+    // 특정 날짜의 공휴일 가져오기
+    const getHolidayForDate = (date) => {
+        const year = date.getFullYear().toString()
+        const dateStr = formatDateString(date)
+        if (holidays[year] && holidays[year][dateStr]) {
+            return holidays[year][dateStr] // 배열 형태로 반환 (예: ["설날"])
+        }
+        return null
     }
 
     const isToday = (date) => {
@@ -338,6 +366,8 @@ const EventPage = () => {
                             const dayEvents = getEventsForDate(day.date)
                             const hasEvents = dayEvents.length > 0
                             const dayOfWeek = day.date.getDay()
+                            const holidayNames = getHolidayForDate(day.date)
+                            const isHoliday = holidayNames !== null
 
                             return (
                                 <div
@@ -348,15 +378,22 @@ const EventPage = () => {
                                         transition-all hover:bg-toss-gray-50
                                         ${!day.isCurrentMonth && 'opacity-40'}
                                         ${isToday(day.date) && 'ring-2 ring-toss-blue ring-inset'}
+                                        ${isHoliday && day.isCurrentMonth && 'bg-red-50'}
                                     `}
                                 >
-                                    <div className={`text-sm font-medium mb-1 ${dayOfWeek === 0 ? 'text-red-500' : dayOfWeek === 6 ? 'text-blue-500' : ''
+                                    <div className={`text-sm font-medium mb-1 ${isHoliday ? 'text-red-500' : dayOfWeek === 0 ? 'text-red-500' : dayOfWeek === 6 ? 'text-blue-500' : ''
                                         }`}>
                                         {day.date.getDate()}
                                     </div>
-                                    {/* 일정 표시 (최대 2개) */}
+                                    {/* 공휴일 표시 */}
+                                    {isHoliday && (
+                                        <div className="text-xs px-1 py-0.5 rounded truncate bg-red-100 text-red-600 mb-0.5">
+                                            {holidayNames.join(', ')}
+                                        </div>
+                                    )}
+                                    {/* 일정 표시 (공휴일 있으면 1개, 없으면 2개) */}
                                     <div className="space-y-0.5">
-                                        {dayEvents.slice(0, 2).map((event, idx) => {
+                                        {dayEvents.slice(0, isHoliday ? 1 : 2).map((event, idx) => {
                                             const typeStyle = EVENT_TYPE_COLORS[event.event_type] || EVENT_TYPE_COLORS.general
                                             return (
                                                 <div
@@ -368,9 +405,9 @@ const EventPage = () => {
                                                 </div>
                                             )
                                         })}
-                                        {dayEvents.length > 2 && (
+                                        {dayEvents.length > (isHoliday ? 1 : 2) && (
                                             <div className="text-xs text-toss-gray-500 pl-1">
-                                                +{dayEvents.length - 2}개 더
+                                                +{dayEvents.length - (isHoliday ? 1 : 2)}개 더
                                             </div>
                                         )}
                                     </div>
@@ -382,6 +419,10 @@ const EventPage = () => {
                     {/* 범례 */}
                     <div className="mt-4 pt-4 border-t border-toss-gray-100">
                         <div className="flex flex-wrap gap-3 text-xs">
+                            <div className="flex items-center gap-1">
+                                <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                                <span className="text-toss-gray-600">공휴일</span>
+                            </div>
                             {Object.entries(EVENT_TYPE_COLORS).map(([key, value]) => (
                                 <div key={key} className="flex items-center gap-1">
                                     <div className={`w-2 h-2 rounded-full ${value.dot}`}></div>
