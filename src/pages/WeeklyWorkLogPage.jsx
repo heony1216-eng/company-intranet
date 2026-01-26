@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { Card, Button, Modal } from '../components/common'
-import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, FileDown } from 'lucide-react'
+import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, Printer, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { uploadMultipleToDropbox, deleteMultipleFilesByUrl } from '../lib/dropbox'
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, Table, TableRow, TableCell, WidthType, BorderStyle } from 'docx'
+import { Document, Packer, Paragraph, TextRun, AlignmentType, ImageRun, Table, TableRow, TableCell, WidthType, BorderStyle, convertInchesToTwip, PageBreak } from 'docx'
 import { saveAs } from 'file-saver'
+import { generateWeeklyWorklogPdf } from '../utils/worklogPdf'
 
 // Dropbox URL을 직접 이미지 링크로 변환
 const convertDropboxUrl = (url) => {
@@ -541,6 +542,83 @@ const WeeklyWorkLogPage = () => {
         }
     }
 
+    const [loadingDailyLogs, setLoadingDailyLogs] = useState(false)
+
+    // 해당 주의 월~금 날짜 범위 계산
+    const getWeekRange = (dateString) => {
+        const date = new Date(dateString)
+        const day = date.getDay() // 0=일, 1=월, ...
+
+        // 월요일 찾기
+        const monday = new Date(date)
+        const diffToMonday = day === 0 ? -6 : 1 - day
+        monday.setDate(date.getDate() + diffToMonday)
+
+        // 금요일 찾기
+        const friday = new Date(monday)
+        friday.setDate(monday.getDate() + 4)
+
+        return {
+            start: monday.toISOString().split('T')[0],
+            end: friday.toISOString().split('T')[0]
+        }
+    }
+
+    // 일일 업무 불러오기
+    const fetchDailyWorklogs = async () => {
+        if (!profile?.user_id) return
+
+        setLoadingDailyLogs(true)
+        try {
+            const { start, end } = getWeekRange(formData.work_date)
+
+            const { data, error } = await supabase
+                .from('work_logs')
+                .select('work_date, morning_work, afternoon_work')
+                .eq('user_id', profile.user_id)
+                .eq('type', 'daily')
+                .gte('work_date', start)
+                .lte('work_date', end)
+                .order('work_date', { ascending: true })
+
+            if (error) throw error
+
+            if (!data || data.length === 0) {
+                alert('해당 주에 작성된 일일 업무가 없습니다.')
+                return
+            }
+
+            // 요일별로 정리
+            const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+            const formattedContent = data.map(log => {
+                const date = new Date(log.work_date)
+                const dayName = dayNames[date.getDay()]
+                const dateStr = `${date.getMonth() + 1}/${date.getDate()}`
+
+                let content = `【${dayName}요일 (${dateStr})】\n`
+                if (log.morning_work) {
+                    content += `[오전]\n${log.morning_work}\n`
+                }
+                if (log.afternoon_work) {
+                    content += `[오후]\n${log.afternoon_work}\n`
+                }
+                return content
+            }).join('\n')
+
+            setFormData(prev => ({
+                ...prev,
+                weekly_work: formattedContent
+            }))
+
+            alert(`${data.length}일치 일일 업무를 불러왔습니다.`)
+        } catch (error) {
+            console.error('Error fetching daily worklogs:', error)
+            alert('일일 업무를 불러오는데 실패했습니다.')
+        } finally {
+            setLoadingDailyLogs(false)
+        }
+    }
+
     const resetForm = () => {
         setFormData({
             work_date: getDefaultWeeklyDate(),
@@ -618,206 +696,219 @@ const WeeklyWorkLogPage = () => {
         })
     }
 
-    // Supabase Edge Function 프록시를 통해 이미지를 ArrayBuffer로 가져오기
-    const loadImageAsArrayBuffer = async (url) => {
-        const proxyUrl = `https://khwzdwewgadvpglptvua.supabase.co/functions/v1/image-proxy?url=${encodeURIComponent(url)}`
-        const response = await fetch(proxyUrl)
-        if (!response.ok) {
-            throw new Error(`이미지 로드 실패: ${response.status}`)
-        }
-        return await response.arrayBuffer()
-    }
-
     const handleSaveAsWord = async (worklog) => {
-        const processedImages = []
-        const failedImages = []
-        if (worklog.file_urls && worklog.file_urls.length > 0) {
-            const imageUrls = worklog.file_urls.filter(item => isImageFile({ url: getUrl(item) }))
-            for (const item of imageUrls) {
-                try {
-                    const url = getUrl(item)
-                    const arrayBuffer = await loadImageAsArrayBuffer(url)
-
-                    // ArrayBuffer를 Blob으로 변환하여 이미지 로드
-                    const blob = new Blob([arrayBuffer])
-                    const blobUrl = URL.createObjectURL(blob)
-                    const img = new Image()
-                    img.src = blobUrl
-                    await new Promise((resolve, reject) => {
-                        img.onload = resolve
-                        img.onerror = reject
-                    })
-
-                    // 이미지 크기 계산 (2열 배치를 위해 최대 240px 너비)
-                    const maxWidth = 240
-                    const maxHeight = 320
-
-                    // 원본 크기에서 비율 계산
-                    let width = img.width
-                    let height = img.height
-                    const ratio = Math.min(maxWidth / width, maxHeight / height, 1)
-                    width = Math.round(width * ratio)
-                    height = Math.round(height * ratio)
-
-                    // Canvas를 사용하여 리사이즈 + EXIF 회전 적용 + 압축
-                    const canvas = document.createElement('canvas')
-                    const ctx = canvas.getContext('2d')
-
-                    // 리사이즈된 크기로 Canvas 설정
-                    canvas.width = width
-                    canvas.height = height
-                    ctx.drawImage(img, 0, 0, width, height)
-
-                    // JPEG로 변환하여 용량 압축
-                    let quality = 0.7
-                    let compressedBlob = await new Promise(resolve => {
-                        canvas.toBlob(resolve, 'image/jpeg', quality)
-                    })
-
-                    // 300KB 초과시 품질 낮춰서 재압축
-                    const targetSize = 300 * 1024
-                    while (compressedBlob.size > targetSize && quality > 0.3) {
-                        quality -= 0.1
-                        compressedBlob = await new Promise(resolve => {
-                            canvas.toBlob(resolve, 'image/jpeg', quality)
-                        })
-                    }
-
-                    const compressedArrayBuffer = await compressedBlob.arrayBuffer()
-
-                    // Blob URL 해제
-                    URL.revokeObjectURL(blobUrl)
-
-                    processedImages.push({ data: compressedArrayBuffer, width, height })
-                } catch (error) {
-                    console.error('이미지 로드 실패:', error)
-                    const fileName = typeof item === 'string' ? item.split('/').pop() : (item.name || '이미지')
-                    failedImages.push(fileName)
-                }
-            }
+        // 테이블 셀 스타일 공통 정의
+        const tableBorders = {
+            top: { style: BorderStyle.SINGLE, size: 1, color: '333333' },
+            bottom: { style: BorderStyle.SINGLE, size: 1, color: '333333' },
+            left: { style: BorderStyle.SINGLE, size: 1, color: '333333' },
+            right: { style: BorderStyle.SINGLE, size: 1, color: '333333' },
         }
 
-        if (failedImages.length > 0) {
-            alert(`일부 이미지(${failedImages.length}개)를 Word에 포함시키지 못했습니다.`)
+        const headerCellStyle = {
+            shading: { fill: 'F8F9FA' },
+            borders: tableBorders,
+            verticalAlign: 'center',
         }
 
-        // 이미지를 2열 테이블로 배치
-        const imageTableRows = []
-        for (let i = 0; i < processedImages.length; i += 2) {
-            const cells = []
-            cells.push(
-                new TableCell({
-                    children: [
-                        new Paragraph({
-                            children: [
-                                new ImageRun({
-                                    data: processedImages[i].data,
-                                    transformation: { width: processedImages[i].width, height: processedImages[i].height },
-                                    type: 'jpg',
-                                }),
-                            ],
-                            alignment: AlignmentType.CENTER,
-                        }),
-                    ],
-                    width: { size: 50, type: WidthType.PERCENTAGE },
-                    borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+        // 업무 내용을 줄바꿈 단위로 Paragraph 배열로 변환
+        const createContentParagraphs = (text) => {
+            if (!text) return [new Paragraph({ text: '' })]
+            return text.split('\n').map(line =>
+                new Paragraph({
+                    children: [new TextRun({ text: line || ' ', size: 24 })],
+                    spacing: { line: 360 }, // 1.5줄 간격
                 })
             )
-            if (i + 1 < processedImages.length) {
-                cells.push(
-                    new TableCell({
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new ImageRun({
-                                        data: processedImages[i + 1].data,
-                                        transformation: { width: processedImages[i + 1].width, height: processedImages[i + 1].height },
-                                        type: 'jpg',
-                                    }),
-                                ],
-                                alignment: AlignmentType.CENTER,
-                            }),
-                        ],
-                        width: { size: 50, type: WidthType.PERCENTAGE },
-                        borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-                    })
-                )
-            } else {
-                cells.push(
-                    new TableCell({
-                        children: [new Paragraph({ text: '' })],
-                        width: { size: 50, type: WidthType.PERCENTAGE },
-                        borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-                    })
-                )
-            }
-            imageTableRows.push(new TableRow({ children: cells }))
         }
 
-        const imageTable = processedImages.length > 0 ? [
-            new Table({ rows: imageTableRows, width: { size: 100, type: WidthType.PERCENTAGE } })
-        ] : []
+        // 기본 정보 테이블
+        const infoTable = new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+                new TableRow({
+                    children: [
+                        new TableCell({
+                            children: [new Paragraph({
+                                children: [new TextRun({ text: '보고기간', bold: true, size: 24 })],
+                                alignment: AlignmentType.CENTER
+                            })],
+                            width: { size: 15, type: WidthType.PERCENTAGE },
+                            ...headerCellStyle,
+                        }),
+                        new TableCell({
+                            children: [new Paragraph({
+                                children: [new TextRun({ text: getWeekNumber(worklog.work_date), size: 24 })]
+                            })],
+                            width: { size: 35, type: WidthType.PERCENTAGE },
+                            borders: tableBorders,
+                        }),
+                        new TableCell({
+                            children: [new Paragraph({
+                                children: [new TextRun({ text: '소속', bold: true, size: 24 })],
+                                alignment: AlignmentType.CENTER
+                            })],
+                            width: { size: 15, type: WidthType.PERCENTAGE },
+                            ...headerCellStyle,
+                        }),
+                        new TableCell({
+                            children: [new Paragraph({
+                                children: [new TextRun({ text: worklog.user?.team || '-', size: 24 })]
+                            })],
+                            width: { size: 35, type: WidthType.PERCENTAGE },
+                            borders: tableBorders,
+                        }),
+                    ],
+                }),
+                new TableRow({
+                    children: [
+                        new TableCell({
+                            children: [new Paragraph({
+                                children: [new TextRun({ text: '직급', bold: true, size: 24 })],
+                                alignment: AlignmentType.CENTER
+                            })],
+                            ...headerCellStyle,
+                        }),
+                        new TableCell({
+                            children: [new Paragraph({
+                                children: [new TextRun({ text: worklog.user?.rank || '-', size: 24 })]
+                            })],
+                            borders: tableBorders,
+                        }),
+                        new TableCell({
+                            children: [new Paragraph({
+                                children: [new TextRun({ text: '성명', bold: true, size: 24 })],
+                                alignment: AlignmentType.CENTER
+                            })],
+                            ...headerCellStyle,
+                        }),
+                        new TableCell({
+                            children: [new Paragraph({
+                                children: [new TextRun({ text: worklog.user?.name || '-', size: 24 })]
+                            })],
+                            borders: tableBorders,
+                        }),
+                    ],
+                }),
+            ],
+        })
+
+        // 업무 내용 테이블
+        const workContentTable = new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+                new TableRow({
+                    children: [
+                        new TableCell({
+                            children: [new Paragraph({
+                                children: [new TextRun({ text: 'Ⅰ. 금주 업무 수행 내용', bold: true, size: 24 })]
+                            })],
+                            ...headerCellStyle,
+                        }),
+                    ],
+                }),
+                new TableRow({
+                    children: [
+                        new TableCell({
+                            children: createContentParagraphs(worklog.morning_work),
+                            borders: tableBorders,
+                            margins: {
+                                top: convertInchesToTwip(0.15),
+                                bottom: convertInchesToTwip(0.15),
+                                left: convertInchesToTwip(0.15),
+                                right: convertInchesToTwip(0.15),
+                            },
+                        }),
+                    ],
+                }),
+            ],
+        })
+
+        // 특이사항 테이블
+        const notesTable = new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+                new TableRow({
+                    children: [
+                        new TableCell({
+                            children: [new Paragraph({
+                                children: [new TextRun({ text: 'Ⅱ. 특이사항 및 건의사항', bold: true, size: 24 })]
+                            })],
+                            ...headerCellStyle,
+                        }),
+                    ],
+                }),
+                new TableRow({
+                    children: [
+                        new TableCell({
+                            children: createContentParagraphs(worklog.special_notes || ' '),
+                            borders: tableBorders,
+                            margins: {
+                                top: convertInchesToTwip(0.15),
+                                bottom: convertInchesToTwip(0.15),
+                                left: convertInchesToTwip(0.15),
+                                right: convertInchesToTwip(0.15),
+                            },
+                        }),
+                    ],
+                }),
+            ],
+        })
 
         const doc = new Document({
             sections: [{
-                properties: {},
+                properties: {
+                    page: {
+                        margin: {
+                            top: convertInchesToTwip(0.6),
+                            bottom: convertInchesToTwip(0.8),
+                            left: convertInchesToTwip(0.8),
+                            right: convertInchesToTwip(0.8),
+                        },
+                    },
+                },
                 children: [
+                    // 작성일 (우측 정렬)
                     new Paragraph({
-                        text: '주간 업무보고',
-                        heading: HeadingLevel.TITLE,
+                        children: [new TextRun({ text: `작성일: ${formatDate(worklog.work_date)}`, size: 22, color: '666666' })],
+                        alignment: AlignmentType.RIGHT,
+                        spacing: { after: 200 },
+                    }),
+                    // 제목
+                    new Paragraph({
+                        children: [new TextRun({ text: '주 간 업 무 보 고 서', bold: true, size: 44 })],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 200 },
+                        border: {
+                            bottom: { style: BorderStyle.SINGLE, size: 12, color: '333333' },
+                        },
+                    }),
+                    new Paragraph({ text: '', spacing: { after: 300 } }),
+                    // 기본 정보 테이블
+                    infoTable,
+                    new Paragraph({ text: '', spacing: { after: 300 } }),
+                    // 업무 내용 테이블
+                    workContentTable,
+                    new Paragraph({ text: '', spacing: { after: 300 } }),
+                    // 특이사항 테이블
+                    notesTable,
+                    new Paragraph({ text: '', spacing: { after: 400 } }),
+                    // 하단 조직명
+                    new Paragraph({
+                        children: [new TextRun({ text: '한인구조단', bold: true, size: 26 })],
                         alignment: AlignmentType.CENTER,
                     }),
-                    new Paragraph({ text: '' }),
-                    new Paragraph({
-                        children: [
-                            new TextRun({ text: '작성일: ', bold: true }),
-                            new TextRun(formatDate(worklog.work_date)),
-                        ],
-                    }),
-                    new Paragraph({
-                        children: [
-                            new TextRun({ text: '주차: ', bold: true }),
-                            new TextRun(getWeekNumber(worklog.work_date)),
-                        ],
-                    }),
-                    new Paragraph({
-                        children: [
-                            new TextRun({ text: '작성자: ', bold: true }),
-                            new TextRun(`${worklog.user?.name || '-'} (${worklog.user?.team || '팀 미설정'})`),
-                        ],
-                    }),
-                    new Paragraph({ text: '' }),
-                    new Paragraph({
-                        text: '주간 업무',
-                        heading: HeadingLevel.HEADING_2,
-                    }),
-                    new Paragraph({
-                        text: worklog.morning_work || '-',
-                    }),
-                    ...(worklog.special_notes ? [
-                        new Paragraph({ text: '' }),
-                        new Paragraph({
-                            text: '특이사항',
-                            heading: HeadingLevel.HEADING_2,
-                        }),
-                        new Paragraph({
-                            text: worklog.special_notes,
-                        }),
-                    ] : []),
-                    ...(processedImages.length > 0 ? [
-                        new Paragraph({ text: '' }),
-                        new Paragraph({
-                            text: '첨부 사진',
-                            heading: HeadingLevel.HEADING_2,
-                        }),
-                        ...imageTable,
-                    ] : []),
                 ],
             }],
         })
 
         const blob = await Packer.toBlob(doc)
         saveAs(blob, `주간업무보고_${getWeekNumber(worklog.work_date)}_${worklog.user?.name || '작성자'}.docx`)
+    }
+
+    // PDF 다운로드 (텍스트 기반 - 편집 가능)
+    const handleDownloadPdf = (worklog) => {
+        generateWeeklyWorklogPdf(worklog, getWeekNumber, formatDate)
     }
 
     const indexOfLastItem = currentPage * itemsPerPage
@@ -897,19 +988,19 @@ const WeeklyWorkLogPage = () => {
                 ) : currentItems.length > 0 ? (
                     <>
                         <div className="hidden md:block overflow-x-auto">
-                            <table className="w-full">
+                            <table className="w-full min-w-[700px]">
                                 <thead className="bg-toss-gray-100 border-b-2 border-toss-gray-300">
                                     <tr>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700 w-16">No</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">주차</th>
+                                        <th className="px-3 py-3 text-center text-sm font-semibold text-toss-gray-700 whitespace-nowrap">No</th>
+                                        <th className="px-3 py-3 text-left text-sm font-semibold text-toss-gray-700 whitespace-nowrap">주차</th>
                                         {isAdmin && (
                                             <>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">작성자</th>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">팀</th>
+                                                <th className="px-3 py-3 text-left text-sm font-semibold text-toss-gray-700 whitespace-nowrap">작성자</th>
+                                                <th className="px-3 py-3 text-left text-sm font-semibold text-toss-gray-700 whitespace-nowrap">팀</th>
                                             </>
                                         )}
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">주간 업무</th>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700 w-24">관리</th>
+                                        <th className="px-3 py-3 text-left text-sm font-semibold text-toss-gray-700">주간 업무</th>
+                                        <th className="px-3 py-3 text-center text-sm font-semibold text-toss-gray-700 whitespace-nowrap">관리</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-toss-gray-200">
@@ -920,39 +1011,49 @@ const WeeklyWorkLogPage = () => {
                                                 isAdmin && !log.is_read ? 'bg-green-50' : ''
                                             }`}
                                         >
-                                            <td className="px-4 py-3 text-sm text-center text-toss-gray-600">
+                                            <td className="px-3 py-3 text-sm text-center text-toss-gray-600 whitespace-nowrap">
                                                 {indexOfFirstItem + index + 1}
                                             </td>
                                             <td
-                                                className="px-4 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-green-600"
+                                                className="px-3 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-green-600 whitespace-nowrap"
                                                 onClick={() => viewWorklogDetail(log)}
                                             >
-                                                <div className="flex items-center gap-2">
-                                                    <Calendar size={14} className="text-toss-gray-400" />
-                                                    {getWeekNumber(log.work_date)}
+                                                <div className="flex items-center gap-1">
+                                                    <Calendar size={14} className="text-toss-gray-400 flex-shrink-0" />
+                                                    <span>{getWeekNumber(log.work_date)}</span>
                                                     {isAdmin && !log.is_read && (
-                                                        <span className="inline-block bg-green-500 text-white px-2 py-0.5 rounded-full text-xs font-medium ml-2">
-                                                            NEW
+                                                        <span className="inline-block bg-green-500 text-white px-1.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0">
+                                                            N
                                                         </span>
                                                     )}
                                                 </div>
                                             </td>
                                             {isAdmin && (
                                                 <>
-                                                    <td className="px-4 py-3 text-sm text-toss-gray-900">
+                                                    <td className="px-3 py-3 text-sm text-toss-gray-900 whitespace-nowrap">
                                                         {log.user?.name || '-'}
                                                     </td>
-                                                    <td className="px-4 py-3 text-sm text-toss-gray-600">{log.user?.team || '-'}</td>
+                                                    <td className="px-3 py-3 text-sm text-toss-gray-600 whitespace-nowrap">{log.user?.team || '-'}</td>
                                                 </>
                                             )}
                                             <td
-                                                className="px-4 py-3 text-sm text-toss-gray-700 max-w-xs truncate cursor-pointer"
+                                                className="px-3 py-3 text-sm text-toss-gray-700 cursor-pointer max-w-xs truncate"
                                                 onClick={() => viewWorklogDetail(log)}
                                             >
                                                 {log.morning_work || '-'}
                                             </td>
-                                            <td className="px-4 py-3 text-center">
+                                            <td className="px-3 py-3 text-center whitespace-nowrap">
                                                 <div className="flex items-center justify-center gap-1">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            handleDownloadPdf(log)
+                                                        }}
+                                                        className="p-2 text-green-600 hover:bg-green-100 rounded-lg transition-colors"
+                                                        title="인쇄"
+                                                    >
+                                                        <Printer size={16} />
+                                                    </button>
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation()
@@ -1114,15 +1215,26 @@ const WeeklyWorkLogPage = () => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-toss-gray-700 mb-2">
-                            주간 업무 *
-                        </label>
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="block text-sm font-medium text-toss-gray-700">
+                                주간 업무 *
+                            </label>
+                            <button
+                                type="button"
+                                onClick={fetchDailyWorklogs}
+                                disabled={loadingDailyLogs}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                <RefreshCw size={14} className={loadingDailyLogs ? 'animate-spin' : ''} />
+                                {loadingDailyLogs ? '불러오는 중...' : '일일 업무 불러오기'}
+                            </button>
+                        </div>
                         <textarea
                             value={formData.weekly_work}
                             onChange={(e) => setFormData({ ...formData, weekly_work: e.target.value })}
-                            rows={6}
+                            rows={10}
                             className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none transition-all leading-relaxed"
-                            placeholder="이번 주에 수행한 업무를 입력하세요"
+                            placeholder="이번 주에 수행한 업무를 입력하세요&#10;&#10;'일일 업무 불러오기' 버튼을 누르면 해당 주의 일일 업무가 자동으로 불러와집니다."
                         />
                     </div>
 
@@ -1276,10 +1388,17 @@ const WeeklyWorkLogPage = () => {
 
                         <div className="flex gap-2 pt-2">
                             <button
-                                onClick={() => handleSaveAsWord(selectedWorklog)}
+                                onClick={() => handleDownloadPdf(selectedWorklog)}
                                 className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition-colors text-sm font-medium"
                             >
-                                <FileDown size={16} />
+                                <Printer size={16} />
+                                인쇄
+                            </button>
+                            <button
+                                onClick={() => handleSaveAsWord(selectedWorklog)}
+                                className="flex items-center gap-2 px-4 py-2 bg-toss-gray-100 text-toss-gray-700 rounded-xl hover:bg-toss-gray-200 transition-colors text-sm font-medium"
+                            >
+                                <Download size={16} />
                                 Word 저장
                             </button>
                         </div>
@@ -1302,6 +1421,7 @@ const WeeklyWorkLogPage = () => {
                     </div>
                 )}
             </Modal>
+
         </div>
     )
 }

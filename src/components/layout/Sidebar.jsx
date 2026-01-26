@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar, CalendarDays, ExternalLink, ChevronDown, Settings } from 'lucide-react'
+import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar, CalendarDays, ExternalLink, ChevronDown, Settings, FolderOpen } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -8,12 +8,16 @@ const Sidebar = () => {
     const canManageLeave = isAdmin || isSubAdmin
     const [isOpen, setIsOpen] = useState(false)
     const [worklogOpen, setWorklogOpen] = useState(false)
+    const [archiveOpen, setArchiveOpen] = useState(false)
     const location = useLocation()
 
     // 업무보고 관련 페이지에 있으면 서브메뉴 열기
     useEffect(() => {
         if (location.pathname.startsWith('/worklogs')) {
             setWorklogOpen(true)
+        }
+        if (location.pathname.startsWith('/archive')) {
+            setArchiveOpen(true)
         }
     }, [location.pathname])
 
@@ -34,6 +38,16 @@ const Sidebar = () => {
         { to: '/rescue', icon: AlertTriangle, label: '구조현황' },
         { to: '/meetings', icon: Calendar, label: '회의록' },
         { to: '/document', icon: FileText, label: '기안서' },
+        {
+            icon: FolderOpen,
+            label: '자료실',
+            isSubmenu: true,
+            menuKey: 'archive',
+            subItems: [
+                { to: '/archive/forms', label: '양식' },
+                { to: '/archive/rescue', label: '문서' },
+            ]
+        },
         ...(canManageLeave ? [{ to: '/admin', icon: Settings, label: '관리' }] : []),
         { to: '/mypage', icon: User, label: '마이페이지' },
     ]
@@ -103,9 +117,15 @@ const Sidebar = () => {
                         item.isSubmenu ? (
                             <div key={item.label}>
                                 <button
-                                    onClick={() => setWorklogOpen(!worklogOpen)}
+                                    onClick={() => {
+                                        if (item.menuKey === 'archive') {
+                                            setArchiveOpen(!archiveOpen)
+                                        } else {
+                                            setWorklogOpen(!worklogOpen)
+                                        }
+                                    }}
                                     className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-toss transition-all ${
-                                        location.pathname.startsWith('/worklogs')
+                                        (item.menuKey === 'archive' ? location.pathname.startsWith('/archive') : location.pathname.startsWith('/worklogs'))
                                             ? 'bg-toss-blue/10 text-toss-blue'
                                             : 'text-toss-gray-900 hover:bg-toss-blue/10 hover:text-toss-blue'
                                     }`}
@@ -116,10 +136,10 @@ const Sidebar = () => {
                                     </div>
                                     <ChevronDown
                                         size={16}
-                                        className={`transition-transform ${worklogOpen ? 'rotate-180' : ''}`}
+                                        className={`transition-transform ${(item.menuKey === 'archive' ? archiveOpen : worklogOpen) ? 'rotate-180' : ''}`}
                                     />
                                 </button>
-                                {worklogOpen && (
+                                {(item.menuKey === 'archive' ? archiveOpen : worklogOpen) && (
                                     <div className="ml-4 mt-1 space-y-1">
                                         {item.subItems.map((subItem) => (
                                             <NavLink

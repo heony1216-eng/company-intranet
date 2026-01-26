@@ -409,20 +409,20 @@ const WorkLog2Page = () => {
                 ) : currentItems.length > 0 ? (
                     <>
                         <div className="overflow-x-auto">
-                            <table className="w-full">
+                            <table className="w-full table-fixed">
                                 <thead className="bg-toss-gray-100 border-b-2 border-toss-gray-300">
                                     <tr>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700 w-16">No</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">작업일</th>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700 w-14">No</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700 w-28">작업일</th>
                                         {isAdmin && (
                                             <>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">작성자</th>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">팀</th>
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700 w-20">작성자</th>
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700 w-24">팀</th>
                                             </>
                                         )}
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">오전 업무</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">오후 업무</th>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700 w-24">관리</th>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700 w-28">관리</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-toss-gray-200">
@@ -433,19 +433,19 @@ const WorkLog2Page = () => {
                                                 isAdmin && !log.is_read ? 'bg-blue-50' : ''
                                             }`}
                                         >
-                                            <td className="px-4 py-3 text-sm text-center text-toss-gray-600">
+                                            <td className="px-4 py-3 text-sm text-center text-toss-gray-600 w-14">
                                                 {filteredWorklogs.length - (indexOfFirstItem + index)}
                                             </td>
                                             <td
-                                                className="px-4 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-toss-blue"
+                                                className="px-4 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-toss-blue w-28"
                                                 onClick={() => viewWorklogDetail(log)}
                                             >
-                                                <div className="flex items-center gap-2">
-                                                    <Calendar size={14} className="text-toss-gray-400" />
-                                                    {new Date(log.work_date).toLocaleDateString('ko-KR')}
+                                                <div className="flex items-center gap-1">
+                                                    <Calendar size={14} className="text-toss-gray-400 flex-shrink-0" />
+                                                    <span className="truncate">{new Date(log.work_date).toLocaleDateString('ko-KR')}</span>
                                                     {isAdmin && !log.is_read && (
-                                                        <span className="inline-block bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium ml-2">
-                                                            NEW
+                                                        <span className="inline-block bg-red-500 text-white px-1.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0">
+                                                            N
                                                         </span>
                                                     )}
                                                 </div>
@@ -453,7 +453,7 @@ const WorkLog2Page = () => {
                                             {isAdmin && (
                                                 <>
                                                     <td
-                                                        className="px-4 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-toss-blue hover:underline"
+                                                        className="px-4 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-toss-blue hover:underline w-20 truncate"
                                                         onClick={(e) => {
                                                             e.stopPropagation()
                                                             setSelectedUserId(log.user_id)
@@ -461,22 +461,22 @@ const WorkLog2Page = () => {
                                                     >
                                                         {log.user?.name || '-'}
                                                     </td>
-                                                    <td className="px-4 py-3 text-sm text-toss-gray-600">{log.user?.team || '-'}</td>
+                                                    <td className="px-4 py-3 text-sm text-toss-gray-600 w-24 truncate">{log.user?.team || '-'}</td>
                                                 </>
                                             )}
                                             <td
-                                                className="px-4 py-3 text-sm text-toss-gray-700 max-w-xs truncate cursor-pointer"
+                                                className="px-4 py-3 text-sm text-toss-gray-700 truncate cursor-pointer"
                                                 onClick={() => viewWorklogDetail(log)}
                                             >
                                                 {log.morning_work || '-'}
                                             </td>
                                             <td
-                                                className="px-4 py-3 text-sm text-toss-gray-700 max-w-xs truncate cursor-pointer"
+                                                className="px-4 py-3 text-sm text-toss-gray-700 truncate cursor-pointer"
                                                 onClick={() => viewWorklogDetail(log)}
                                             >
                                                 {log.afternoon_work || '-'}
                                             </td>
-                                            <td className="px-4 py-3 text-center">
+                                            <td className="px-4 py-3 text-center w-28">
                                                 <div className="flex items-center justify-center gap-1">
                                                     <button
                                                         onClick={() => handlePrint(log)}

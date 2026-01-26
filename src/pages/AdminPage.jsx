@@ -79,6 +79,7 @@ const AdminPage = () => {
     const [leaveActiveTab, setLeaveActiveTab] = useState('pending')
     const [allLeaves, setAllLeaves] = useState([])
     const [processedRequests, setProcessedRequests] = useState([])
+    const [processedAttendanceDocs, setProcessedAttendanceDocs] = useState([]) // 승인/반려된 근태 기안서
     const [leaveSearchTerm, setLeaveSearchTerm] = useState('')
     const [historySearchTerm, setHistorySearchTerm] = useState('')
     const [leaveRejectingId, setLeaveRejectingId] = useState(null)
@@ -141,6 +142,18 @@ const AdminPage = () => {
 
             if (processedData) {
                 setProcessedRequests(processedData)
+            }
+
+            // 처리된 근태 기안서 (code=4인 라벨, approved/rejected 상태)
+            const { data: processedAttendanceData } = await supabase
+                .from('documents')
+                .select('*, document_labels(*)')
+                .eq('document_labels.code', 4)
+                .in('status', ['approved', 'rejected'])
+                .order('updated_at', { ascending: false })
+
+            if (processedAttendanceData) {
+                setProcessedAttendanceDocs(processedAttendanceData.filter(d => d.document_labels?.code === 4))
             }
         }
 
@@ -375,6 +388,8 @@ const AdminPage = () => {
     }
 
     const filteredDocuments = allDocuments.filter(doc => {
+        // 근태(code=4) 라벨 제외
+        if (doc.document_labels?.code === 4) return false
         const userDoc = getUserInfo(doc.drafter_id)
         return userDoc.name?.toLowerCase().includes(docSearchTerm.toLowerCase()) ||
                doc.title?.toLowerCase().includes(docSearchTerm.toLowerCase())
@@ -1200,7 +1215,7 @@ const AdminPage = () => {
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-lg font-bold text-toss-gray-900 flex items-center gap-2">
                                     <History className="text-purple-500" size={20} />
-                                    처리된 연차 내역
+                                    처리 내역
                                 </h2>
                                 <div className="relative">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-toss-gray-400" size={16} />
@@ -1214,10 +1229,10 @@ const AdminPage = () => {
                                 </div>
                             </div>
 
-                            {processedRequests.length === 0 ? (
+                            {processedRequests.length === 0 && processedAttendanceDocs.length === 0 ? (
                                 <div className="py-12 text-center text-toss-gray-500">
                                     <History className="mx-auto mb-3 text-toss-gray-300" size={48} />
-                                    <p>처리된 연차 내역이 없습니다</p>
+                                    <p>처리된 내역이 없습니다</p>
                                 </div>
                             ) : (
                                 <div className="overflow-x-auto">
@@ -1226,65 +1241,155 @@ const AdminPage = () => {
                                             <tr className="border-b border-toss-gray-200">
                                                 <th className="text-left py-3 px-4 text-sm font-medium text-toss-gray-500">처리일</th>
                                                 <th className="text-left py-3 px-4 text-sm font-medium text-toss-gray-500">신청자</th>
-                                                <th className="text-left py-3 px-4 text-sm font-medium text-toss-gray-500">유형</th>
+                                                <th className="text-left py-3 px-4 text-sm font-medium text-toss-gray-500">구분</th>
+                                                <th className="text-left py-3 px-4 text-sm font-medium text-toss-gray-500">유형/제목</th>
                                                 <th className="text-left py-3 px-4 text-sm font-medium text-toss-gray-500">기간</th>
-                                                <th className="text-center py-3 px-4 text-sm font-medium text-toss-gray-500">일수</th>
                                                 <th className="text-center py-3 px-4 text-sm font-medium text-toss-gray-500">상태</th>
                                                 <th className="text-center py-3 px-4 text-sm font-medium text-toss-gray-500">관리</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {processedRequests
-                                                .filter(r => getUserInfo(r.user_id).name?.toLowerCase().includes(historySearchTerm.toLowerCase()))
-                                                .map((request) => {
-                                                    const userInfo = getUserInfo(request.user_id)
-                                                    const isProcessing = leaveProcessingId === request.id
+                                            {/* 연차 신청 내역과 근태 기안서를 통합하여 시간순 정렬 */}
+                                            {[
+                                                ...processedRequests.map(r => ({ ...r, _type: 'leave', _sortDate: new Date(r.updated_at) })),
+                                                ...processedAttendanceDocs.map(d => ({ ...d, _type: 'document', _sortDate: new Date(d.updated_at || d.approved_at || d.created_at) }))
+                                            ]
+                                                .sort((a, b) => b._sortDate - a._sortDate)
+                                                .filter(item => {
+                                                    const userId = item._type === 'leave' ? item.user_id : item.drafter_id
+                                                    return getUserInfo(userId).name?.toLowerCase().includes(historySearchTerm.toLowerCase())
+                                                })
+                                                .map((item) => {
+                                                    if (item._type === 'leave') {
+                                                        // 연차 신청
+                                                        const request = item
+                                                        const userInfo = getUserInfo(request.user_id)
+                                                        const isProcessing = leaveProcessingId === request.id
 
-                                                    return (
-                                                        <tr
-                                                            key={request.id}
-                                                            onClick={() => setSelectedRequest({ ...request, userInfo })}
-                                                            className="border-b border-toss-gray-100 hover:bg-toss-gray-50 cursor-pointer"
-                                                        >
-                                                            <td className="py-3 px-4 text-sm text-toss-gray-600">{formatTableDate(request.updated_at)}</td>
-                                                            <td className="py-3 px-4">
-                                                                <p className="text-sm font-medium text-toss-gray-900">{userInfo.name}</p>
-                                                                {userInfo.rank && <p className="text-xs text-toss-gray-500">{userInfo.rank}</p>}
-                                                            </td>
-                                                            <td className="py-3 px-4 text-sm text-toss-gray-900">{LEAVE_TYPES[request.leave_type]?.label}</td>
-                                                            <td className="py-3 px-4">
-                                                                <p className="text-sm text-toss-gray-900">
-                                                                    {formatTableDate(request.start_date)}
-                                                                    {request.start_date !== request.end_date && <> ~ {formatTableDate(request.end_date)}</>}
-                                                                </p>
-                                                            </td>
-                                                            <td className="py-3 px-4 text-center">
-                                                                <span className="text-sm font-medium text-purple-600">{request.days}일</span>
-                                                            </td>
-                                                            <td className="py-3 px-4 text-center">{getLeaveStatusBadge(request.status)}</td>
-                                                            <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
-                                                                <div className="flex items-center justify-center gap-1">
-                                                                    {request.status === 'approved' && (
+                                                        return (
+                                                            <tr
+                                                                key={`leave-${request.id}`}
+                                                                onClick={() => setSelectedRequest({ ...request, userInfo })}
+                                                                className="border-b border-toss-gray-100 hover:bg-toss-gray-50 cursor-pointer"
+                                                            >
+                                                                <td className="py-3 px-4 text-sm text-toss-gray-600">{formatTableDate(request.updated_at)}</td>
+                                                                <td className="py-3 px-4">
+                                                                    <p className="text-sm font-medium text-toss-gray-900">{userInfo.name}</p>
+                                                                    {userInfo.rank && <p className="text-xs text-toss-gray-500">{userInfo.rank}</p>}
+                                                                </td>
+                                                                <td className="py-3 px-4">
+                                                                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">연차</span>
+                                                                </td>
+                                                                <td className="py-3 px-4 text-sm text-toss-gray-900">
+                                                                    {LEAVE_TYPES[request.leave_type]?.label}
+                                                                    {request.days && <span className="text-purple-600 ml-1">({request.days}일)</span>}
+                                                                </td>
+                                                                <td className="py-3 px-4">
+                                                                    <p className="text-sm text-toss-gray-900">
+                                                                        {formatTableDate(request.start_date)}
+                                                                        {request.start_date !== request.end_date && <> ~ {formatTableDate(request.end_date)}</>}
+                                                                    </p>
+                                                                </td>
+                                                                <td className="py-3 px-4 text-center">{getLeaveStatusBadge(request.status)}</td>
+                                                                <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                    <div className="flex items-center justify-center gap-1">
+                                                                        {request.status === 'approved' && (
+                                                                            <button
+                                                                                onClick={() => generateLeaveDocumentPdf(request, userInfo)}
+                                                                                className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                                                                title="연차신청서 PDF 다운로드"
+                                                                            >
+                                                                                <FileText size={18} />
+                                                                            </button>
+                                                                        )}
                                                                         <button
-                                                                            onClick={() => generateLeaveDocumentPdf(request, userInfo)}
-                                                                            className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                                                                            title="연차신청서 PDF 다운로드"
+                                                                            onClick={() => handleLeaveDelete(request)}
+                                                                            disabled={isProcessing}
+                                                                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                                                                            title="삭제"
                                                                         >
-                                                                            <FileText size={18} />
+                                                                            {isProcessing ? <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" /> : <Trash2 size={18} />}
                                                                         </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        )
+                                                    } else {
+                                                        // 근태 기안서
+                                                        const doc = item
+                                                        const userInfo = getUserInfo(doc.drafter_id)
+                                                        const isProcessing = docProcessingId === doc.id
+
+                                                        return (
+                                                            <tr
+                                                                key={`doc-${doc.id}`}
+                                                                onClick={() => setSelectedDoc({ ...doc, userInfo })}
+                                                                className="border-b border-toss-gray-100 hover:bg-toss-gray-50 cursor-pointer"
+                                                            >
+                                                                <td className="py-3 px-4 text-sm text-toss-gray-600">{formatTableDate(doc.updated_at || doc.approved_at || doc.created_at)}</td>
+                                                                <td className="py-3 px-4">
+                                                                    <p className="text-sm font-medium text-toss-gray-900">{userInfo.name}</p>
+                                                                    {userInfo.rank && <p className="text-xs text-toss-gray-500">{userInfo.rank}</p>}
+                                                                </td>
+                                                                <td className="py-3 px-4">
+                                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                                                        doc.attendance_type === 'overtime' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                                                                    }`}>
+                                                                        {doc.attendance_type === 'overtime' ? '추가근무' : '휴가'}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="py-3 px-4 text-sm text-toss-gray-900">
+                                                                    {doc.attendance_type === 'leave' ? (
+                                                                        <>
+                                                                            {LEAVE_TYPES[doc.leave_type]?.label || doc.leave_type}
+                                                                            {doc.leave_days && <span className="text-purple-600 ml-1">({doc.leave_days}일)</span>}
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            {doc.title}
+                                                                            {doc.extra_work_hours > 0 && <span className="text-blue-600 ml-1">({doc.extra_work_hours}시간)</span>}
+                                                                        </>
                                                                     )}
-                                                                    <button
-                                                                        onClick={() => handleLeaveDelete(request)}
-                                                                        disabled={isProcessing}
-                                                                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                                                                        title="삭제"
-                                                                    >
-                                                                        {isProcessing ? <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" /> : <Trash2 size={18} />}
-                                                                    </button>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    )
+                                                                </td>
+                                                                <td className="py-3 px-4">
+                                                                    {doc.leave_start_date ? (
+                                                                        <p className="text-sm text-toss-gray-900">
+                                                                            {formatTableDate(doc.leave_start_date)}
+                                                                            {doc.leave_start_date !== doc.leave_end_date && doc.leave_end_date && <> ~ {formatTableDate(doc.leave_end_date)}</>}
+                                                                        </p>
+                                                                    ) : (
+                                                                        <span className="text-sm text-toss-gray-400">-</span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="py-3 px-4 text-center">{getDocStatusBadge(doc.status)}</td>
+                                                                <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                    <div className="flex items-center justify-center gap-1">
+                                                                        {doc.status === 'approved' && (
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    const totalAmt = getDocumentTotalAmount(doc)
+                                                                                    const directorName = totalAmt >= 1000000 ? '권태일' : ''
+                                                                                    generateDocumentPdf(doc, userInfo, '이정숙', directorName)
+                                                                                }}
+                                                                                className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                                                                title="기안서 PDF 다운로드"
+                                                                            >
+                                                                                <FileText size={18} />
+                                                                            </button>
+                                                                        )}
+                                                                        <button
+                                                                            onClick={() => handleDocDelete(doc.id)}
+                                                                            disabled={isProcessing}
+                                                                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                                                                            title="삭제"
+                                                                        >
+                                                                            {isProcessing ? <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" /> : <Trash2 size={18} />}
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        )
+                                                    }
                                                 })}
                                         </tbody>
                                     </table>
