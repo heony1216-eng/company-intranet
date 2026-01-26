@@ -22,17 +22,22 @@ html, html.dark, html[data-theme="dark"] {
   -moz-osx-font-smoothing: grayscale;
 }
 
-html {
+html, body {
   background-color: #F9FAFB !important;
   color: #191F28 !important;
+  overflow-x: hidden !important;
+  max-width: 100vw !important;
 }
 
 body {
-  background-color: #F9FAFB !important;
-  color: #191F28 !important;
   line-height: 1.6;
   letter-spacing: -0.02em;
   min-height: 100vh;
+}
+
+#root {
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 /* 반응형 텍스트 크기 */

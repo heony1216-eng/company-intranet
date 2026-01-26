@@ -102,9 +102,18 @@ export const Modal = ({
     isOpen,
     onClose,
     title,
-    children
+    children,
+    size = 'default'
 }) => {
     if (!isOpen) return null
+
+    const sizeClasses = {
+        default: 'max-w-2xl max-h-[90vh]',
+        large: 'max-w-4xl max-h-[95vh]',
+        xl: 'max-w-6xl max-h-[95vh]',
+        full: 'max-w-[95vw] max-h-[95vh]',
+        a4: 'max-w-[900px] max-h-[95vh]'
+    }
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -112,7 +121,7 @@ export const Modal = ({
                 className="absolute inset-0 bg-black/50 backdrop-blur-sm"
                 onClick={onClose}
             />
-            <div className="relative bg-white rounded-toss-lg shadow-toss-lg w-full max-w-2xl mx-4 max-h-[90vh] overflow-auto">
+            <div className={`relative bg-white rounded-toss-lg shadow-toss-lg w-full mx-4 overflow-auto ${sizeClasses[size] || sizeClasses.default}`}>
                 <div className="flex items-center justify-between p-6 border-b border-toss-gray-100">
                     <h2 className="text-xl font-bold text-toss-gray-900">{title}</h2>
                     <button

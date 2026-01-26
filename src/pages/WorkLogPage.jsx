@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { Card, Button, Modal } from '../components/common'
-import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, FileDown } from 'lucide-react'
+import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, FileDown, PlusCircle, Printer } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { uploadMultipleToDropbox, deleteMultipleFilesByUrl } from '../lib/dropbox'
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, Table, TableRow, TableCell, WidthType, BorderStyle } from 'docx'
+import { Document, Packer, Paragraph, TextRun, AlignmentType, ImageRun, Table, TableRow, TableCell, WidthType, BorderStyle, convertInchesToTwip } from 'docx'
 import { saveAs } from 'file-saver'
+import { generateDailyWorklogPdf } from '../utils/worklogPdf'
 
 // Dropbox URL을 직접 이미지 링크로 변환 (Safari 호환)
 const convertDropboxUrl = (url) => {
@@ -345,15 +346,66 @@ const WorkLogPage = () => {
     const itemsPerPage = 15
     const fileInputRef = useRef(null)
 
+    // 오전/오후 업무 항목 구조: [{ content: '', progress: '' }]
     const [formData, setFormData] = useState({
         work_date: new Date().toISOString().split('T')[0],
-        morning_work: '',
-        afternoon_work: '',
+        morning_tasks: [{ content: '', progress: '' }],
+        afternoon_tasks: [{ content: '', progress: '' }],
         next_day_work: '',
         special_notes: '',
         files: [],
         existingFileUrls: []
     })
+
+    // 업무 항목 추가
+    const addTask = (type) => {
+        setFormData(prev => ({
+            ...prev,
+            [type]: [...prev[type], { content: '', progress: '' }]
+        }))
+    }
+
+    // 업무 항목 삭제
+    const removeTask = (type, index) => {
+        setFormData(prev => ({
+            ...prev,
+            [type]: prev[type].filter((_, i) => i !== index)
+        }))
+    }
+
+    // 업무 항목 수정
+    const updateTask = (type, index, field, value) => {
+        setFormData(prev => ({
+            ...prev,
+            [type]: prev[type].map((task, i) =>
+                i === index ? { ...task, [field]: value } : task
+            )
+        }))
+    }
+
+    // 업무 배열을 문자열로 변환 (저장용)
+    const tasksToString = (tasks) => {
+        return tasks
+            .filter(t => t.content.trim())
+            .map(t => t.progress ? `${t.content} (${t.progress}%)` : t.content)
+            .join('\n')
+    }
+
+    // 문자열을 업무 배열로 변환 (불러오기용)
+    const stringToTasks = (str) => {
+        if (!str) return [{ content: '', progress: '' }]
+        const lines = str.split('\n').filter(line => line.trim())
+        if (lines.length === 0) return [{ content: '', progress: '' }]
+
+        return lines.map(line => {
+            // "내용 (50%)" 형식에서 진척도 추출
+            const match = line.match(/^(.+?)\s*\((\d+)%\)$/)
+            if (match) {
+                return { content: match[1].trim(), progress: match[2] }
+            }
+            return { content: line, progress: '' }
+        })
+    }
 
     // 연도 목록 생성 (2026년부터 현재 연도까지)
     const startYear = 2026
@@ -464,7 +516,10 @@ const WorkLogPage = () => {
     }
 
     const handleCreate = async () => {
-        if (!formData.morning_work && !formData.afternoon_work) {
+        const morningWork = tasksToString(formData.morning_tasks)
+        const afternoonWork = tasksToString(formData.afternoon_tasks)
+
+        if (!morningWork && !afternoonWork) {
             alert('오전 또는 오후 업무 중 하나는 입력해주세요.')
             return
         }
@@ -479,8 +534,8 @@ const WorkLogPage = () => {
 
             const { error } = await supabase.from('work_logs').insert({
                 work_date: formData.work_date,
-                morning_work: formData.morning_work,
-                afternoon_work: formData.afternoon_work,
+                morning_work: morningWork,
+                afternoon_work: afternoonWork,
                 next_day_work: formData.next_day_work,
                 special_notes: formData.special_notes,
                 file_urls: fileUrls,
@@ -504,7 +559,10 @@ const WorkLogPage = () => {
     }
 
     const handleEdit = async () => {
-        if (!formData.morning_work && !formData.afternoon_work) {
+        const morningWork = tasksToString(formData.morning_tasks)
+        const afternoonWork = tasksToString(formData.afternoon_tasks)
+
+        if (!morningWork && !afternoonWork) {
             alert('오전 또는 오후 업무 중 하나는 입력해주세요.')
             return
         }
@@ -531,8 +589,8 @@ const WorkLogPage = () => {
                 .from('work_logs')
                 .update({
                     work_date: formData.work_date,
-                    morning_work: formData.morning_work,
-                    afternoon_work: formData.afternoon_work,
+                    morning_work: morningWork,
+                    afternoon_work: afternoonWork,
                     next_day_work: formData.next_day_work,
                     special_notes: formData.special_notes,
                     file_urls: allFileUrls
@@ -556,8 +614,8 @@ const WorkLogPage = () => {
     const resetForm = () => {
         setFormData({
             work_date: new Date().toISOString().split('T')[0],
-            morning_work: '',
-            afternoon_work: '',
+            morning_tasks: [{ content: '', progress: '' }],
+            afternoon_tasks: [{ content: '', progress: '' }],
             next_day_work: '',
             special_notes: '',
             files: [],
@@ -570,8 +628,8 @@ const WorkLogPage = () => {
     const openEditModal = (worklog) => {
         setFormData({
             work_date: worklog.work_date,
-            morning_work: worklog.morning_work || '',
-            afternoon_work: worklog.afternoon_work || '',
+            morning_tasks: stringToTasks(worklog.morning_work),
+            afternoon_tasks: stringToTasks(worklog.afternoon_work),
             next_day_work: worklog.next_day_work || '',
             special_notes: worklog.special_notes || '',
             files: [],
@@ -618,6 +676,11 @@ const WorkLogPage = () => {
         }
     }
 
+    // PDF 다운로드
+    const handleDownloadPdf = (worklog) => {
+        generateDailyWorklogPdf(worklog, formatDate)
+    }
+
     // Supabase Edge Function 프록시를 통해 이미지를 ArrayBuffer로 가져오기
     const loadImageAsArrayBuffer = async (url) => {
         const proxyUrl = `https://khwzdwewgadvpglptvua.supabase.co/functions/v1/image-proxy?url=${encodeURIComponent(url)}`
@@ -628,10 +691,98 @@ const WorkLogPage = () => {
         return await response.arrayBuffer()
     }
 
-    // Word 파일로 저장
+    // Word 파일로 저장 (전문적인 테이블 기반 디자인)
     const handleSaveAsWord = async (worklog) => {
-        // 이미지 파일들 가져오기
-        const processedImages = [] // {data, width, height} 배열
+        // 공통 테이블 셀 테두리 스타일
+        const tableBorders = {
+            top: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+            bottom: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+            left: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+            right: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+        }
+
+        // 업무 항목을 테이블 행으로 변환
+        const parseTasksToRows = (taskString) => {
+            if (!taskString) {
+                return [
+                    new TableRow({
+                        children: [
+                            new TableCell({
+                                children: [new Paragraph({ text: '-', alignment: AlignmentType.CENTER })],
+                                width: { size: 600, type: WidthType.DXA },
+                                borders: tableBorders,
+                            }),
+                            new TableCell({
+                                children: [new Paragraph({ text: '' })],
+                                borders: tableBorders,
+                            }),
+                            new TableCell({
+                                children: [new Paragraph({ text: '-', alignment: AlignmentType.CENTER })],
+                                width: { size: 1000, type: WidthType.DXA },
+                                borders: tableBorders,
+                            }),
+                        ],
+                    }),
+                ]
+            }
+
+            const lines = taskString.split('\n').filter(line => line.trim())
+            if (lines.length === 0) {
+                return [
+                    new TableRow({
+                        children: [
+                            new TableCell({
+                                children: [new Paragraph({ text: '-', alignment: AlignmentType.CENTER })],
+                                width: { size: 600, type: WidthType.DXA },
+                                borders: tableBorders,
+                            }),
+                            new TableCell({
+                                children: [new Paragraph({ text: '' })],
+                                borders: tableBorders,
+                            }),
+                            new TableCell({
+                                children: [new Paragraph({ text: '-', alignment: AlignmentType.CENTER })],
+                                width: { size: 1000, type: WidthType.DXA },
+                                borders: tableBorders,
+                            }),
+                        ],
+                    }),
+                ]
+            }
+
+            return lines.map((line, index) => {
+                const match = line.match(/^(.+?)\s*\((\d+)%\)$/)
+                let content = line
+                let progress = '-'
+
+                if (match) {
+                    content = match[1].trim()
+                    progress = match[2] + '%'
+                }
+
+                return new TableRow({
+                    children: [
+                        new TableCell({
+                            children: [new Paragraph({ text: String(index + 1), alignment: AlignmentType.CENTER })],
+                            width: { size: 600, type: WidthType.DXA },
+                            borders: tableBorders,
+                        }),
+                        new TableCell({
+                            children: [new Paragraph({ text: content })],
+                            borders: tableBorders,
+                        }),
+                        new TableCell({
+                            children: [new Paragraph({ text: progress, alignment: AlignmentType.CENTER })],
+                            width: { size: 1000, type: WidthType.DXA },
+                            borders: tableBorders,
+                        }),
+                    ],
+                })
+            })
+        }
+
+        // 이미지 처리
+        const processedImages = []
         const failedImages = []
 
         if (worklog.file_urls && worklog.file_urls.length > 0) {
@@ -645,7 +796,6 @@ const WorkLogPage = () => {
                     const url = getUrl(item)
                     const arrayBuffer = await loadImageAsArrayBuffer(url)
 
-                    // ArrayBuffer를 Blob으로 변환하여 이미지 로드
                     const blob = new Blob([arrayBuffer])
                     const blobUrl = URL.createObjectURL(blob)
                     const img = new Image()
@@ -655,33 +805,26 @@ const WorkLogPage = () => {
                         img.onerror = reject
                     })
 
-                    // 이미지 크기 계산 (2열 배치를 위해 최대 240px 너비)
                     const maxWidth = 240
                     const maxHeight = 320
 
-                    // 원본 크기에서 비율 계산
                     let width = img.width
                     let height = img.height
                     const ratio = Math.min(maxWidth / width, maxHeight / height, 1)
                     width = Math.round(width * ratio)
                     height = Math.round(height * ratio)
 
-                    // Canvas를 사용하여 리사이즈 + EXIF 회전 적용 + 압축
                     const canvas = document.createElement('canvas')
                     const ctx = canvas.getContext('2d')
-
-                    // 리사이즈된 크기로 Canvas 설정
                     canvas.width = width
                     canvas.height = height
                     ctx.drawImage(img, 0, 0, width, height)
 
-                    // JPEG로 변환하여 용량 압축 (품질 0.7 = 약 70%)
                     let quality = 0.7
                     let compressedBlob = await new Promise(resolve => {
                         canvas.toBlob(resolve, 'image/jpeg', quality)
                     })
 
-                    // 300KB 초과시 품질 낮춰서 재압축
                     const targetSize = 300 * 1024
                     while (compressedBlob.size > targetSize && quality > 0.3) {
                         quality -= 0.1
@@ -691,9 +834,6 @@ const WorkLogPage = () => {
                     }
 
                     const compressedArrayBuffer = await compressedBlob.arrayBuffer()
-                    console.log(`이미지 압축: ${width}x${height}, 품질: ${(quality * 100).toFixed(0)}%, 크기: ${(compressedBlob.size / 1024).toFixed(0)}KB`)
-
-                    // Blob URL 해제
                     URL.revokeObjectURL(blobUrl)
 
                     processedImages.push({
@@ -709,12 +849,10 @@ const WorkLogPage = () => {
             }
         }
 
-        // 이미지를 2열 테이블로 배치
+        // 이미지 테이블 행 생성
         const imageTableRows = []
         for (let i = 0; i < processedImages.length; i += 2) {
             const cells = []
-
-            // 첫 번째 이미지
             cells.push(
                 new TableCell({
                     children: [
@@ -742,7 +880,6 @@ const WorkLogPage = () => {
                 })
             )
 
-            // 두 번째 이미지 (있으면)
             if (i + 1 < processedImages.length) {
                 cells.push(
                     new TableCell({
@@ -771,7 +908,6 @@ const WorkLogPage = () => {
                     })
                 )
             } else {
-                // 빈 셀
                 cells.push(
                     new TableCell({
                         children: [new Paragraph({ text: '' })],
@@ -789,102 +925,245 @@ const WorkLogPage = () => {
             imageTableRows.push(new TableRow({ children: cells }))
         }
 
-        const imageTable = processedImages.length > 0 ? [
-            new Table({
-                rows: imageTableRows,
-                width: { size: 100, type: WidthType.PERCENTAGE },
-            })
-        ] : []
-
-        // 실패한 이미지는 링크로 표시
-        const failedImageLinks = failedImages.length > 0 ? [
-            new Paragraph({ text: '' }),
-            new Paragraph({
-                children: [
-                    new TextRun({ text: '(일부 이미지는 링크로 대체되었습니다)', italics: true, color: '666666' }),
-                ],
-            }),
-            ...failedImages.map((fileName, index) =>
-                new Paragraph({
-                    children: [
-                        new TextRun({ text: `${index + 1}. ${fileName}`, color: '0066CC' }),
-                    ],
-                })
-            ),
-        ] : []
-
         const doc = new Document({
             sections: [{
                 properties: {},
                 children: [
+                    // 제목
                     new Paragraph({
-                        text: '업무보고',
-                        heading: HeadingLevel.TITLE,
+                        children: [
+                            new TextRun({ text: '일 일 업 무 보 고 서', bold: true, size: 48 }),
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 400 },
+                        border: {
+                            bottom: { style: BorderStyle.SINGLE, size: 12, color: '333333' },
+                        },
+                    }),
+                    new Paragraph({ text: '', spacing: { after: 200 } }),
+
+                    // 기본 정보 테이블
+                    new Table({
+                        rows: [
+                            new TableRow({
+                                children: [
+                                    new TableCell({
+                                        children: [new Paragraph({ text: '보고일자', alignment: AlignmentType.CENTER })],
+                                        width: { size: 1500, type: WidthType.DXA },
+                                        shading: { fill: 'F8F9FA' },
+                                        borders: tableBorders,
+                                    }),
+                                    new TableCell({
+                                        children: [new Paragraph({ text: formatDate(worklog.work_date) })],
+                                        width: { size: 3000, type: WidthType.DXA },
+                                        borders: tableBorders,
+                                    }),
+                                    new TableCell({
+                                        children: [new Paragraph({ text: '소속', alignment: AlignmentType.CENTER })],
+                                        width: { size: 1500, type: WidthType.DXA },
+                                        shading: { fill: 'F8F9FA' },
+                                        borders: tableBorders,
+                                    }),
+                                    new TableCell({
+                                        children: [new Paragraph({ text: worklog.user?.team || '-' })],
+                                        width: { size: 3000, type: WidthType.DXA },
+                                        borders: tableBorders,
+                                    }),
+                                ],
+                            }),
+                            new TableRow({
+                                children: [
+                                    new TableCell({
+                                        children: [new Paragraph({ text: '직급', alignment: AlignmentType.CENTER })],
+                                        shading: { fill: 'F8F9FA' },
+                                        borders: tableBorders,
+                                    }),
+                                    new TableCell({
+                                        children: [new Paragraph({ text: worklog.user?.rank || '-' })],
+                                        borders: tableBorders,
+                                    }),
+                                    new TableCell({
+                                        children: [new Paragraph({ text: '성명', alignment: AlignmentType.CENTER })],
+                                        shading: { fill: 'F8F9FA' },
+                                        borders: tableBorders,
+                                    }),
+                                    new TableCell({
+                                        children: [new Paragraph({ text: worklog.user?.name || '-' })],
+                                        borders: tableBorders,
+                                    }),
+                                ],
+                            }),
+                        ],
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                    }),
+                    new Paragraph({ text: '', spacing: { after: 300 } }),
+
+                    // 오전 업무 테이블
+                    new Table({
+                        rows: [
+                            new TableRow({
+                                children: [
+                                    new TableCell({
+                                        children: [new Paragraph({ children: [new TextRun({ text: 'Ⅰ. 오전 업무', bold: true })] })],
+                                        columnSpan: 3,
+                                        shading: { fill: 'F8F9FA' },
+                                        borders: tableBorders,
+                                    }),
+                                ],
+                            }),
+                            new TableRow({
+                                children: [
+                                    new TableCell({
+                                        children: [new Paragraph({ text: 'No', alignment: AlignmentType.CENTER })],
+                                        width: { size: 600, type: WidthType.DXA },
+                                        shading: { fill: 'F8F9FA' },
+                                        borders: tableBorders,
+                                    }),
+                                    new TableCell({
+                                        children: [new Paragraph({ text: '업무 내용', alignment: AlignmentType.CENTER })],
+                                        shading: { fill: 'F8F9FA' },
+                                        borders: tableBorders,
+                                    }),
+                                    new TableCell({
+                                        children: [new Paragraph({ text: '진척률', alignment: AlignmentType.CENTER })],
+                                        width: { size: 1000, type: WidthType.DXA },
+                                        shading: { fill: 'F8F9FA' },
+                                        borders: tableBorders,
+                                    }),
+                                ],
+                            }),
+                            ...parseTasksToRows(worklog.morning_work),
+                        ],
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                    }),
+                    new Paragraph({ text: '', spacing: { after: 200 } }),
+
+                    // 오후 업무 테이블
+                    new Table({
+                        rows: [
+                            new TableRow({
+                                children: [
+                                    new TableCell({
+                                        children: [new Paragraph({ children: [new TextRun({ text: 'Ⅱ. 오후 업무', bold: true })] })],
+                                        columnSpan: 3,
+                                        shading: { fill: 'F8F9FA' },
+                                        borders: tableBorders,
+                                    }),
+                                ],
+                            }),
+                            new TableRow({
+                                children: [
+                                    new TableCell({
+                                        children: [new Paragraph({ text: 'No', alignment: AlignmentType.CENTER })],
+                                        width: { size: 600, type: WidthType.DXA },
+                                        shading: { fill: 'F8F9FA' },
+                                        borders: tableBorders,
+                                    }),
+                                    new TableCell({
+                                        children: [new Paragraph({ text: '업무 내용', alignment: AlignmentType.CENTER })],
+                                        shading: { fill: 'F8F9FA' },
+                                        borders: tableBorders,
+                                    }),
+                                    new TableCell({
+                                        children: [new Paragraph({ text: '진척률', alignment: AlignmentType.CENTER })],
+                                        width: { size: 1000, type: WidthType.DXA },
+                                        shading: { fill: 'F8F9FA' },
+                                        borders: tableBorders,
+                                    }),
+                                ],
+                            }),
+                            ...parseTasksToRows(worklog.afternoon_work),
+                        ],
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                    }),
+                    new Paragraph({ text: '', spacing: { after: 200 } }),
+
+                    // 익일 업무 테이블
+                    new Table({
+                        rows: [
+                            new TableRow({
+                                children: [
+                                    new TableCell({
+                                        children: [new Paragraph({ children: [new TextRun({ text: 'Ⅲ. 익일 업무', bold: true })] })],
+                                        shading: { fill: 'F8F9FA' },
+                                        borders: tableBorders,
+                                    }),
+                                ],
+                            }),
+                            new TableRow({
+                                children: [
+                                    new TableCell({
+                                        children: [new Paragraph({ text: worklog.next_day_work || '-' })],
+                                        borders: tableBorders,
+                                    }),
+                                ],
+                            }),
+                        ],
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                    }),
+                    new Paragraph({ text: '', spacing: { after: 200 } }),
+
+                    // 특이사항 테이블
+                    new Table({
+                        rows: [
+                            new TableRow({
+                                children: [
+                                    new TableCell({
+                                        children: [new Paragraph({ children: [new TextRun({ text: 'Ⅳ. 특이사항 및 비고', bold: true })] })],
+                                        shading: { fill: 'F8F9FA' },
+                                        borders: tableBorders,
+                                    }),
+                                ],
+                            }),
+                            new TableRow({
+                                children: [
+                                    new TableCell({
+                                        children: [new Paragraph({ text: worklog.special_notes || '-' })],
+                                        borders: tableBorders,
+                                    }),
+                                ],
+                            }),
+                        ],
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                    }),
+                    new Paragraph({ text: '', spacing: { after: 400 } }),
+
+                    // 푸터
+                    new Paragraph({
+                        children: [new TextRun({ text: '한인구조단', bold: true, size: 28 })],
                         alignment: AlignmentType.CENTER,
                     }),
-                    new Paragraph({ text: '' }),
-                    new Paragraph({
-                        children: [
-                            new TextRun({ text: '작성일: ', bold: true }),
-                            new TextRun(formatDate(worklog.work_date)),
-                        ],
-                    }),
-                    new Paragraph({
-                        children: [
-                            new TextRun({ text: '작성자: ', bold: true }),
-                            new TextRun(`${worklog.user?.name || '-'} (${worklog.user?.team || '팀 미설정'})`),
-                        ],
-                    }),
-                    new Paragraph({ text: '' }),
-                    new Paragraph({
-                        text: '오전 업무',
-                        heading: HeadingLevel.HEADING_2,
-                    }),
-                    new Paragraph({
-                        text: worklog.morning_work || '-',
-                    }),
-                    new Paragraph({ text: '' }),
-                    new Paragraph({
-                        text: '오후 업무',
-                        heading: HeadingLevel.HEADING_2,
-                    }),
-                    new Paragraph({
-                        text: worklog.afternoon_work || '-',
-                    }),
-                    new Paragraph({ text: '' }),
-                    new Paragraph({
-                        text: '익일 업무',
-                        heading: HeadingLevel.HEADING_2,
-                    }),
-                    new Paragraph({
-                        text: worklog.next_day_work || '-',
-                    }),
-                    ...(worklog.special_notes ? [
-                        new Paragraph({ text: '' }),
+
+                    // 이미지 첨부
+                    ...(processedImages.length > 0 ? [
+                        new Paragraph({ text: '', spacing: { after: 300 } }),
                         new Paragraph({
-                            text: '특이사항',
-                            heading: HeadingLevel.HEADING_2,
+                            children: [new TextRun({ text: '첨부 사진', bold: true, size: 24 })],
                         }),
-                        new Paragraph({
-                            text: worklog.special_notes,
+                        new Table({
+                            rows: imageTableRows,
+                            width: { size: 100, type: WidthType.PERCENTAGE },
                         }),
                     ] : []),
-                    // 이미지 첨부 (2열 테이블 배치)
-                    ...(processedImages.length > 0 || failedImages.length > 0 ? [
+
+                    // 실패한 이미지
+                    ...(failedImages.length > 0 ? [
                         new Paragraph({ text: '' }),
                         new Paragraph({
-                            text: '첨부 사진',
-                            heading: HeadingLevel.HEADING_2,
+                            children: [new TextRun({ text: '(일부 이미지는 링크로 대체되었습니다)', italics: true, color: '666666' })],
                         }),
-                        ...imageTable,
-                        ...failedImageLinks,
+                        ...failedImages.map((fileName, index) =>
+                            new Paragraph({
+                                children: [new TextRun({ text: `${index + 1}. ${fileName}`, color: '0066CC' })],
+                            })
+                        ),
                     ] : []),
                 ],
             }],
         })
 
         const blob = await Packer.toBlob(doc)
-        saveAs(blob, `업무보고_${worklog.work_date}_${worklog.user?.name || '작성자'}.docx`)
+        saveAs(blob, `일일업무보고_${worklog.work_date}_${worklog.user?.name || '작성자'}.docx`)
     }
 
     const getWeekday = (dateString) => {
@@ -987,20 +1266,20 @@ const WorkLogPage = () => {
                     <>
                         {/* Desktop Table */}
                         <div className="hidden md:block overflow-x-auto">
-                            <table className="w-full">
+                            <table className="w-full min-w-[800px]">
                                 <thead className="bg-toss-gray-100 border-b-2 border-toss-gray-300">
                                     <tr>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700 w-16">No</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">작업일</th>
+                                        <th className="px-3 py-3 text-center text-sm font-semibold text-toss-gray-700 whitespace-nowrap">No</th>
+                                        <th className="px-3 py-3 text-left text-sm font-semibold text-toss-gray-700 whitespace-nowrap">작업일</th>
                                         {isAdmin && (
                                             <>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">작성자</th>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">팀</th>
+                                                <th className="px-3 py-3 text-left text-sm font-semibold text-toss-gray-700 whitespace-nowrap">작성자</th>
+                                                <th className="px-3 py-3 text-left text-sm font-semibold text-toss-gray-700 whitespace-nowrap">팀</th>
                                             </>
                                         )}
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">오전 업무</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-700">오후 업무</th>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-700 w-24">관리</th>
+                                        <th className="px-3 py-3 text-left text-sm font-semibold text-toss-gray-700">오전 업무</th>
+                                        <th className="px-3 py-3 text-left text-sm font-semibold text-toss-gray-700">오후 업무</th>
+                                        <th className="px-3 py-3 text-center text-sm font-semibold text-toss-gray-700 whitespace-nowrap">관리</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-toss-gray-200">
@@ -1011,19 +1290,19 @@ const WorkLogPage = () => {
                                                 isAdmin && !log.is_read ? 'bg-blue-50' : ''
                                             }`}
                                         >
-                                            <td className="px-4 py-3 text-sm text-center text-toss-gray-600">
+                                            <td className="px-3 py-3 text-sm text-center text-toss-gray-600 whitespace-nowrap">
                                                 {indexOfFirstItem + index + 1}
                                             </td>
                                             <td
-                                                className="px-4 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-toss-blue"
+                                                className="px-3 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-toss-blue whitespace-nowrap"
                                                 onClick={() => viewWorklogDetail(log)}
                                             >
-                                                <div className="flex items-center gap-2">
-                                                    <Calendar size={14} className="text-toss-gray-400" />
-                                                    {new Date(log.work_date).toLocaleDateString('ko-KR')}
+                                                <div className="flex items-center gap-1">
+                                                    <Calendar size={14} className="text-toss-gray-400 flex-shrink-0" />
+                                                    <span>{new Date(log.work_date).toLocaleDateString('ko-KR')}</span>
                                                     {isAdmin && !log.is_read && (
-                                                        <span className="inline-block bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium ml-2">
-                                                            NEW
+                                                        <span className="inline-block bg-red-500 text-white px-1.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0">
+                                                            N
                                                         </span>
                                                     )}
                                                 </div>
@@ -1031,7 +1310,7 @@ const WorkLogPage = () => {
                                             {isAdmin && (
                                                 <>
                                                     <td
-                                                        className="px-4 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-toss-blue hover:underline"
+                                                        className="px-3 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-toss-blue hover:underline whitespace-nowrap"
                                                         onClick={(e) => {
                                                             e.stopPropagation()
                                                             setSelectedUserId(log.user_id)
@@ -1039,23 +1318,33 @@ const WorkLogPage = () => {
                                                     >
                                                         {log.user?.name || '-'}
                                                     </td>
-                                                    <td className="px-4 py-3 text-sm text-toss-gray-600">{log.user?.team || '-'}</td>
+                                                    <td className="px-3 py-3 text-sm text-toss-gray-600 whitespace-nowrap">{log.user?.team || '-'}</td>
                                                 </>
                                             )}
                                             <td
-                                                className="px-4 py-3 text-sm text-toss-gray-700 max-w-xs truncate cursor-pointer"
+                                                className="px-3 py-3 text-sm text-toss-gray-700 cursor-pointer max-w-[200px] truncate"
                                                 onClick={() => viewWorklogDetail(log)}
                                             >
                                                 {log.morning_work || '-'}
                                             </td>
                                             <td
-                                                className="px-4 py-3 text-sm text-toss-gray-700 max-w-xs truncate cursor-pointer"
+                                                className="px-3 py-3 text-sm text-toss-gray-700 cursor-pointer max-w-[200px] truncate"
                                                 onClick={() => viewWorklogDetail(log)}
                                             >
                                                 {log.afternoon_work || '-'}
                                             </td>
-                                            <td className="px-4 py-3 text-center">
+                                            <td className="px-3 py-3 text-center whitespace-nowrap">
                                                 <div className="flex items-center justify-center gap-1">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            handleDownloadPdf(log)
+                                                        }}
+                                                        className="p-2 text-toss-gray-600 hover:bg-toss-gray-100 rounded-lg transition-colors"
+                                                        title="PDF 다운로드"
+                                                    >
+                                                        <Printer size={16} />
+                                                    </button>
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation()
@@ -1114,6 +1403,13 @@ const WorkLogPage = () => {
                                             )}
                                         </div>
                                         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                            <button
+                                                onClick={() => handleDownloadPdf(log)}
+                                                className="p-1.5 text-toss-gray-600 hover:bg-toss-gray-100 rounded-lg"
+                                                title="PDF 다운로드"
+                                            >
+                                                <Printer size={14} />
+                                            </button>
                                             <button
                                                 onClick={() => handleSaveAsWord(log)}
                                                 className="p-1.5 text-toss-gray-600 hover:bg-toss-gray-100 rounded-lg"
@@ -1231,13 +1527,52 @@ const WorkLogPage = () => {
                         <label className="block text-sm font-medium text-toss-gray-700 mb-2">
                             오전 업무
                         </label>
-                        <textarea
-                            value={formData.morning_work}
-                            onChange={(e) => setFormData({ ...formData, morning_work: e.target.value })}
-                            rows={4}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all leading-relaxed"
-                            placeholder="오전에 수행한 업무를 입력하세요"
-                        />
+                        <div className="space-y-2">
+                            {formData.morning_tasks.map((task, index) => (
+                                <div key={index} className="flex items-start gap-2">
+                                    <span className="w-6 text-center text-sm font-medium text-toss-gray-500 pt-3">{index + 1}</span>
+                                    <textarea
+                                        value={task.content}
+                                        onChange={(e) => updateTask('morning_tasks', index, 'content', e.target.value)}
+                                        data-morning-task={index}
+                                        rows={2}
+                                        className="flex-1 px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all resize-none leading-relaxed"
+                                        placeholder="업무 상세 내용 (Enter로 줄바꿈)"
+                                    />
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        value={task.progress}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/[^0-9]/g, '')
+                                            if (val === '' || (parseInt(val) >= 0 && parseInt(val) <= 100)) {
+                                                updateTask('morning_tasks', index, 'progress', val)
+                                            }
+                                        }}
+                                        className="w-16 px-2 self-stretch bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all text-center"
+                                        placeholder="%"
+                                    />
+                                    {formData.morning_tasks.length > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => removeTask('morning_tasks', index)}
+                                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                            <button
+                                type="button"
+                                onClick={() => addTask('morning_tasks')}
+                                className="flex items-center gap-2 px-4 py-2 text-toss-blue hover:bg-toss-blue/10 rounded-xl transition-colors text-sm font-medium"
+                            >
+                                <PlusCircle size={16} />
+                                업무 추가
+                            </button>
+                        </div>
                     </div>
 
                     {/* 오후 업무 */}
@@ -1245,13 +1580,52 @@ const WorkLogPage = () => {
                         <label className="block text-sm font-medium text-toss-gray-700 mb-2">
                             오후 업무
                         </label>
-                        <textarea
-                            value={formData.afternoon_work}
-                            onChange={(e) => setFormData({ ...formData, afternoon_work: e.target.value })}
-                            rows={4}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all leading-relaxed"
-                            placeholder="오후에 수행한 업무를 입력하세요"
-                        />
+                        <div className="space-y-2">
+                            {formData.afternoon_tasks.map((task, index) => (
+                                <div key={index} className="flex items-start gap-2">
+                                    <span className="w-6 text-center text-sm font-medium text-toss-gray-500 pt-3">{index + 1}</span>
+                                    <textarea
+                                        value={task.content}
+                                        onChange={(e) => updateTask('afternoon_tasks', index, 'content', e.target.value)}
+                                        data-afternoon-task={index}
+                                        rows={2}
+                                        className="flex-1 px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all resize-none leading-relaxed"
+                                        placeholder="업무 상세 내용 (Enter로 줄바꿈)"
+                                    />
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        value={task.progress}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/[^0-9]/g, '')
+                                            if (val === '' || (parseInt(val) >= 0 && parseInt(val) <= 100)) {
+                                                updateTask('afternoon_tasks', index, 'progress', val)
+                                            }
+                                        }}
+                                        className="w-16 px-2 self-stretch bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all text-center"
+                                        placeholder="%"
+                                    />
+                                    {formData.afternoon_tasks.length > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => removeTask('afternoon_tasks', index)}
+                                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                            <button
+                                type="button"
+                                onClick={() => addTask('afternoon_tasks')}
+                                className="flex items-center gap-2 px-4 py-2 text-toss-blue hover:bg-toss-blue/10 rounded-xl transition-colors text-sm font-medium"
+                            >
+                                <PlusCircle size={16} />
+                                업무 추가
+                            </button>
+                        </div>
                     </div>
 
                     {/* 익일 업무 */}
@@ -1401,15 +1775,43 @@ const WorkLogPage = () => {
 
                         <div>
                             <label className="block text-sm font-medium text-toss-gray-500 mb-2">오전 업무</label>
-                            <div className="bg-toss-gray-50 rounded-xl p-4 min-h-[80px] whitespace-pre-wrap text-toss-gray-900">
-                                {selectedWorklog.morning_work || '-'}
+                            <div className="bg-toss-gray-50 rounded-xl p-4 min-h-[80px]">
+                                {selectedWorklog.morning_work ? (
+                                    <div className="space-y-2">
+                                        {stringToTasks(selectedWorklog.morning_work).map((task, index) => (
+                                            <div key={index} className="flex items-start gap-3">
+                                                <span className="w-6 text-center text-sm font-medium text-toss-gray-500 flex-shrink-0">{index + 1}</span>
+                                                <span className="flex-1 text-toss-gray-900">{task.content}</span>
+                                                {task.progress && (
+                                                    <span className="text-sm font-medium text-toss-blue flex-shrink-0">{task.progress}%</span>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <span className="text-toss-gray-500">-</span>
+                                )}
                             </div>
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-toss-gray-500 mb-2">오후 업무</label>
-                            <div className="bg-toss-gray-50 rounded-xl p-4 min-h-[80px] whitespace-pre-wrap text-toss-gray-900">
-                                {selectedWorklog.afternoon_work || '-'}
+                            <div className="bg-toss-gray-50 rounded-xl p-4 min-h-[80px]">
+                                {selectedWorklog.afternoon_work ? (
+                                    <div className="space-y-2">
+                                        {stringToTasks(selectedWorklog.afternoon_work).map((task, index) => (
+                                            <div key={index} className="flex items-start gap-3">
+                                                <span className="w-6 text-center text-sm font-medium text-toss-gray-500 flex-shrink-0">{index + 1}</span>
+                                                <span className="flex-1 text-toss-gray-900">{task.content}</span>
+                                                {task.progress && (
+                                                    <span className="text-sm font-medium text-toss-blue flex-shrink-0">{task.progress}%</span>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <span className="text-toss-gray-500">-</span>
+                                )}
                             </div>
                         </div>
 
@@ -1435,6 +1837,13 @@ const WorkLogPage = () => {
 
                         {/* 저장 버튼 */}
                         <div className="flex gap-2 pt-2">
+                            <button
+                                onClick={() => handleDownloadPdf(selectedWorklog)}
+                                className="flex items-center gap-2 px-4 py-2 bg-toss-gray-100 text-toss-gray-700 rounded-xl hover:bg-toss-gray-200 transition-colors text-sm font-medium"
+                            >
+                                <Printer size={16} />
+                                PDF 저장
+                            </button>
                             <button
                                 onClick={() => handleSaveAsWord(selectedWorklog)}
                                 className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors text-sm font-medium"

@@ -149,7 +149,7 @@ export const generateDocumentPdf = (document, userInfo, chairmanName = '이정�
         }
         .approval-box .label-cell {
             width: 30px;
-            writing-mode: vertical-rl;
+            writing-mode: vertical-lr;
             text-orientation: upright;
             letter-spacing: 2px;
             padding: 8px 4px;
@@ -298,12 +298,12 @@ export const generateDocumentPdf = (document, userInfo, chairmanName = '이정�
                 </tr>
                 <tr>
                     <td class="label">제 목</td>
-                    <td>${document.document_labels?.name || ''} (${document.title}) 구매의 건</td>
+                    <td>${document.document_labels?.name || ''} (${document.title})</td>
                 </tr>
             </table>
 
             <div class="content-area">
-                <p class="content-statement">아래와 같이 ${document.document_labels?.name || '사무용품'} 구매를 집행하고자 하오니 재가해 주시기 바랍니다.</p>
+                <p class="content-statement">아래와 같이 집행하고자 하오니 재가해 주시기 바랍니다.</p>
 
                 <p style="text-align: center; margin: 20px 0;">아래-</p>
 

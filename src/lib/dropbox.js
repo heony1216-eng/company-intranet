@@ -227,5 +227,115 @@ export const deleteMultipleFilesByUrl = async (fileUrls) => {
     }
 }
 
+/**
+ * Dropbox 폴더의 파일 목록을 가져옴
+ * @param {string} folderPath - 폴더 경로
+ * @returns {Promise<Array>} - 파일 목록
+ */
+export const listDropboxFiles = async (folderPath = '') => {
+    try {
+        const dbx = await getDropboxClient()
+        const result = await dbx.filesListFolder({ path: folderPath })
+
+        const files = result.result.entries.map(entry => ({
+            name: entry.name,
+            path: entry.path_display,
+            id: entry.id,
+            isFolder: entry['.tag'] === 'folder',
+            size: entry.size || 0,
+            modified: entry.client_modified || entry.server_modified,
+        }))
+
+        return files
+    } catch (error) {
+        console.error('Dropbox list files error:', error)
+        throw new Error('파일 목록을 가져오는데 실패했습니다: ' + (error.error?.error_summary || error.message))
+    }
+}
+
+/**
+ * Dropbox에서 파일의 임시 다운로드 링크를 가져옴
+ * @param {string} path - 파일 경로
+ * @returns {Promise<string>} - 다운로드 링크
+ */
+export const getDropboxDownloadLink = async (path) => {
+    try {
+        const dbx = await getDropboxClient()
+        const result = await dbx.filesGetTemporaryLink({ path })
+        return result.result.link
+    } catch (error) {
+        console.error('Dropbox get download link error:', error)
+        throw new Error('다운로드 링크를 가져오는데 실패했습니다.')
+    }
+}
+
+/**
+ * Dropbox에서 엑셀 파일의 내용을 읽음 (텍스트 추출)
+ * @param {string} path - 파일 경로
+ * @returns {Promise<ArrayBuffer>} - 파일 내용 (ArrayBuffer)
+ */
+export const downloadDropboxFile = async (path) => {
+    try {
+        const dbx = await getDropboxClient()
+        const result = await dbx.filesDownload({ path })
+        // fileBlob은 브라우저 환경에서 Blob으로 반환됨
+        return result.result.fileBlob
+    } catch (error) {
+        console.error('Dropbox download file error:', error)
+        throw new Error('파일을 다운로드하는데 실패했습니다.')
+    }
+}
+
+/**
+ * 파일을 원본 파일명 그대로 Dropbox에 업로드 (자료실용)
+ * @param {File} file - 업로드할 파일
+ * @param {string} folder - 저장할 폴더 경로
+ * @returns {Promise<{path: string, name: string}>} - 업로드된 파일 정보
+ */
+export const uploadToDropboxWithOriginalName = async (file, folder = '/자료실') => {
+    try {
+        const dbx = await getDropboxClient()
+        const path = `${folder}/${file.name}`
+        const arrayBuffer = await file.arrayBuffer()
+
+        const uploadResult = await dbx.filesUpload({
+            path: path,
+            contents: arrayBuffer,
+            mode: { '.tag': 'overwrite' }, // 같은 이름 파일은 덮어쓰기
+            autorename: false
+        })
+
+        return {
+            path: uploadResult.result.path_display,
+            name: file.name,
+            size: file.size
+        }
+    } catch (error) {
+        console.error('Dropbox upload error:', error)
+        throw new Error('파일 업로드에 실패했습니다: ' + (error.error?.error_summary || error.message))
+    }
+}
+
+/**
+ * Dropbox에 폴더 생성
+ * @param {string} path - 생성할 폴더 경로
+ * @returns {Promise<boolean>} - 성공 여부
+ */
+export const createDropboxFolder = async (path) => {
+    try {
+        const dbx = await getDropboxClient()
+        await dbx.filesCreateFolderV2({ path, autorename: false })
+        return true
+    } catch (error) {
+        // 이미 폴더가 존재하는 경우도 성공으로 처리
+        if (error.error?.error?.['.tag'] === 'path' &&
+            error.error?.error?.path?.['.tag'] === 'conflict') {
+            return true
+        }
+        console.error('Dropbox create folder error:', error)
+        throw new Error('폴더 생성에 실패했습니다: ' + (error.error?.error_summary || error.message))
+    }
+}
+
 // 기본 export는 getDropboxClient 함수로 변경
 export default getDropboxClient

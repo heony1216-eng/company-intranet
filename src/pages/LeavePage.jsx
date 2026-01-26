@@ -358,15 +358,15 @@ const LeavePage = () => {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full">
+                        <table className="w-full table-fixed">
                             <thead>
                                 <tr className="border-b border-toss-gray-200">
-                                    <th className="text-left py-3 px-4 text-sm font-medium text-toss-gray-500">신청일</th>
-                                    <th className="text-left py-3 px-4 text-sm font-medium text-toss-gray-500">유형</th>
+                                    <th className="text-left py-3 px-4 text-sm font-medium text-toss-gray-500 w-24">신청일</th>
+                                    <th className="text-left py-3 px-4 text-sm font-medium text-toss-gray-500 w-24">유형</th>
                                     <th className="text-left py-3 px-4 text-sm font-medium text-toss-gray-500">기간</th>
-                                    <th className="text-center py-3 px-4 text-sm font-medium text-toss-gray-500">일수</th>
-                                    <th className="text-center py-3 px-4 text-sm font-medium text-toss-gray-500">상태</th>
-                                    <th className="text-center py-3 px-4 text-sm font-medium text-toss-gray-500">관리</th>
+                                    <th className="text-center py-3 px-4 text-sm font-medium text-toss-gray-500 w-16">일수</th>
+                                    <th className="text-center py-3 px-4 text-sm font-medium text-toss-gray-500 w-20">상태</th>
+                                    <th className="text-center py-3 px-4 text-sm font-medium text-toss-gray-500 w-16">관리</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -376,34 +376,34 @@ const LeavePage = () => {
                                         onClick={() => setSelectedRequest(request)}
                                         className="border-b border-toss-gray-100 hover:bg-toss-gray-50 cursor-pointer"
                                     >
-                                        <td className="py-3 px-4 text-sm text-toss-gray-600">
+                                        <td className="py-3 px-4 text-sm text-toss-gray-600 w-24 truncate">
                                             {formatTableDate(request.created_at)}
                                         </td>
-                                        <td className="py-3 px-4">
+                                        <td className="py-3 px-4 w-24 truncate">
                                             <span className="text-sm font-medium text-toss-gray-900">
                                                 {getLeaveTypeLabel(request.leave_type)}
                                             </span>
                                         </td>
                                         <td className="py-3 px-4">
-                                            <p className="text-sm text-toss-gray-900">
+                                            <p className="text-sm text-toss-gray-900 truncate">
                                                 {formatTableDate(request.start_date)}
                                                 {request.start_date !== request.end_date && (
                                                     <> ~ {formatTableDate(request.end_date)}</>
                                                 )}
                                             </p>
                                             {request.reason && (
-                                                <p className="text-xs text-toss-gray-500 truncate max-w-[200px]">
+                                                <p className="text-xs text-toss-gray-500 truncate">
                                                     {request.reason}
                                                 </p>
                                             )}
                                         </td>
-                                        <td className="py-3 px-4 text-center">
+                                        <td className="py-3 px-4 text-center w-16">
                                             <span className="text-sm font-medium text-toss-blue">{request.days}일</span>
                                         </td>
-                                        <td className="py-3 px-4 text-center">
+                                        <td className="py-3 px-4 text-center w-20">
                                             {getStatusBadge(request.status)}
                                         </td>
-                                        <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                        <td className="py-3 px-4 text-center w-16" onClick={(e) => e.stopPropagation()}>
                                             {request.status === 'pending' && (
                                                 <button
                                                     onClick={() => handleCancel(request.id)}
