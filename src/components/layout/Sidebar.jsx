@@ -39,16 +39,17 @@ const Sidebar = () => {
         { to: '/meetings', icon: Calendar, label: '회의록' },
         { to: '/document', icon: FileText, label: '기안서' },
         { to: '/document-ledger', icon: BookOpen, label: '수·발신대장' },
-        {
-            icon: FolderOpen,
-            label: '자료실',
-            isSubmenu: true,
-            menuKey: 'archive',
-            subItems: [
-                { to: '/archive/forms', label: '양식' },
-                { to: '/archive/rescue', label: '문서' },
-            ]
-        },
+        // 자료실 - 비활성화 (나중에 부활 시 주석 해제)
+        // {
+        //     icon: FolderOpen,
+        //     label: '자료실',
+        //     isSubmenu: true,
+        //     menuKey: 'archive',
+        //     subItems: [
+        //         { to: '/archive/forms', label: '양식' },
+        //         { to: '/archive/rescue', label: '문서' },
+        //     ]
+        // },
         ...(canManageLeave ? [{ to: '/admin', icon: Settings, label: '관리' }] : []),
         { to: '/mypage', icon: User, label: '마이페이지' },
     ]
