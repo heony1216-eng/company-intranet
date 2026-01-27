@@ -266,44 +266,133 @@ export const useDocument = () => {
                     }
                 }
 
-                // 휴가 신청인 경우 - 연차/대체휴무 차감
-                if (doc.attendance_type === 'leave' && doc.leave_type && doc.leave_days > 0) {
-                    if (doc.leave_type === 'comp') {
-                        // 대체휴무 차감
-                        const hoursToUse = doc.leave_days * 8
-                        const { data: compLeave } = await supabase
-                            .from('comp_leaves')
-                            .select('*')
-                            .eq('user_id', doc.drafter_id)
-                            .eq('year', currentYear)
-                            .single()
-
-                        if (compLeave) {
-                            await supabase
+                // 휴가 신청인 경우 - 연차/대체휴무 차감 및 일정 추가
+                if (doc.attendance_type === 'leave' && doc.leave_type) {
+                    // 연차/대체휴무 차감
+                    if (doc.leave_days > 0) {
+                        if (doc.leave_type === 'comp') {
+                            // 대체휴무 차감
+                            const hoursToUse = doc.leave_days * 8
+                            const { data: compLeave } = await supabase
                                 .from('comp_leaves')
-                                .update({
-                                    used_hours: compLeave.used_hours + hoursToUse,
-                                    updated_at: new Date().toISOString()
-                                })
-                                .eq('id', compLeave.id)
-                        }
-                    } else {
-                        // 연차 차감 (full, half_am, half_pm, out_2h, out_3h)
-                        const { data: annualLeave } = await supabase
-                            .from('annual_leaves')
-                            .select('*')
-                            .eq('user_id', doc.drafter_id)
-                            .eq('year', currentYear)
-                            .single()
+                                .select('*')
+                                .eq('user_id', doc.drafter_id)
+                                .eq('year', currentYear)
+                                .single()
 
-                        if (annualLeave) {
-                            await supabase
+                            if (compLeave) {
+                                await supabase
+                                    .from('comp_leaves')
+                                    .update({
+                                        used_hours: compLeave.used_hours + hoursToUse,
+                                        updated_at: new Date().toISOString()
+                                    })
+                                    .eq('id', compLeave.id)
+                            }
+                        } else {
+                            // 연차 차감 (full, half_am, half_pm, out_2h, out_3h)
+                            const { data: annualLeave } = await supabase
                                 .from('annual_leaves')
-                                .update({
-                                    used_days: annualLeave.used_days + doc.leave_days,
-                                    updated_at: new Date().toISOString()
+                                .select('*')
+                                .eq('user_id', doc.drafter_id)
+                                .eq('year', currentYear)
+                                .single()
+
+                            if (annualLeave) {
+                                await supabase
+                                    .from('annual_leaves')
+                                    .update({
+                                        used_days: annualLeave.used_days + doc.leave_days,
+                                        updated_at: new Date().toISOString()
+                                    })
+                                    .eq('id', annualLeave.id)
+                            }
+                        }
+                    }
+
+                    // 휴가 승인 시 일정에 자동 추가
+                    const { data: drafter } = await supabase
+                        .from('users')
+                        .select('name, rank')
+                        .eq('user_id', doc.drafter_id)
+                        .single()
+
+                    if (drafter) {
+                        // 휴가 유형별 라벨
+                        const leaveTypeLabels = {
+                            full: '연차',
+                            half_am: '오전반차',
+                            half_pm: '오후반차',
+                            out_2h: '조퇴',
+                            out_3h: '조퇴',
+                            comp: '대체휴무'
+                        }
+
+                        // 제목에서 휴가 유형 추출 (제목 우선, 없으면 leave_type 사용)
+                        let leaveLabel = '휴가'
+                        if (doc.title) {
+                            if (doc.title.includes('조퇴')) leaveLabel = '조퇴'
+                            else if (doc.title.includes('오전반차')) leaveLabel = '오전반차'
+                            else if (doc.title.includes('오후반차')) leaveLabel = '오후반차'
+                            else if (doc.title.includes('반차')) leaveLabel = '반차'
+                            else if (doc.title.includes('연차')) leaveLabel = '연차'
+                            else if (doc.title.includes('외출')) leaveLabel = '외출'
+                            else if (doc.title.includes('휴가')) leaveLabel = '휴가'
+                            else if (doc.title.includes('대체휴무')) leaveLabel = '대체휴무'
+                            else if (doc.leave_type) leaveLabel = leaveTypeLabels[doc.leave_type] || '휴가'
+                        } else if (doc.leave_type) {
+                            leaveLabel = leaveTypeLabels[doc.leave_type] || '휴가'
+                        }
+
+                        const eventTitle = `[${leaveLabel}] ${drafter.name}${drafter.rank ? ' ' + drafter.rank : ''}`
+
+                        // 이벤트 생성할 날짜들
+                        let eventDates = []
+
+                        if (doc.leave_start_date) {
+                            // leave_start_date가 있는 경우: 시작일~종료일 범위
+                            const startDateStr = doc.leave_start_date
+                            const endDateStr = doc.leave_end_date || doc.leave_start_date
+                            const start = new Date(startDateStr + 'T00:00:00')
+                            const end = new Date(endDateStr + 'T00:00:00')
+
+                            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                                const year = d.getFullYear()
+                                const month = String(d.getMonth() + 1).padStart(2, '0')
+                                const day = String(d.getDate()).padStart(2, '0')
+                                eventDates.push(`${year}-${month}-${day}`)
+                            }
+                        } else {
+                            // leave_start_date가 없는 경우: 제목에서 날짜 파싱
+                            // 예: "0127,0129 조퇴신청서" -> [01-27, 01-29]
+                            const docYear = new Date(doc.created_at).getFullYear()
+                            const datePattern = /(\d{4})/g
+                            const matches = doc.title.match(datePattern)
+
+                            if (matches) {
+                                for (const match of matches) {
+                                    const month = match.substring(0, 2)
+                                    const day = match.substring(2, 4)
+                                    // 유효한 월/일인지 확인
+                                    if (parseInt(month) >= 1 && parseInt(month) <= 12 &&
+                                        parseInt(day) >= 1 && parseInt(day) <= 31) {
+                                        eventDates.push(`${docYear}-${month}-${day}`)
+                                    }
+                                }
+                            }
+                        }
+
+                        // 각 날짜에 일정 추가
+                        for (const eventDate of eventDates) {
+                            await supabase
+                                .from('events')
+                                .insert({
+                                    event_date: eventDate,
+                                    title: eventTitle,
+                                    event_type: 'leave',
+                                    description: doc.title,
+                                    created_by: doc.drafter_id
                                 })
-                                .eq('id', annualLeave.id)
                         }
                     }
                 }

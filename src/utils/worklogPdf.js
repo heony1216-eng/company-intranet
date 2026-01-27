@@ -3,6 +3,15 @@
  * 이미지 기반이 아닌 텍스트 기반으로 생성되어 편집 가능
  */
 
+// 날짜를 YYYYMMDD 형식으로 변환
+const formatDateCompact = (dateString) => {
+    const date = new Date(dateString)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}${month}${day}`
+}
+
 /**
  * 주간 업무보고서 PDF 생성
  * @param {Object} worklog - 업무보고 데이터
@@ -27,7 +36,7 @@ export const generateWeeklyWorklogPdf = (worklog, getWeekNumber, formatDate) => 
     <style>
         @page {
             size: A4;
-            margin: 15mm 15mm 20mm 15mm;
+            margin: 25mm;
         }
         * {
             margin: 0;
@@ -82,19 +91,24 @@ export const generateWeeklyWorklogPdf = (worklog, getWeekNumber, formatDate) => 
             width: 35%;
         }
 
-        .section-header {
-            background-color: #f8f9fa;
-            border: 1px solid #333;
-            padding: 12px 15px;
-            font-weight: 600;
-            font-size: 14px;
+        .content-table {
+            width: 100%;
+            border-collapse: collapse;
             margin-top: 20px;
         }
-        .section-content {
+        .content-table td {
             border: 1px solid #333;
-            border-top: none;
-            padding: 20px;
+            padding: 0;
             font-size: 14px;
+            vertical-align: top;
+        }
+        .content-table .section-title {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            padding: 12px 15px;
+        }
+        .content-table .section-body {
+            padding: 20px;
             min-height: 50px;
         }
 
@@ -111,12 +125,6 @@ export const generateWeeklyWorklogPdf = (worklog, getWeekNumber, formatDate) => 
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
-            .section-header {
-                page-break-after: avoid;
-            }
-            .section-content {
-                page-break-inside: auto;
-            }
             p {
                 page-break-inside: avoid;
                 orphans: 2;
@@ -127,7 +135,7 @@ export const generateWeeklyWorklogPdf = (worklog, getWeekNumber, formatDate) => 
 </head>
 <body>
     <div class="date-header">
-        작성일: ${formatDate(worklog.work_date)}
+        작성일: ${formatDateCompact(worklog.work_date)}
     </div>
 
     <div class="title-section">
@@ -149,19 +157,38 @@ export const generateWeeklyWorklogPdf = (worklog, getWeekNumber, formatDate) => 
         </tr>
     </table>
 
-    <div class="section-header">Ⅰ. 금주 업무 수행 내용</div>
-    <div class="section-content">
-        ${textToLines(worklog.morning_work)}
-    </div>
+    <table class="content-table">
+        <tr>
+            <td class="section-title">Ⅰ. 금주 업무 수행 내용</td>
+        </tr>
+        <tr>
+            <td class="section-body">
+                ${textToLines(worklog.morning_work)}
+            </td>
+        </tr>
+    </table>
 
-    <div class="section-header">Ⅱ. 특이사항 및 건의사항</div>
-    <div class="section-content">
-        ${textToLines(worklog.special_notes)}
-    </div>
+    <table class="content-table">
+        <tr>
+            <td class="section-title">Ⅱ. 금주 업무</td>
+        </tr>
+        <tr>
+            <td class="section-body">
+                ${textToLines(worklog.this_week_work)}
+            </td>
+        </tr>
+    </table>
 
-    <div class="footer">
-        한인구조단
-    </div>
+    <table class="content-table">
+        <tr>
+            <td class="section-title">Ⅲ. 특이사항 및 건의사항</td>
+        </tr>
+        <tr>
+            <td class="section-body">
+                ${textToLines(worklog.special_notes)}
+            </td>
+        </tr>
+    </table>
 
     <script>
         window.onload = function() {
@@ -202,7 +229,7 @@ export const generateMonthlyWorklogPdf = (worklog, getMonthLabel, formatDate) =>
     <style>
         @page {
             size: A4;
-            margin: 15mm 15mm 20mm 15mm;
+            margin: 25mm;
         }
         * {
             margin: 0;
@@ -257,19 +284,24 @@ export const generateMonthlyWorklogPdf = (worklog, getMonthLabel, formatDate) =>
             width: 35%;
         }
 
-        .section-header {
-            background-color: #f8f9fa;
-            border: 1px solid #333;
-            padding: 12px 15px;
-            font-weight: 600;
-            font-size: 14px;
+        .content-table {
+            width: 100%;
+            border-collapse: collapse;
             margin-top: 20px;
         }
-        .section-content {
+        .content-table td {
             border: 1px solid #333;
-            border-top: none;
-            padding: 20px;
+            padding: 0;
             font-size: 14px;
+            vertical-align: top;
+        }
+        .content-table .section-title {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            padding: 12px 15px;
+        }
+        .content-table .section-body {
+            padding: 20px;
             min-height: 50px;
         }
 
@@ -286,12 +318,6 @@ export const generateMonthlyWorklogPdf = (worklog, getMonthLabel, formatDate) =>
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
-            .section-header {
-                page-break-after: avoid;
-            }
-            .section-content {
-                page-break-inside: auto;
-            }
             p {
                 page-break-inside: avoid;
                 orphans: 2;
@@ -302,7 +328,7 @@ export const generateMonthlyWorklogPdf = (worklog, getMonthLabel, formatDate) =>
 </head>
 <body>
     <div class="date-header">
-        작성일: ${formatDate(worklog.work_date)}
+        작성일: ${formatDateCompact(worklog.work_date)}
     </div>
 
     <div class="title-section">
@@ -324,19 +350,27 @@ export const generateMonthlyWorklogPdf = (worklog, getMonthLabel, formatDate) =>
         </tr>
     </table>
 
-    <div class="section-header">Ⅰ. 금월 업무 수행 내용</div>
-    <div class="section-content">
-        ${textToLines(worklog.morning_work)}
-    </div>
+    <table class="content-table">
+        <tr>
+            <td class="section-title">Ⅰ. 금월 업무 수행 내용</td>
+        </tr>
+        <tr>
+            <td class="section-body">
+                ${textToLines(worklog.morning_work)}
+            </td>
+        </tr>
+    </table>
 
-    <div class="section-header">Ⅱ. 특이사항 및 건의사항</div>
-    <div class="section-content">
-        ${textToLines(worklog.special_notes)}
-    </div>
-
-    <div class="footer">
-        한인구조단
-    </div>
+    <table class="content-table">
+        <tr>
+            <td class="section-title">Ⅱ. 특이사항 및 건의사항</td>
+        </tr>
+        <tr>
+            <td class="section-body">
+                ${textToLines(worklog.special_notes)}
+            </td>
+        </tr>
+    </table>
 
     <script>
         window.onload = function() {
@@ -360,29 +394,50 @@ export const generateMonthlyWorklogPdf = (worklog, getMonthLabel, formatDate) =>
  * @param {Function} formatDate - 날짜 포맷 함수
  */
 export const generateDailyWorklogPdf = (worklog, formatDate) => {
-    // 업무 항목을 리스트로 변환
-    const parseTasksToList = (taskString) => {
-        if (!taskString) return '<p style="color: #666; text-align: center;">-</p>'
+    // 업무 항목 구분자
+    const TASK_SEPARATOR = '\n---TASK---\n'
 
-        const lines = taskString.split('\n').filter(line => line.trim())
-        if (lines.length === 0) return '<p style="color: #666; text-align: center;">-</p>'
+    // 업무 항목을 테이블 행으로 변환
+    const parseTasksToTableRows = (taskString) => {
+        if (!taskString) return '<tr><td colspan="3" style="text-align: center; color: #666; padding: 15px;">-</td></tr>'
 
-        return lines.map((line, index) => {
-            const match = line.match(/^(.+?)\s*\((\d+)%\)$/)
-            let content = line
+        // 새 형식(TASK_SEPARATOR) 또는 기존 형식(\n) 지원
+        const hasSeparator = taskString.includes('---TASK---')
+        const items = hasSeparator
+            ? taskString.split(TASK_SEPARATOR).filter(item => item.trim())
+            : taskString.split('\n').filter(line => line.trim())
+
+        if (items.length === 0) return '<tr><td colspan="3" style="text-align: center; color: #666; padding: 15px;">-</td></tr>'
+
+        return items.map((item, index) => {
+            // 여러 줄인 경우 마지막 줄에서 진척도 추출
+            const lines = item.trim().split('\n')
+            const lastLine = lines[lines.length - 1]
+            const match = lastLine.match(/^(.+?)\s*\((\d+)%\)$/)
+
+            let content = item.trim()
             let progress = '-'
 
-            if (match) {
+            if (match && lines.length === 1) {
+                // 단일 줄이고 진척도가 있는 경우
                 content = match[1].trim()
+                progress = match[2] + '%'
+            } else if (match && lines.length > 1) {
+                // 여러 줄이고 마지막 줄에 진척도가 있는 경우
+                lines[lines.length - 1] = match[1].trim()
+                content = lines.join('\n')
                 progress = match[2] + '%'
             }
 
+            // 줄바꿈을 <br>로 변환하여 표시
+            const contentHtml = content.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
+
             return `
-                <div style="display: flex; border-bottom: 1px solid #ddd; padding: 8px 0;">
-                    <span style="width: 40px; text-align: center; flex-shrink: 0;">${index + 1}</span>
-                    <span style="flex: 1; padding: 0 10px;">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
-                    <span style="width: 60px; text-align: center; flex-shrink: 0;">${progress}</span>
-                </div>
+                <tr>
+                    <td style="width: 40px; text-align: center; padding: 8px; border: 1px solid #333;">${index + 1}</td>
+                    <td style="padding: 8px 10px; border: 1px solid #333;">${contentHtml}</td>
+                    <td style="width: 60px; text-align: center; padding: 8px; border: 1px solid #333;">${progress}</td>
+                </tr>
             `
         }).join('')
     }
@@ -403,7 +458,7 @@ export const generateDailyWorklogPdf = (worklog, formatDate) => {
     <style>
         @page {
             size: A4;
-            margin: 15mm 15mm 20mm 15mm;
+            margin: 25mm;
         }
         * {
             margin: 0;
@@ -458,32 +513,46 @@ export const generateDailyWorklogPdf = (worklog, formatDate) => {
             width: 35%;
         }
 
-        .section-header {
-            background-color: #f8f9fa;
-            border: 1px solid #333;
-            padding: 12px 15px;
-            font-weight: 600;
-            font-size: 14px;
+        .content-table {
+            width: 100%;
+            border-collapse: collapse;
             margin-top: 15px;
         }
-        .section-subheader {
-            display: flex;
+        .content-table td, .content-table th {
             border: 1px solid #333;
-            border-top: none;
+            padding: 0;
+            font-size: 13px;
+            vertical-align: top;
+        }
+        .content-table .section-title {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            padding: 12px 15px;
+            text-align: left;
+        }
+        .content-table .section-body {
+            padding: 15px;
+            min-height: 30px;
+        }
+        .content-table .subheader {
             background-color: #fafafa;
             font-weight: 600;
-            font-size: 13px;
-        }
-        .section-subheader span {
             padding: 8px;
             text-align: center;
         }
-        .section-content {
+
+        .task-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .task-table td, .task-table th {
             border: 1px solid #333;
-            border-top: none;
-            padding: 15px;
             font-size: 13px;
-            min-height: 30px;
+        }
+        .task-table th {
+            background-color: #fafafa;
+            font-weight: 600;
+            padding: 8px;
         }
 
         .footer {
@@ -499,13 +568,7 @@ export const generateDailyWorklogPdf = (worklog, formatDate) => {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
-            .section-header, .section-subheader {
-                page-break-after: avoid;
-            }
-            .section-content {
-                page-break-inside: auto;
-            }
-            .section-content > div {
+            tr {
                 page-break-inside: avoid;
             }
             p {
@@ -518,7 +581,7 @@ export const generateDailyWorklogPdf = (worklog, formatDate) => {
 </head>
 <body>
     <div class="date-header">
-        작성일: ${formatDate(worklog.work_date)}
+        작성일: ${formatDateCompact(worklog.work_date)}
     </div>
 
     <div class="title-section">
@@ -540,39 +603,63 @@ export const generateDailyWorklogPdf = (worklog, formatDate) => {
         </tr>
     </table>
 
-    <div class="section-header">Ⅰ. 오전 업무</div>
-    <div class="section-subheader">
-        <span style="width: 40px;">No</span>
-        <span style="flex: 1;">업무 내용</span>
-        <span style="width: 60px;">진척률</span>
-    </div>
-    <div class="section-content">
-        ${parseTasksToList(worklog.morning_work)}
-    </div>
+    <table class="content-table">
+        <tr>
+            <td class="section-title" colspan="3">Ⅰ. 오전 업무</td>
+        </tr>
+    </table>
+    <table class="task-table">
+        <thead>
+            <tr>
+                <th style="width: 40px;">No</th>
+                <th>업무 내용</th>
+                <th style="width: 60px;">진척률</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${parseTasksToTableRows(worklog.morning_work)}
+        </tbody>
+    </table>
 
-    <div class="section-header">Ⅱ. 오후 업무</div>
-    <div class="section-subheader">
-        <span style="width: 40px;">No</span>
-        <span style="flex: 1;">업무 내용</span>
-        <span style="width: 60px;">진척률</span>
-    </div>
-    <div class="section-content">
-        ${parseTasksToList(worklog.afternoon_work)}
-    </div>
+    <table class="content-table" style="margin-top: 15px;">
+        <tr>
+            <td class="section-title" colspan="3">Ⅱ. 오후 업무</td>
+        </tr>
+    </table>
+    <table class="task-table">
+        <thead>
+            <tr>
+                <th style="width: 40px;">No</th>
+                <th>업무 내용</th>
+                <th style="width: 60px;">진척률</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${parseTasksToTableRows(worklog.afternoon_work)}
+        </tbody>
+    </table>
 
-    <div class="section-header">Ⅲ. 익일 업무</div>
-    <div class="section-content">
-        ${textToLines(worklog.next_day_work)}
-    </div>
+    <table class="content-table" style="margin-top: 15px;">
+        <tr>
+            <td class="section-title">Ⅲ. 익일 업무</td>
+        </tr>
+        <tr>
+            <td class="section-body">
+                ${textToLines(worklog.next_day_work)}
+            </td>
+        </tr>
+    </table>
 
-    <div class="section-header">Ⅳ. 특이사항 및 비고</div>
-    <div class="section-content">
-        ${textToLines(worklog.special_notes)}
-    </div>
-
-    <div class="footer">
-        한인구조단
-    </div>
+    <table class="content-table" style="margin-top: 15px;">
+        <tr>
+            <td class="section-title">Ⅳ. 특이사항 및 비고</td>
+        </tr>
+        <tr>
+            <td class="section-body">
+                ${textToLines(worklog.special_notes)}
+            </td>
+        </tr>
+    </table>
 
     <script>
         window.onload = function() {

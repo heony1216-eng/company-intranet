@@ -34,6 +34,16 @@ const isImageFile = (item) => {
     return imageExtensions.some(ext => lowerUrl.includes(ext))
 }
 
+// 업무 문자열을 정리 (구분자와 진척도 제거)
+const formatWorkContent = (str) => {
+    if (!str) return ''
+    // ---TASK--- 구분자를 줄바꿈으로 변환
+    let result = str.replace(/\n---TASK---\n/g, '\n')
+    // (100%) 등 진척도 제거
+    result = result.replace(/\s*\(\d+%\)/g, '')
+    return result.trim()
+}
+
 // 이미지 갤러리 컴포넌트 (드래그 스크롤 + 스와이프 지원)
 const ImageGallery = ({ urls }) => {
     const scrollRef = useRef(null)
@@ -573,7 +583,7 @@ const MonthlyWorkLogPage = () => {
                 const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1)
                 const weekNumber = Math.ceil((date.getDate() + firstDayOfMonth.getDay()) / 7)
 
-                return `【${weekNumber}주차】\n${log.morning_work || '-'}`
+                return `【${weekNumber}주차】\n${formatWorkContent(log.morning_work) || '-'}`
             }).join('\n\n')
 
             setFormData(prev => ({

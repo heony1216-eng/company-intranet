@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Card, Button, Modal } from '../components/common'
-import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, FileDown, PlusCircle, Printer } from 'lucide-react'
+import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, FileDown, PlusCircle, Printer, Copy, AlertCircle, CheckCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { uploadMultipleToDropbox, deleteMultipleFilesByUrl } from '../lib/dropbox'
@@ -346,11 +346,43 @@ const WorkLogPage = () => {
     const itemsPerPage = 15
     const fileInputRef = useRef(null)
 
+    // 알림 모달 상태
+    const [alertModal, setAlertModal] = useState({ isOpen: false, message: '', type: 'info' })
+    const showAlert = (message, type = 'info') => {
+        setAlertModal({ isOpen: true, message, type })
+    }
+
+    // 삭제 확인 모달 상태
+    const [confirmModal, setConfirmModal] = useState({ isOpen: false, worklog: null })
+
+    // 한국 시간 기준 오늘 날짜 가져오기
+    const getTodayKST = () => {
+        const now = new Date()
+        const year = now.getFullYear()
+        const month = String(now.getMonth() + 1).padStart(2, '0')
+        const day = String(now.getDate()).padStart(2, '0')
+        return `${year}-${month}-${day}`
+    }
+
     // 오전/오후 업무 항목 구조: [{ content: '', progress: '' }]
     const [formData, setFormData] = useState({
-        work_date: new Date().toISOString().split('T')[0],
+        work_date: getTodayKST(),
         morning_tasks: [{ content: '', progress: '' }],
         afternoon_tasks: [{ content: '', progress: '' }],
+        next_day_work: '',
+        special_notes: '',
+        files: [],
+        existingFileUrls: []
+    })
+
+    // 홍사범 사장님용 간단 폼 체크
+    const isSimpleFormUser = profile?.name === '홍사범'
+
+    // 간단 폼 (텍스트 하나씩) - 홍사범 사장님용
+    const [simpleFormData, setSimpleFormData] = useState({
+        work_date: getTodayKST(),
+        morning_work: '',
+        afternoon_work: '',
         next_day_work: '',
         special_notes: '',
         files: [],
@@ -383,28 +415,70 @@ const WorkLogPage = () => {
         }))
     }
 
+    // 업무 항목 구분자 (줄바꿈과 구분하기 위해 특수 구분자 사용)
+    const TASK_SEPARATOR = '\n---TASK---\n'
+
     // 업무 배열을 문자열로 변환 (저장용)
     const tasksToString = (tasks) => {
         return tasks
             .filter(t => t.content.trim())
             .map(t => t.progress ? `${t.content} (${t.progress}%)` : t.content)
-            .join('\n')
+            .join(TASK_SEPARATOR)
     }
 
     // 문자열을 업무 배열로 변환 (불러오기용)
     const stringToTasks = (str) => {
         if (!str) return [{ content: '', progress: '' }]
-        const lines = str.split('\n').filter(line => line.trim())
-        if (lines.length === 0) return [{ content: '', progress: '' }]
 
-        return lines.map(line => {
-            // "내용 (50%)" 형식에서 진척도 추출
-            const match = line.match(/^(.+?)\s*\((\d+)%\)$/)
-            if (match) {
-                return { content: match[1].trim(), progress: match[2] }
+        // 새 형식(TASK_SEPARATOR) 확인
+        const hasSeparator = str.includes('---TASK---')
+
+        let items
+        if (hasSeparator) {
+            // 새 형식: TASK_SEPARATOR로 분리
+            items = str.split(TASK_SEPARATOR).filter(item => item.trim())
+        } else {
+            // 레거시 형식: 번호 패턴(1., 2., 3. 등)으로 분리 시도
+            // "1. 내용" 또는 "1.내용" 패턴 감지
+            const hasNumberPattern = /^\d+\.\s*/m.test(str)
+            if (hasNumberPattern) {
+                // 번호 패턴으로 분리 (줄 시작이 숫자.인 경우)
+                items = str.split(/\n(?=\d+\.\s*)/).filter(item => item.trim())
+                // 번호 제거 (1. 2. 3. 등)
+                items = items.map(item => item.replace(/^\d+\.\s*/, '').trim())
+            } else {
+                // 패턴 없으면 전체를 하나의 항목으로
+                items = [str]
             }
-            return { content: line, progress: '' }
+        }
+
+        if (items.length === 0 || (items.length === 1 && !items[0].trim())) {
+            return [{ content: '', progress: '' }]
+        }
+
+        return items.map(item => {
+            // "내용 (50%)" 형식에서 진척도 추출 (마지막 줄에서만)
+            const lines = item.trim().split('\n')
+            const lastLine = lines[lines.length - 1]
+            const match = lastLine.match(/^(.+?)\s*\((\d+)%\)$/)
+
+            if (match && lines.length === 1) {
+                // 단일 줄이고 진척도가 있는 경우
+                return { content: match[1].trim(), progress: match[2] }
+            } else if (match && lines.length > 1) {
+                // 여러 줄이고 마지막 줄에 진척도가 있는 경우
+                lines[lines.length - 1] = match[1].trim()
+                return { content: lines.join('\n'), progress: match[2] }
+            }
+            return { content: item.trim(), progress: '' }
         })
+    }
+
+    // 업무 문자열을 미리보기용으로 변환 (구분자 제거)
+    const getTaskPreview = (str) => {
+        if (!str) return '-'
+        // 구분자를 쉼표로 대체하여 한 줄로 표시
+        return str.replace(/\n---TASK---\n/g, ', ').replace(/\n/g, ' ')
     }
 
     // 연도 목록 생성 (2026년부터 현재 연도까지)
@@ -485,17 +559,31 @@ const WorkLogPage = () => {
             name: file.name,
             size: (file.size / 1024).toFixed(0) + 'KB'
         }))
-        setFormData(prev => ({
-            ...prev,
-            files: [...prev.files, ...fileData]
-        }))
+        if (isSimpleFormUser) {
+            setSimpleFormData(prev => ({
+                ...prev,
+                files: [...prev.files, ...fileData]
+            }))
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                files: [...prev.files, ...fileData]
+            }))
+        }
     }
 
     const removeFile = (index) => {
-        setFormData(prev => ({
-            ...prev,
-            files: prev.files.filter((_, i) => i !== index)
-        }))
+        if (isSimpleFormUser) {
+            setSimpleFormData(prev => ({
+                ...prev,
+                files: prev.files.filter((_, i) => i !== index)
+            }))
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                files: prev.files.filter((_, i) => i !== index)
+            }))
+        }
     }
 
     const removeExistingFile = (index) => {
@@ -516,11 +604,65 @@ const WorkLogPage = () => {
     }
 
     const handleCreate = async () => {
+        // 홍사범 사장님은 간단 폼 사용
+        if (isSimpleFormUser) {
+            const morningWork = simpleFormData.morning_work.trim()
+            const afternoonWork = simpleFormData.afternoon_work.trim()
+
+            if (!morningWork && !afternoonWork) {
+                showAlert('오전 또는 오후 업무 중 하나는 입력해주세요.', 'error')
+                return
+            }
+
+            try {
+                setUploading(true)
+                let fileUrls = []
+
+                if (simpleFormData.files.length > 0) {
+                    fileUrls = await uploadFiles(simpleFormData.files)
+                }
+
+                const { error } = await supabase.from('work_logs').insert({
+                    work_date: simpleFormData.work_date,
+                    morning_work: morningWork,
+                    afternoon_work: afternoonWork,
+                    next_day_work: simpleFormData.next_day_work,
+                    special_notes: simpleFormData.special_notes,
+                    file_urls: fileUrls,
+                    user_id: profile.user_id,
+                    type: 'daily',
+                    is_read: false
+                })
+
+                if (error) throw error
+
+                setIsModalOpen(false)
+                resetForm()
+                fetchWorklogs()
+                showAlert('업무보고가 저장되었습니다.', 'success')
+            } catch (error) {
+                console.error('Error creating worklog:', error)
+                showAlert('업무보고 저장에 실패했습니다: ' + error.message, 'error')
+            } finally {
+                setUploading(false)
+            }
+            return
+        }
+
+        // 직원용 폼
         const morningWork = tasksToString(formData.morning_tasks)
         const afternoonWork = tasksToString(formData.afternoon_tasks)
 
         if (!morningWork && !afternoonWork) {
-            alert('오전 또는 오후 업무 중 하나는 입력해주세요.')
+            showAlert('오전 또는 오후 업무 중 하나는 입력해주세요.', 'error')
+            return
+        }
+
+        // 진척률 필수 검사
+        const morningTasksWithContent = formData.morning_tasks.filter(t => t.content.trim())
+        const afternoonTasksWithContent = formData.afternoon_tasks.filter(t => t.content.trim())
+        if (morningTasksWithContent.some(t => !t.progress) || afternoonTasksWithContent.some(t => !t.progress)) {
+            showAlert('모든 업무 항목에 진척률(%)을 입력해주세요.', 'error')
             return
         }
 
@@ -549,31 +691,87 @@ const WorkLogPage = () => {
             setIsModalOpen(false)
             resetForm()
             fetchWorklogs()
-            alert('업무보고가 저장되었습니다.')
+            showAlert('업무보고가 저장되었습니다.', 'success')
         } catch (error) {
             console.error('Error creating worklog:', error)
-            alert('업무보고 저장에 실패했습니다: ' + error.message)
+            showAlert('업무보고 저장에 실패했습니다: ' + error.message, 'error')
         } finally {
             setUploading(false)
         }
     }
 
     const handleEdit = async () => {
-        const morningWork = tasksToString(formData.morning_tasks)
-        const afternoonWork = tasksToString(formData.afternoon_tasks)
-
-        if (!morningWork && !afternoonWork) {
-            alert('오전 또는 오후 업무 중 하나는 입력해주세요.')
-            return
-        }
-
         if (!selectedWorklog?.id) {
-            alert('수정할 업무보고를 찾을 수 없습니다. 다시 시도해주세요.')
+            showAlert('수정할 업무보고를 찾을 수 없습니다. 다시 시도해주세요.', 'error')
             return
         }
 
         // 수정 중 selectedWorklog가 변경되지 않도록 ID를 미리 저장
         const worklogId = selectedWorklog.id
+
+        // 홍사범 사장님은 간단 폼 사용
+        if (isSimpleFormUser) {
+            const morningWork = simpleFormData.morning_work.trim()
+            const afternoonWork = simpleFormData.afternoon_work.trim()
+
+            if (!morningWork && !afternoonWork) {
+                showAlert('오전 또는 오후 업무 중 하나는 입력해주세요.', 'error')
+                return
+            }
+
+            try {
+                setUploading(true)
+                let newFileUrls = []
+
+                if (simpleFormData.files.length > 0) {
+                    newFileUrls = await uploadFiles(simpleFormData.files)
+                }
+
+                const allFileUrls = [...simpleFormData.existingFileUrls, ...newFileUrls]
+
+                const { error } = await supabase
+                    .from('work_logs')
+                    .update({
+                        work_date: simpleFormData.work_date,
+                        morning_work: morningWork,
+                        afternoon_work: afternoonWork,
+                        next_day_work: simpleFormData.next_day_work,
+                        special_notes: simpleFormData.special_notes,
+                        file_urls: allFileUrls
+                    })
+                    .eq('id', worklogId)
+
+                if (error) throw error
+
+                setIsModalOpen(false)
+                resetForm()
+                fetchWorklogs()
+                showAlert('업무보고가 수정되었습니다.', 'success')
+            } catch (error) {
+                console.error('Error updating worklog:', error)
+                showAlert('업무보고 수정에 실패했습니다: ' + error.message, 'error')
+            } finally {
+                setUploading(false)
+            }
+            return
+        }
+
+        // 직원용 폼
+        const morningWork = tasksToString(formData.morning_tasks)
+        const afternoonWork = tasksToString(formData.afternoon_tasks)
+
+        if (!morningWork && !afternoonWork) {
+            showAlert('오전 또는 오후 업무 중 하나는 입력해주세요.', 'error')
+            return
+        }
+
+        // 진척률 필수 검사
+        const morningTasksWithContent = formData.morning_tasks.filter(t => t.content.trim())
+        const afternoonTasksWithContent = formData.afternoon_tasks.filter(t => t.content.trim())
+        if (morningTasksWithContent.some(t => !t.progress) || afternoonTasksWithContent.some(t => !t.progress)) {
+            showAlert('모든 업무 항목에 진척률(%)을 입력해주세요.', 'error')
+            return
+        }
 
         try {
             setUploading(true)
@@ -602,10 +800,10 @@ const WorkLogPage = () => {
             setIsModalOpen(false)
             resetForm()
             fetchWorklogs()
-            alert('업무보고가 수정되었습니다.')
+            showAlert('업무보고가 수정되었습니다.', 'success')
         } catch (error) {
             console.error('Error updating worklog:', error)
-            alert('업무보고 수정에 실패했습니다: ' + error.message)
+            showAlert('업무보고 수정에 실패했습니다: ' + error.message, 'error')
         } finally {
             setUploading(false)
         }
@@ -613,9 +811,18 @@ const WorkLogPage = () => {
 
     const resetForm = () => {
         setFormData({
-            work_date: new Date().toISOString().split('T')[0],
+            work_date: getTodayKST(),
             morning_tasks: [{ content: '', progress: '' }],
             afternoon_tasks: [{ content: '', progress: '' }],
+            next_day_work: '',
+            special_notes: '',
+            files: [],
+            existingFileUrls: []
+        })
+        setSimpleFormData({
+            work_date: getTodayKST(),
+            morning_work: '',
+            afternoon_work: '',
             next_day_work: '',
             special_notes: '',
             files: [],
@@ -626,6 +833,17 @@ const WorkLogPage = () => {
     }
 
     const openEditModal = (worklog) => {
+        // 관리자용 간단 폼
+        setSimpleFormData({
+            work_date: worklog.work_date,
+            morning_work: worklog.morning_work || '',
+            afternoon_work: worklog.afternoon_work || '',
+            next_day_work: worklog.next_day_work || '',
+            special_notes: worklog.special_notes || '',
+            files: [],
+            existingFileUrls: worklog.file_urls || []
+        })
+        // 직원용 폼
         setFormData({
             work_date: worklog.work_date,
             morning_tasks: stringToTasks(worklog.morning_work),
@@ -645,8 +863,67 @@ const WorkLogPage = () => {
         setIsModalOpen(true)
     }
 
-    const handleDelete = async (worklog) => {
-        if (!confirm('정말 삭제하시겠습니까?')) return
+    // 이전 업무일지 불러오기
+    const loadPreviousWorklog = () => {
+        // 현재 사용자의 가장 최근 업무일지 찾기
+        const myWorklogs = worklogs.filter(log => log.user_id === profile?.user_id)
+        if (myWorklogs.length === 0) {
+            showAlert('불러올 이전 업무보고가 없습니다.', 'info')
+            return
+        }
+
+        const latest = myWorklogs[0] // 이미 날짜순 정렬됨
+
+        if (isSimpleFormUser) {
+            // 홍사범 사장님용 간단 폼
+            setSimpleFormData(prev => ({
+                ...prev,
+                morning_work: latest.morning_work || '',
+                afternoon_work: latest.afternoon_work || '',
+                next_day_work: latest.next_day_work || '',
+                special_notes: ''
+            }))
+        } else {
+            // 일반 직원용 폼
+            setFormData(prev => ({
+                ...prev,
+                morning_tasks: stringToTasks(latest.morning_work),
+                afternoon_tasks: stringToTasks(latest.afternoon_work),
+                next_day_work: latest.next_day_work || '',
+                special_notes: ''
+            }))
+        }
+        showAlert('이전 업무보고를 불러왔습니다.', 'success')
+    }
+
+    // Tab 키로 새 항목 자동 추가
+    const handleTaskKeyDown = (e, type, index) => {
+        const tasks = formData[type]
+        const isLastTask = index === tasks.length - 1
+
+        if (e.key === 'Tab' && !e.shiftKey && isLastTask) {
+            // 마지막 항목에서 Tab 누르면 새 항목 추가
+            e.preventDefault()
+            addTask(type)
+            // 새 항목에 포커스 (다음 렌더 사이클에서)
+            setTimeout(() => {
+                const selector = type === 'morning_tasks'
+                    ? `[data-morning-task="${index + 1}"]`
+                    : `[data-afternoon-task="${index + 1}"]`
+                document.querySelector(selector)?.focus()
+            }, 0)
+        }
+    }
+
+    const handleDelete = (worklog) => {
+        setConfirmModal({ isOpen: true, worklog })
+    }
+
+    const confirmDelete = async () => {
+        const worklog = confirmModal.worklog
+        if (!worklog) return
+
+        setConfirmModal({ isOpen: false, worklog: null })
 
         try {
             // Dropbox에서 첨부파일 삭제
@@ -657,10 +934,10 @@ const WorkLogPage = () => {
             const { error } = await supabase.from('work_logs').delete().eq('id', worklog.id)
             if (error) throw error
             fetchWorklogs()
-            alert('삭제되었습니다.')
+            showAlert('삭제되었습니다.', 'success')
         } catch (error) {
             console.error('Error deleting worklog:', error)
-            alert('삭제에 실패했습니다.')
+            showAlert('삭제에 실패했습니다.', 'error')
         }
     }
 
@@ -726,8 +1003,13 @@ const WorkLogPage = () => {
                 ]
             }
 
-            const lines = taskString.split('\n').filter(line => line.trim())
-            if (lines.length === 0) {
+            // 새 형식(TASK_SEPARATOR) 또는 기존 형식(\n) 지원
+            const hasSeparator = taskString.includes('---TASK---')
+            const items = hasSeparator
+                ? taskString.split(TASK_SEPARATOR).filter(item => item.trim())
+                : taskString.split('\n').filter(line => line.trim())
+
+            if (items.length === 0) {
                 return [
                     new TableRow({
                         children: [
@@ -750,15 +1032,28 @@ const WorkLogPage = () => {
                 ]
             }
 
-            return lines.map((line, index) => {
-                const match = line.match(/^(.+?)\s*\((\d+)%\)$/)
-                let content = line
+            return items.map((item, index) => {
+                // 여러 줄인 경우 마지막 줄에서 진척도 추출
+                const lines = item.trim().split('\n')
+                const lastLine = lines[lines.length - 1]
+                const match = lastLine.match(/^(.+?)\s*\((\d+)%\)$/)
+
+                let content = item.trim()
                 let progress = '-'
 
-                if (match) {
+                if (match && lines.length === 1) {
                     content = match[1].trim()
                     progress = match[2] + '%'
+                } else if (match && lines.length > 1) {
+                    lines[lines.length - 1] = match[1].trim()
+                    content = lines.join('\n')
+                    progress = match[2] + '%'
                 }
+
+                // 여러 줄인 경우 각 줄을 별도 Paragraph로 생성
+                const contentParagraphs = content.split('\n').map(line =>
+                    new Paragraph({ text: line })
+                )
 
                 return new TableRow({
                     children: [
@@ -768,7 +1063,7 @@ const WorkLogPage = () => {
                             borders: tableBorders,
                         }),
                         new TableCell({
-                            children: [new Paragraph({ text: content })],
+                            children: contentParagraphs,
                             borders: tableBorders,
                         }),
                         new TableCell({
@@ -1325,13 +1620,13 @@ const WorkLogPage = () => {
                                                 className="px-3 py-3 text-sm text-toss-gray-700 cursor-pointer max-w-[200px] truncate"
                                                 onClick={() => viewWorklogDetail(log)}
                                             >
-                                                {log.morning_work || '-'}
+                                                {getTaskPreview(log.morning_work)}
                                             </td>
                                             <td
                                                 className="px-3 py-3 text-sm text-toss-gray-700 cursor-pointer max-w-[200px] truncate"
                                                 onClick={() => viewWorklogDetail(log)}
                                             >
-                                                {log.afternoon_work || '-'}
+                                                {getTaskPreview(log.afternoon_work)}
                                             </td>
                                             <td className="px-3 py-3 text-center whitespace-nowrap">
                                                 <div className="flex items-center justify-center gap-1">
@@ -1445,11 +1740,11 @@ const WorkLogPage = () => {
                                     <div className="space-y-1">
                                         <p className="text-sm text-toss-gray-700 line-clamp-1">
                                             <span className="text-toss-gray-500 mr-1">오전:</span>
-                                            {log.morning_work || '-'}
+                                            {getTaskPreview(log.morning_work)}
                                         </p>
                                         <p className="text-sm text-toss-gray-700 line-clamp-1">
                                             <span className="text-toss-gray-500 mr-1">오후:</span>
-                                            {log.afternoon_work || '-'}
+                                            {getTaskPreview(log.afternoon_work)}
                                         </p>
                                     </div>
                                 </div>
@@ -1513,175 +1808,289 @@ const WorkLogPage = () => {
                         </label>
                         <input
                             type="date"
-                            value={formData.work_date}
-                            onChange={(e) => setFormData({ ...formData, work_date: e.target.value })}
+                            value={isSimpleFormUser ? simpleFormData.work_date : formData.work_date}
+                            onChange={(e) => isSimpleFormUser
+                                ? setSimpleFormData({ ...simpleFormData, work_date: e.target.value })
+                                : setFormData({ ...formData, work_date: e.target.value })
+                            }
                             className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
                         />
                         <p className="text-sm text-toss-gray-500 mt-1">
-                            {formatDate(formData.work_date)}
+                            {formatDate(isSimpleFormUser ? simpleFormData.work_date : formData.work_date)}
                         </p>
                     </div>
 
-                    {/* 오전 업무 */}
-                    <div>
-                        <label className="block text-sm font-medium text-toss-gray-700 mb-2">
-                            오전 업무
-                        </label>
-                        <div className="space-y-2">
-                            {formData.morning_tasks.map((task, index) => (
-                                <div key={index} className="flex items-start gap-2">
-                                    <span className="w-6 text-center text-sm font-medium text-toss-gray-500 pt-3">{index + 1}</span>
-                                    <textarea
-                                        value={task.content}
-                                        onChange={(e) => updateTask('morning_tasks', index, 'content', e.target.value)}
-                                        data-morning-task={index}
-                                        rows={2}
-                                        className="flex-1 px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all resize-none leading-relaxed"
-                                        placeholder="업무 상세 내용 (Enter로 줄바꿈)"
-                                    />
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        pattern="[0-9]*"
-                                        value={task.progress}
-                                        onChange={(e) => {
-                                            const val = e.target.value.replace(/[^0-9]/g, '')
-                                            if (val === '' || (parseInt(val) >= 0 && parseInt(val) <= 100)) {
-                                                updateTask('morning_tasks', index, 'progress', val)
-                                            }
-                                        }}
-                                        className="w-16 px-2 self-stretch bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all text-center"
-                                        placeholder="%"
-                                    />
-                                    {formData.morning_tasks.length > 1 && (
-                                        <button
-                                            type="button"
-                                            onClick={() => removeTask('morning_tasks', index)}
-                                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    )}
-                                </div>
-                            ))}
-                            <button
-                                type="button"
-                                onClick={() => addTask('morning_tasks')}
-                                className="flex items-center gap-2 px-4 py-2 text-toss-blue hover:bg-toss-blue/10 rounded-xl transition-colors text-sm font-medium"
-                            >
-                                <PlusCircle size={16} />
-                                업무 추가
-                            </button>
-                        </div>
-                    </div>
+                    {/* 이전 업무일지 불러오기 버튼 */}
+                    {!isEditMode && (
+                        <button
+                            type="button"
+                            onClick={loadPreviousWorklog}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-toss-gray-100 text-toss-gray-700 rounded-xl hover:bg-toss-gray-200 transition-colors text-sm font-medium w-full justify-center"
+                        >
+                            <Copy size={16} />
+                            이전 업무일지 불러오기
+                        </button>
+                    )}
 
-                    {/* 오후 업무 */}
-                    <div>
-                        <label className="block text-sm font-medium text-toss-gray-700 mb-2">
-                            오후 업무
-                        </label>
-                        <div className="space-y-2">
-                            {formData.afternoon_tasks.map((task, index) => (
-                                <div key={index} className="flex items-start gap-2">
-                                    <span className="w-6 text-center text-sm font-medium text-toss-gray-500 pt-3">{index + 1}</span>
-                                    <textarea
-                                        value={task.content}
-                                        onChange={(e) => updateTask('afternoon_tasks', index, 'content', e.target.value)}
-                                        data-afternoon-task={index}
-                                        rows={2}
-                                        className="flex-1 px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all resize-none leading-relaxed"
-                                        placeholder="업무 상세 내용 (Enter로 줄바꿈)"
-                                    />
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        pattern="[0-9]*"
-                                        value={task.progress}
-                                        onChange={(e) => {
-                                            const val = e.target.value.replace(/[^0-9]/g, '')
-                                            if (val === '' || (parseInt(val) >= 0 && parseInt(val) <= 100)) {
-                                                updateTask('afternoon_tasks', index, 'progress', val)
-                                            }
-                                        }}
-                                        className="w-16 px-2 self-stretch bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all text-center"
-                                        placeholder="%"
-                                    />
-                                    {formData.afternoon_tasks.length > 1 && (
-                                        <button
-                                            type="button"
-                                            onClick={() => removeTask('afternoon_tasks', index)}
-                                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    )}
-                                </div>
-                            ))}
-                            <button
-                                type="button"
-                                onClick={() => addTask('afternoon_tasks')}
-                                className="flex items-center gap-2 px-4 py-2 text-toss-blue hover:bg-toss-blue/10 rounded-xl transition-colors text-sm font-medium"
-                            >
-                                <PlusCircle size={16} />
-                                업무 추가
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* 익일 업무 */}
-                    <div>
-                        <label className="block text-sm font-medium text-toss-gray-700 mb-2">
-                            익일 업무
-                        </label>
-                        <textarea
-                            value={formData.next_day_work}
-                            onChange={(e) => setFormData({ ...formData, next_day_work: e.target.value })}
-                            rows={3}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all leading-relaxed"
-                            placeholder="다음날 수행할 업무를 입력하세요"
-                        />
-                    </div>
-
-                    {/* 특이사항(비고) */}
-                    <div>
-                        <label className="block text-sm font-medium text-toss-gray-700 mb-2">
-                            특이사항(비고)
-                        </label>
-                        <textarea
-                            value={formData.special_notes}
-                            onChange={(e) => setFormData({ ...formData, special_notes: e.target.value })}
-                            rows={3}
-                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all leading-relaxed"
-                            placeholder="특이사항이나 비고사항을 입력하세요"
-                        />
-                    </div>
-
-                    {/* 기존 파일 목록 (수정 모드일 때만) */}
-                    {isEditMode && formData.existingFileUrls.length > 0 && (
-                        <div>
-                            <label className="block text-sm font-medium text-toss-gray-700 mb-2">
-                                기존 파일
-                            </label>
-                            <div className="space-y-2">
-                                {formData.existingFileUrls.map((url, index) => {
-                                    const fileName = url.split('/').pop()
-                                    return (
-                                        <div key={index} className="flex items-center justify-between p-3 bg-toss-gray-50 rounded-xl">
-                                            <div className="flex items-center gap-2">
-                                                <File size={16} className="text-toss-gray-500" />
-                                                <span className="text-sm text-toss-gray-700">{fileName}</span>
-                                            </div>
-                                            <button
-                                                onClick={() => removeExistingFile(index)}
-                                                className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors"
-                                            >
-                                                <X size={16} />
-                                            </button>
-                                        </div>
-                                    )
-                                })}
+                    {/* 홍사범 사장님용 간단 폼 */}
+                    {isSimpleFormUser ? (
+                        <>
+                            {/* 오전 업무 - 간단 */}
+                            <div>
+                                <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                    오전 업무
+                                </label>
+                                <textarea
+                                    value={simpleFormData.morning_work}
+                                    onChange={(e) => setSimpleFormData({ ...simpleFormData, morning_work: e.target.value })}
+                                    rows={4}
+                                    className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all leading-relaxed"
+                                    placeholder="오전 업무 내용을 자유롭게 입력하세요"
+                                />
                             </div>
-                        </div>
+
+                            {/* 오후 업무 - 간단 */}
+                            <div>
+                                <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                    오후 업무
+                                </label>
+                                <textarea
+                                    value={simpleFormData.afternoon_work}
+                                    onChange={(e) => setSimpleFormData({ ...simpleFormData, afternoon_work: e.target.value })}
+                                    rows={4}
+                                    className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all leading-relaxed"
+                                    placeholder="오후 업무 내용을 자유롭게 입력하세요"
+                                />
+                            </div>
+
+                            {/* 익일 업무 */}
+                            <div>
+                                <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                    익일 업무
+                                </label>
+                                <textarea
+                                    value={simpleFormData.next_day_work}
+                                    onChange={(e) => setSimpleFormData({ ...simpleFormData, next_day_work: e.target.value })}
+                                    rows={3}
+                                    className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all leading-relaxed"
+                                    placeholder="다음날 수행할 업무를 입력하세요"
+                                />
+                            </div>
+
+                            {/* 특이사항(비고) */}
+                            <div>
+                                <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                    특이사항(비고)
+                                </label>
+                                <textarea
+                                    value={simpleFormData.special_notes}
+                                    onChange={(e) => setSimpleFormData({ ...simpleFormData, special_notes: e.target.value })}
+                                    rows={3}
+                                    className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all leading-relaxed"
+                                    placeholder="특이사항이나 비고사항을 입력하세요"
+                                />
+                            </div>
+
+                            {/* 기존 파일 목록 (수정 모드일 때만) */}
+                            {isEditMode && simpleFormData.existingFileUrls.length > 0 && (
+                                <div>
+                                    <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                        기존 파일
+                                    </label>
+                                    <div className="space-y-2">
+                                        {simpleFormData.existingFileUrls.map((url, index) => {
+                                            const fileName = url.split('/').pop()
+                                            return (
+                                                <div key={index} className="flex items-center justify-between p-3 bg-toss-gray-50 rounded-xl">
+                                                    <div className="flex items-center gap-2">
+                                                        <File size={16} className="text-toss-gray-500" />
+                                                        <span className="text-sm text-toss-gray-700">{fileName}</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            setSimpleFormData(prev => ({
+                                                                ...prev,
+                                                                existingFileUrls: prev.existingFileUrls.filter((_, i) => i !== index)
+                                                            }))
+                                                        }}
+                                                        className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors"
+                                                    >
+                                                        <X size={16} />
+                                                    </button>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            {/* 직원용 상세 폼 */}
+                            {/* 오전 업무 */}
+                            <div>
+                                <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                    오전 업무
+                                </label>
+                                <div className="space-y-2">
+                                    {formData.morning_tasks.map((task, index) => (
+                                        <div key={index} className="flex items-start gap-2">
+                                            <span className="w-6 text-center text-sm font-medium text-toss-gray-500 pt-3">{index + 1}</span>
+                                            <textarea
+                                                value={task.content}
+                                                onChange={(e) => updateTask('morning_tasks', index, 'content', e.target.value)}
+                                                onKeyDown={(e) => handleTaskKeyDown(e, 'morning_tasks', index)}
+                                                data-morning-task={index}
+                                                rows={2}
+                                                className="flex-1 px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all resize-none leading-relaxed"
+                                                placeholder="업무 상세 내용 (Enter로 줄바꿈, Tab으로 항목 추가)"
+                                            />
+                                            <input
+                                                type="text"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                value={task.progress}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(/[^0-9]/g, '')
+                                                    if (val === '' || (parseInt(val) >= 0 && parseInt(val) <= 100)) {
+                                                        updateTask('morning_tasks', index, 'progress', val)
+                                                    }
+                                                }}
+                                                className="w-16 px-2 self-stretch bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all text-center"
+                                                placeholder="%"
+                                            />
+                                            {formData.morning_tasks.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeTask('morning_tasks', index)}
+                                                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() => addTask('morning_tasks')}
+                                        className="flex items-center gap-2 px-4 py-2 text-toss-blue hover:bg-toss-blue/10 rounded-xl transition-colors text-sm font-medium"
+                                    >
+                                        <PlusCircle size={16} />
+                                        항목 추가
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* 오후 업무 */}
+                            <div>
+                                <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                    오후 업무
+                                </label>
+                                <div className="space-y-2">
+                                    {formData.afternoon_tasks.map((task, index) => (
+                                        <div key={index} className="flex items-start gap-2">
+                                            <span className="w-6 text-center text-sm font-medium text-toss-gray-500 pt-3">{index + 1}</span>
+                                            <textarea
+                                                value={task.content}
+                                                onChange={(e) => updateTask('afternoon_tasks', index, 'content', e.target.value)}
+                                                onKeyDown={(e) => handleTaskKeyDown(e, 'afternoon_tasks', index)}
+                                                data-afternoon-task={index}
+                                                rows={2}
+                                                className="flex-1 px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all resize-none leading-relaxed"
+                                                placeholder="업무 상세 내용 (Enter로 줄바꿈, Tab으로 항목 추가)"
+                                            />
+                                            <input
+                                                type="text"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                value={task.progress}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(/[^0-9]/g, '')
+                                                    if (val === '' || (parseInt(val) >= 0 && parseInt(val) <= 100)) {
+                                                        updateTask('afternoon_tasks', index, 'progress', val)
+                                                    }
+                                                }}
+                                                className="w-16 px-2 self-stretch bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all text-center"
+                                                placeholder="%"
+                                            />
+                                            {formData.afternoon_tasks.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeTask('afternoon_tasks', index)}
+                                                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() => addTask('afternoon_tasks')}
+                                        className="flex items-center gap-2 px-4 py-2 text-toss-blue hover:bg-toss-blue/10 rounded-xl transition-colors text-sm font-medium"
+                                    >
+                                        <PlusCircle size={16} />
+                                        항목 추가
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* 익일 업무 */}
+                            <div>
+                                <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                    익일 업무
+                                </label>
+                                <textarea
+                                    value={formData.next_day_work}
+                                    onChange={(e) => setFormData({ ...formData, next_day_work: e.target.value })}
+                                    rows={3}
+                                    className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all leading-relaxed"
+                                    placeholder="다음날 수행할 업무를 입력하세요"
+                                />
+                            </div>
+
+                            {/* 특이사항(비고) */}
+                            <div>
+                                <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                    특이사항(비고)
+                                </label>
+                                <textarea
+                                    value={formData.special_notes}
+                                    onChange={(e) => setFormData({ ...formData, special_notes: e.target.value })}
+                                    rows={3}
+                                    className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent resize-none transition-all leading-relaxed"
+                                    placeholder="특이사항이나 비고사항을 입력하세요"
+                                />
+                            </div>
+
+                            {/* 기존 파일 목록 (수정 모드일 때만) */}
+                            {isEditMode && formData.existingFileUrls.length > 0 && (
+                                <div>
+                                    <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                                        기존 파일
+                                    </label>
+                                    <div className="space-y-2">
+                                        {formData.existingFileUrls.map((url, index) => {
+                                            const fileName = url.split('/').pop()
+                                            return (
+                                                <div key={index} className="flex items-center justify-between p-3 bg-toss-gray-50 rounded-xl">
+                                                    <div className="flex items-center gap-2">
+                                                        <File size={16} className="text-toss-gray-500" />
+                                                        <span className="text-sm text-toss-gray-700">{fileName}</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => removeExistingFile(index)}
+                                                        className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors"
+                                                    >
+                                                        <X size={16} />
+                                                    </button>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </>
                     )}
 
                     {/* 파일 첨부 */}
@@ -1708,9 +2117,9 @@ const WorkLogPage = () => {
                             </div>
                         </button>
 
-                        {formData.files.length > 0 && (
+                        {(isSimpleFormUser ? simpleFormData.files : formData.files).length > 0 && (
                             <div className="mt-4 space-y-2">
-                                {formData.files.map((file, index) => (
+                                {(isSimpleFormUser ? simpleFormData.files : formData.files).map((file, index) => (
                                     <div key={index} className="flex items-center justify-between p-3 bg-toss-gray-50 rounded-xl">
                                         <div className="flex items-center gap-2">
                                             <File size={16} className="text-toss-gray-500" />
@@ -1781,7 +2190,7 @@ const WorkLogPage = () => {
                                         {stringToTasks(selectedWorklog.morning_work).map((task, index) => (
                                             <div key={index} className="flex items-start gap-3">
                                                 <span className="w-6 text-center text-sm font-medium text-toss-gray-500 flex-shrink-0">{index + 1}</span>
-                                                <span className="flex-1 text-toss-gray-900">{task.content}</span>
+                                                <span className="flex-1 text-toss-gray-900 whitespace-pre-wrap">{task.content}</span>
                                                 {task.progress && (
                                                     <span className="text-sm font-medium text-toss-blue flex-shrink-0">{task.progress}%</span>
                                                 )}
@@ -1802,7 +2211,7 @@ const WorkLogPage = () => {
                                         {stringToTasks(selectedWorklog.afternoon_work).map((task, index) => (
                                             <div key={index} className="flex items-start gap-3">
                                                 <span className="w-6 text-center text-sm font-medium text-toss-gray-500 flex-shrink-0">{index + 1}</span>
-                                                <span className="flex-1 text-toss-gray-900">{task.content}</span>
+                                                <span className="flex-1 text-toss-gray-900 whitespace-pre-wrap">{task.content}</span>
                                                 {task.progress && (
                                                     <span className="text-sm font-medium text-toss-blue flex-shrink-0">{task.progress}%</span>
                                                 )}
@@ -1871,6 +2280,85 @@ const WorkLogPage = () => {
                     </div>
                 )}
             </Modal>
+
+            {/* Alert Modal */}
+            {alertModal.isOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center p-4"
+                    style={{ zIndex: 10000 }}
+                    onClick={() => setAlertModal({ ...alertModal, isOpen: false })}
+                >
+                    <div
+                        className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex flex-col items-center text-center">
+                            <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 ${
+                                alertModal.type === 'success' ? 'bg-green-100' :
+                                alertModal.type === 'error' ? 'bg-red-100' : 'bg-blue-100'
+                            }`}>
+                                {alertModal.type === 'success' ? (
+                                    <CheckCircle className="w-7 h-7 text-green-600" />
+                                ) : alertModal.type === 'error' ? (
+                                    <AlertCircle className="w-7 h-7 text-red-600" />
+                                ) : (
+                                    <AlertCircle className="w-7 h-7 text-blue-600" />
+                                )}
+                            </div>
+                            <p className="text-toss-gray-900 font-medium mb-6 leading-relaxed">
+                                {alertModal.message}
+                            </p>
+                            <button
+                                onClick={() => setAlertModal({ ...alertModal, isOpen: false })}
+                                className={`w-full py-3 rounded-xl font-medium transition-colors ${
+                                    alertModal.type === 'success' ? 'bg-green-500 hover:bg-green-600 text-white' :
+                                    alertModal.type === 'error' ? 'bg-red-500 hover:bg-red-600 text-white' :
+                                    'bg-toss-blue hover:bg-blue-600 text-white'
+                                }`}
+                            >
+                                확인
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Confirm Modal (삭제 확인) */}
+            {confirmModal.isOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center p-4"
+                    style={{ zIndex: 10000 }}
+                    onClick={() => setConfirmModal({ isOpen: false, worklog: null })}
+                >
+                    <div
+                        className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex flex-col items-center text-center">
+                            <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 bg-red-100">
+                                <Trash2 className="w-7 h-7 text-red-600" />
+                            </div>
+                            <p className="text-toss-gray-900 font-medium mb-6 leading-relaxed">
+                                정말 삭제하시겠습니까?
+                            </p>
+                            <div className="flex gap-3 w-full">
+                                <button
+                                    onClick={() => setConfirmModal({ isOpen: false, worklog: null })}
+                                    className="flex-1 py-3 rounded-xl font-medium transition-colors bg-gray-100 hover:bg-gray-200 text-toss-gray-700"
+                                >
+                                    취소
+                                </button>
+                                <button
+                                    onClick={confirmDelete}
+                                    className="flex-1 py-3 rounded-xl font-medium transition-colors bg-red-500 hover:bg-red-600 text-white"
+                                >
+                                    삭제
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

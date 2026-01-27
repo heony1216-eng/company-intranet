@@ -34,6 +34,16 @@ const isImageFile = (item) => {
     return imageExtensions.some(ext => lowerUrl.includes(ext))
 }
 
+// 일일 업무 문자열을 정리 (구분자와 진척도 제거)
+const formatDailyWork = (str) => {
+    if (!str) return ''
+    // ---TASK--- 구분자를 줄바꿈으로 변환
+    let result = str.replace(/\n---TASK---\n/g, '\n')
+    // (100%) 등 진척도 제거
+    result = result.replace(/\s*\(\d+%\)/g, '')
+    return result.trim()
+}
+
 // 이미지 갤러리 컴포넌트 (드래그 스크롤 + 스와이프 지원)
 const ImageGallery = ({ urls }) => {
     const scrollRef = useRef(null)
@@ -347,6 +357,7 @@ const WeeklyWorkLogPage = () => {
     const [formData, setFormData] = useState({
         work_date: getDefaultWeeklyDate(),
         weekly_work: '',
+        this_week_work: '',
         special_notes: '',
         files: [],
         existingFileUrls: []
@@ -474,6 +485,7 @@ const WeeklyWorkLogPage = () => {
             const { error } = await supabase.from('work_logs').insert({
                 work_date: formData.work_date,
                 morning_work: formData.weekly_work,
+                this_week_work: formData.this_week_work,
                 special_notes: formData.special_notes,
                 file_urls: fileUrls,
                 user_id: profile.user_id,
@@ -523,6 +535,7 @@ const WeeklyWorkLogPage = () => {
                 .update({
                     work_date: formData.work_date,
                     morning_work: formData.weekly_work,
+                    this_week_work: formData.this_week_work,
                     special_notes: formData.special_notes,
                     file_urls: allFileUrls
                 })
@@ -597,10 +610,10 @@ const WeeklyWorkLogPage = () => {
 
                 let content = `【${dayName}요일 (${dateStr})】\n`
                 if (log.morning_work) {
-                    content += `[오전]\n${log.morning_work}\n`
+                    content += `[오전]\n${formatDailyWork(log.morning_work)}\n`
                 }
                 if (log.afternoon_work) {
-                    content += `[오후]\n${log.afternoon_work}\n`
+                    content += `[오후]\n${formatDailyWork(log.afternoon_work)}\n`
                 }
                 return content
             }).join('\n')
@@ -623,6 +636,7 @@ const WeeklyWorkLogPage = () => {
         setFormData({
             work_date: getDefaultWeeklyDate(),
             weekly_work: '',
+            this_week_work: '',
             special_notes: '',
             files: [],
             existingFileUrls: []
@@ -635,6 +649,7 @@ const WeeklyWorkLogPage = () => {
         setFormData({
             work_date: worklog.work_date,
             weekly_work: worklog.morning_work || '',
+            this_week_work: worklog.this_week_work || '',
             special_notes: worklog.special_notes || '',
             files: [],
             existingFileUrls: worklog.file_urls || []
@@ -824,6 +839,37 @@ const WeeklyWorkLogPage = () => {
             ],
         })
 
+        // 금주 업무 테이블
+        const thisWeekTable = new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+                new TableRow({
+                    children: [
+                        new TableCell({
+                            children: [new Paragraph({
+                                children: [new TextRun({ text: 'Ⅱ. 금주 업무', bold: true, size: 24 })]
+                            })],
+                            ...headerCellStyle,
+                        }),
+                    ],
+                }),
+                new TableRow({
+                    children: [
+                        new TableCell({
+                            children: createContentParagraphs(worklog.this_week_work || ' '),
+                            borders: tableBorders,
+                            margins: {
+                                top: convertInchesToTwip(0.15),
+                                bottom: convertInchesToTwip(0.15),
+                                left: convertInchesToTwip(0.15),
+                                right: convertInchesToTwip(0.15),
+                            },
+                        }),
+                    ],
+                }),
+            ],
+        })
+
         // 특이사항 테이블
         const notesTable = new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
@@ -832,7 +878,7 @@ const WeeklyWorkLogPage = () => {
                     children: [
                         new TableCell({
                             children: [new Paragraph({
-                                children: [new TextRun({ text: 'Ⅱ. 특이사항 및 건의사항', bold: true, size: 24 })]
+                                children: [new TextRun({ text: 'Ⅲ. 특이사항 및 건의사항', bold: true, size: 24 })]
                             })],
                             ...headerCellStyle,
                         }),
@@ -889,6 +935,9 @@ const WeeklyWorkLogPage = () => {
                     new Paragraph({ text: '', spacing: { after: 300 } }),
                     // 업무 내용 테이블
                     workContentTable,
+                    new Paragraph({ text: '', spacing: { after: 300 } }),
+                    // 금주 업무 테이블
+                    thisWeekTable,
                     new Paragraph({ text: '', spacing: { after: 300 } }),
                     // 특이사항 테이블
                     notesTable,
@@ -1240,6 +1289,19 @@ const WeeklyWorkLogPage = () => {
 
                     <div>
                         <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                            금주 업무
+                        </label>
+                        <textarea
+                            value={formData.this_week_work}
+                            onChange={(e) => setFormData({ ...formData, this_week_work: e.target.value })}
+                            rows={5}
+                            className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none transition-all leading-relaxed"
+                            placeholder="금주 진행할 업무를 입력하세요"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-toss-gray-700 mb-2">
                             특이사항(비고)
                         </label>
                         <textarea
@@ -1372,6 +1434,15 @@ const WeeklyWorkLogPage = () => {
                                 {selectedWorklog.morning_work || '-'}
                             </div>
                         </div>
+
+                        {selectedWorklog.this_week_work && (
+                            <div>
+                                <label className="block text-sm font-medium text-toss-gray-500 mb-2">금주 업무</label>
+                                <div className="bg-toss-gray-50 rounded-xl p-4 whitespace-pre-wrap text-toss-gray-900">
+                                    {selectedWorklog.this_week_work}
+                                </div>
+                            </div>
+                        )}
 
                         {selectedWorklog.special_notes && (
                             <div>
