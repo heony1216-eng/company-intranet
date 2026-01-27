@@ -1,6 +1,6 @@
 import { useAuth } from '../hooks/useAuth'
 import { Card, Modal } from '../components/common'
-import { AlertTriangle, MapPin, Phone, User, Calendar, FileText, X } from 'lucide-react'
+import { AlertTriangle, MapPin, Phone, User, Calendar, FileText, X, ClipboardList, AlertCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
@@ -13,11 +13,95 @@ const Dashboard = () => {
     const [selectedRescue, setSelectedRescue] = useState(null)
     const [isRescueModalOpen, setIsRescueModalOpen] = useState(false)
 
+    // 업무일지 미작성 알림 상태
+    const [worklogAlerts, setWorklogAlerts] = useState({
+        daily: false,
+        weekly: false,
+        monthly: false
+    })
+
     useEffect(() => {
         fetchRescueCount()
         fetchRecentNotices()
         fetchActiveRescues()
-    }, [])
+        if (profile?.user_id) {
+            checkWorklogStatus()
+        }
+    }, [profile?.user_id])
+
+    // 업무일지 작성 여부 확인
+    const checkWorklogStatus = async () => {
+        if (!profile?.user_id) return
+
+        const now = new Date()
+        const currentHour = now.getHours()
+        const dayOfWeek = now.getDay() // 0: 일, 1: 월, ..., 5: 금, 6: 토
+        const today = now.toISOString().split('T')[0]
+
+        const alerts = { daily: false, weekly: false, monthly: false }
+
+        // 1. 일일 업무일지: 평일 오후 3시 이후
+        if (dayOfWeek >= 1 && dayOfWeek <= 5 && currentHour >= 15) {
+            const { data: dailyLog } = await supabase
+                .from('work_logs')
+                .select('id')
+                .eq('user_id', profile.user_id)
+                .eq('type', 'daily')
+                .eq('work_date', today)
+                .single()
+
+            if (!dailyLog) {
+                alerts.daily = true
+            }
+        }
+
+        // 2. 주간 업무일지: 금요일 오후 3시 이후
+        if (dayOfWeek === 5 && currentHour >= 15) {
+            // 이번 주 월요일 찾기
+            const monday = new Date(now)
+            monday.setDate(now.getDate() - (dayOfWeek - 1))
+            const mondayStr = monday.toISOString().split('T')[0]
+
+            // 이번 주 금요일
+            const friday = new Date(now)
+            const fridayStr = friday.toISOString().split('T')[0]
+
+            const { data: weeklyLog } = await supabase
+                .from('work_logs')
+                .select('id')
+                .eq('user_id', profile.user_id)
+                .eq('type', 'weekly')
+                .gte('work_date', mondayStr)
+                .lte('work_date', fridayStr)
+                .single()
+
+            if (!weeklyLog) {
+                alerts.weekly = true
+            }
+        }
+
+        // 3. 월간 업무일지: 월말 마지막 날 오후 3시 이후
+        const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+        if (now.getDate() === lastDayOfMonth && currentHour >= 15) {
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+            const monthEnd = today
+
+            const { data: monthlyLog } = await supabase
+                .from('work_logs')
+                .select('id')
+                .eq('user_id', profile.user_id)
+                .eq('type', 'monthly')
+                .gte('work_date', monthStart)
+                .lte('work_date', monthEnd)
+                .single()
+
+            if (!monthlyLog) {
+                alerts.monthly = true
+            }
+        }
+
+        setWorklogAlerts(alerts)
+    }
 
     const fetchRescueCount = async () => {
         try {
@@ -97,6 +181,58 @@ const Dashboard = () => {
                     </div>
                 </div>
             </Card>
+
+            {/* 업무일지 미작성 알림 */}
+            {(worklogAlerts.daily || worklogAlerts.weekly || worklogAlerts.monthly) && (
+                <Card className="bg-amber-50 border border-amber-200">
+                    <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <AlertCircle size={20} className="text-amber-600" />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-bold text-amber-800 mb-2">업무일지 작성이 필요합니다</h3>
+                            <div className="space-y-2">
+                                {worklogAlerts.daily && (
+                                    <Link
+                                        to="/worklog"
+                                        className="flex items-center justify-between p-2 bg-white rounded-lg hover:bg-amber-100 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <ClipboardList size={16} className="text-amber-600" />
+                                            <span className="text-sm text-amber-800">오늘 일일 업무일지 미작성</span>
+                                        </div>
+                                        <span className="text-xs text-amber-600 font-medium">작성하기 →</span>
+                                    </Link>
+                                )}
+                                {worklogAlerts.weekly && (
+                                    <Link
+                                        to="/worklog/weekly"
+                                        className="flex items-center justify-between p-2 bg-white rounded-lg hover:bg-amber-100 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <ClipboardList size={16} className="text-amber-600" />
+                                            <span className="text-sm text-amber-800">이번 주 주간 업무일지 미작성</span>
+                                        </div>
+                                        <span className="text-xs text-amber-600 font-medium">작성하기 →</span>
+                                    </Link>
+                                )}
+                                {worklogAlerts.monthly && (
+                                    <Link
+                                        to="/worklog/monthly"
+                                        className="flex items-center justify-between p-2 bg-white rounded-lg hover:bg-amber-100 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <ClipboardList size={16} className="text-amber-600" />
+                                            <span className="text-sm text-amber-800">이번 달 월간 업무일지 미작성</span>
+                                        </div>
+                                        <span className="text-xs text-amber-600 font-medium">작성하기 →</span>
+                                    </Link>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </Card>
+            )}
 
             {/* 2-Column Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

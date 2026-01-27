@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar, CalendarDays, ExternalLink, ChevronDown, Settings, FolderOpen } from 'lucide-react'
+import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar, CalendarDays, ExternalLink, ChevronDown, Settings, FolderOpen, BookOpen } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -38,6 +38,7 @@ const Sidebar = () => {
         { to: '/rescue', icon: AlertTriangle, label: '구조현황' },
         { to: '/meetings', icon: Calendar, label: '회의록' },
         { to: '/document', icon: FileText, label: '기안서' },
+        { to: '/document-ledger', icon: BookOpen, label: '수·발신대장' },
         {
             icon: FolderOpen,
             label: '자료실',

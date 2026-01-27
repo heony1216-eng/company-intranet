@@ -1,22 +1,37 @@
 import { useState, useEffect } from 'react'
 import { Card, Button, Modal } from '../components/common'
-import { ChevronLeft, ChevronRight, CalendarDays, MapPin, Clock, Plus, Edit3, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CalendarDays, MapPin, Clock, Plus, Edit3, Trash2, X, Settings, AlertCircle, CheckCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 
-// 일정 유형 색상
-const EVENT_TYPE_COLORS = {
+// 색상 옵션 목록
+const COLOR_OPTIONS = [
+    { key: 'blue', bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500' },
+    { key: 'purple', bg: 'bg-purple-100', text: 'text-purple-700', dot: 'bg-purple-500' },
+    { key: 'green', bg: 'bg-green-100', text: 'text-green-700', dot: 'bg-green-500' },
+    { key: 'amber', bg: 'bg-amber-100', text: 'text-amber-700', dot: 'bg-amber-500' },
+    { key: 'red', bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-500' },
+    { key: 'orange', bg: 'bg-orange-100', text: 'text-orange-700', dot: 'bg-orange-500' },
+    { key: 'gray', bg: 'bg-gray-100', text: 'text-gray-700', dot: 'bg-gray-500' },
+    { key: 'pink', bg: 'bg-pink-100', text: 'text-pink-700', dot: 'bg-pink-500' },
+    { key: 'teal', bg: 'bg-teal-100', text: 'text-teal-700', dot: 'bg-teal-500' },
+    { key: 'indigo', bg: 'bg-indigo-100', text: 'text-indigo-700', dot: 'bg-indigo-500' }
+]
+
+// 기본 일정 유형 (DB에 없을 경우 사용)
+const DEFAULT_EVENT_TYPES = {
     general: { bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500', label: '일반' },
     meeting: { bg: 'bg-purple-100', text: 'text-purple-700', dot: 'bg-purple-500', label: '회의' },
     training: { bg: 'bg-green-100', text: 'text-green-700', dot: 'bg-green-500', label: '교육' },
     rescue: { bg: 'bg-amber-100', text: 'text-amber-700', dot: 'bg-amber-500', label: '구조' },
     holiday: { bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-500', label: '휴일' },
     event: { bg: 'bg-orange-100', text: 'text-orange-700', dot: 'bg-orange-500', label: '행사' },
+    leave: { bg: 'bg-pink-100', text: 'text-pink-700', dot: 'bg-pink-500', label: '휴가' },
     other: { bg: 'bg-gray-100', text: 'text-gray-700', dot: 'bg-gray-500', label: '기타' }
 }
 
 const EventPage = () => {
-    const { user } = useAuth()
+    const { user, isAdmin } = useAuth()
     const [currentDate, setCurrentDate] = useState(new Date())
     const [selectedDate, setSelectedDate] = useState(null)
     const [selectedEvent, setSelectedEvent] = useState(null)
@@ -36,6 +51,112 @@ const EventPage = () => {
         end_time: ''
     })
 
+    // 일정 유형 관리
+    const [eventTypes, setEventTypes] = useState(DEFAULT_EVENT_TYPES)
+    const [isTypeModalOpen, setIsTypeModalOpen] = useState(false)
+    const [typeFormData, setTypeFormData] = useState({ key: '', label: '', color: 'blue' })
+    const [editingTypeKey, setEditingTypeKey] = useState(null)
+
+    // 알림 모달
+    const [alertModal, setAlertModal] = useState({ isOpen: false, message: '', type: 'info' })
+    const showAlert = (message, type = 'info') => {
+        setAlertModal({ isOpen: true, message, type })
+    }
+
+    // 일정 유형 불러오기
+    const fetchEventTypes = async () => {
+        try {
+            const { data } = await supabase
+                .from('event_types')
+                .select('*')
+                .order('created_at')
+
+            if (data && data.length > 0) {
+                const typesObj = {}
+                data.forEach(type => {
+                    const colorOption = COLOR_OPTIONS.find(c => c.key === type.color) || COLOR_OPTIONS[0]
+                    typesObj[type.key] = {
+                        bg: colorOption.bg,
+                        text: colorOption.text,
+                        dot: colorOption.dot,
+                        label: type.label
+                    }
+                })
+                setEventTypes(typesObj)
+            }
+        } catch (error) {
+            console.error('Error fetching event types:', error)
+            // DB 테이블이 없으면 기본값 사용
+        }
+    }
+
+    // 일정 유형 저장
+    const handleSaveType = async () => {
+        if (!typeFormData.key.trim() || !typeFormData.label.trim()) {
+            showAlert('유형 코드와 이름을 입력해주세요.', 'error')
+            return
+        }
+
+        try {
+            if (editingTypeKey) {
+                // 수정
+                await supabase
+                    .from('event_types')
+                    .update({
+                        label: typeFormData.label,
+                        color: typeFormData.color,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('key', editingTypeKey)
+            } else {
+                // 새로 추가
+                await supabase
+                    .from('event_types')
+                    .insert({
+                        key: typeFormData.key.toLowerCase().replace(/\s/g, '_'),
+                        label: typeFormData.label,
+                        color: typeFormData.color
+                    })
+            }
+
+            await fetchEventTypes()
+            setIsTypeModalOpen(false)
+            setTypeFormData({ key: '', label: '', color: 'blue' })
+            setEditingTypeKey(null)
+            showAlert(editingTypeKey ? '일정 유형이 수정되었습니다.' : '일정 유형이 추가되었습니다.', 'success')
+        } catch (error) {
+            console.error('Error saving event type:', error)
+            showAlert('저장에 실패했습니다.', 'error')
+        }
+    }
+
+    // 일정 유형 삭제
+    const handleDeleteType = async (key) => {
+        if (!confirm('이 일정 유형을 삭제하시겠습니까?')) return
+
+        try {
+            await supabase
+                .from('event_types')
+                .delete()
+                .eq('key', key)
+
+            await fetchEventTypes()
+            showAlert('일정 유형이 삭제되었습니다.', 'success')
+        } catch (error) {
+            console.error('Error deleting event type:', error)
+            showAlert('삭제에 실패했습니다.', 'error')
+        }
+    }
+
+    // 일정 유형 수정 모달 열기
+    const openEditTypeModal = (key) => {
+        const type = eventTypes[key]
+        const colorKey = COLOR_OPTIONS.find(c => c.bg === type.bg)?.key || 'blue'
+        setTypeFormData({ key, label: type.label, color: colorKey })
+        setEditingTypeKey(key)
+        setIsTypeModalOpen(true)
+    }
+
     // 공휴일 데이터 가져오기
     useEffect(() => {
         const fetchHolidays = async () => {
@@ -51,6 +172,7 @@ const EventPage = () => {
     }, [])
 
     useEffect(() => {
+        fetchEventTypes()
         fetchEvents()
         fetchRecentEvents()
     }, [currentDate])
@@ -394,7 +516,7 @@ const EventPage = () => {
                                     {/* 일정 표시 (공휴일 있으면 1개, 없으면 2개) */}
                                     <div className="space-y-0.5">
                                         {dayEvents.slice(0, isHoliday ? 1 : 2).map((event, idx) => {
-                                            const typeStyle = EVENT_TYPE_COLORS[event.event_type] || EVENT_TYPE_COLORS.general
+                                            const typeStyle = eventTypes[event.event_type] || eventTypes.general
                                             return (
                                                 <div
                                                     key={idx}
@@ -418,17 +540,32 @@ const EventPage = () => {
 
                     {/* 범례 */}
                     <div className="mt-4 pt-4 border-t border-toss-gray-100">
-                        <div className="flex flex-wrap gap-3 text-xs">
-                            <div className="flex items-center gap-1">
-                                <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                                <span className="text-toss-gray-600">공휴일</span>
-                            </div>
-                            {Object.entries(EVENT_TYPE_COLORS).map(([key, value]) => (
-                                <div key={key} className="flex items-center gap-1">
-                                    <div className={`w-2 h-2 rounded-full ${value.dot}`}></div>
-                                    <span className="text-toss-gray-600">{value.label}</span>
+                        <div className="flex items-center justify-between">
+                            <div className="flex flex-wrap gap-3 text-xs">
+                                <div className="flex items-center gap-1">
+                                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                                    <span className="text-toss-gray-600">공휴일</span>
                                 </div>
-                            ))}
+                                {Object.entries(eventTypes).map(([key, value]) => (
+                                    <div key={key} className="flex items-center gap-1">
+                                        <div className={`w-2 h-2 rounded-full ${value.dot}`}></div>
+                                        <span className="text-toss-gray-600">{value.label}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            {isAdmin && (
+                                <button
+                                    onClick={() => {
+                                        setTypeFormData({ key: '', label: '', color: 'blue' })
+                                        setEditingTypeKey(null)
+                                        setIsTypeModalOpen(true)
+                                    }}
+                                    className="flex items-center gap-1 text-xs text-toss-gray-500 hover:text-toss-blue transition-colors"
+                                >
+                                    <Settings size={14} />
+                                    유형 관리
+                                </button>
+                            )}
                         </div>
                     </div>
                 </Card>
@@ -454,7 +591,7 @@ const EventPage = () => {
                             </p>
                         ) : (
                             recentEvents.map((event) => {
-                                const typeStyle = EVENT_TYPE_COLORS[event.event_type] || EVENT_TYPE_COLORS.general
+                                const typeStyle = eventTypes[event.event_type] || eventTypes.general
                                 return (
                                     <div
                                         key={event.id}
@@ -542,7 +679,7 @@ const EventPage = () => {
                             onChange={(e) => setFormData({ ...formData, event_type: e.target.value })}
                             className="w-full px-4 py-3 border border-toss-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-toss-blue"
                         >
-                            {Object.entries(EVENT_TYPE_COLORS).map(([key, value]) => (
+                            {Object.entries(eventTypes).map(([key, value]) => (
                                 <option key={key} value={key}>{value.label}</option>
                             ))}
                         </select>
@@ -630,8 +767,8 @@ const EventPage = () => {
                 {selectedEvent && (
                     <div className="space-y-4">
                         <div>
-                            <span className={`inline-block text-xs px-2 py-1 rounded ${EVENT_TYPE_COLORS[selectedEvent.event_type]?.bg || 'bg-gray-100'} ${EVENT_TYPE_COLORS[selectedEvent.event_type]?.text || 'text-gray-700'}`}>
-                                {EVENT_TYPE_COLORS[selectedEvent.event_type]?.label || '일반'}
+                            <span className={`inline-block text-xs px-2 py-1 rounded ${eventTypes[selectedEvent.event_type]?.bg || 'bg-gray-100'} ${eventTypes[selectedEvent.event_type]?.text || 'text-gray-700'}`}>
+                                {eventTypes[selectedEvent.event_type]?.label || '일반'}
                             </span>
                         </div>
 
@@ -680,7 +817,7 @@ const EventPage = () => {
                                 <label className="block text-sm font-medium text-toss-gray-500 mb-2">같은 날 다른 일정</label>
                                 <div className="space-y-2">
                                     {events.filter(e => e.event_date === selectedDate && e.id !== selectedEvent.id).map((event) => {
-                                        const typeStyle = EVENT_TYPE_COLORS[event.event_type] || EVENT_TYPE_COLORS.general
+                                        const typeStyle = eventTypes[event.event_type] || eventTypes.general
                                         return (
                                             <div
                                                 key={event.id}
@@ -720,6 +857,167 @@ const EventPage = () => {
                     </div>
                 )}
             </Modal>
+
+            {/* 일정 유형 관리 모달 */}
+            <Modal
+                isOpen={isTypeModalOpen}
+                onClose={() => {
+                    setIsTypeModalOpen(false)
+                    setEditingTypeKey(null)
+                    setTypeFormData({ key: '', label: '', color: 'blue' })
+                }}
+                title="일정 유형 관리"
+            >
+                <div className="space-y-4">
+                    {/* 기존 유형 목록 */}
+                    <div>
+                        <label className="block text-sm font-medium text-toss-gray-700 mb-2">
+                            등록된 유형
+                        </label>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {Object.entries(eventTypes).map(([key, value]) => (
+                                <div key={key} className="flex items-center justify-between p-2 bg-toss-gray-50 rounded-lg">
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-3 h-3 rounded-full ${value.dot}`}></div>
+                                        <span className="text-sm font-medium">{value.label}</span>
+                                        <span className="text-xs text-toss-gray-500">({key})</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => openEditTypeModal(key)}
+                                            className="p-1 text-toss-gray-500 hover:text-toss-blue transition-colors"
+                                        >
+                                            <Edit3 size={14} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteType(key)}
+                                            className="p-1 text-toss-gray-500 hover:text-red-500 transition-colors"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="border-t border-toss-gray-100 pt-4">
+                        <h4 className="text-sm font-medium text-toss-gray-700 mb-3">
+                            {editingTypeKey ? '유형 수정' : '새 유형 추가'}
+                        </h4>
+
+                        {!editingTypeKey && (
+                            <div className="mb-3">
+                                <label className="block text-xs text-toss-gray-500 mb-1">
+                                    유형 코드 (영문)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={typeFormData.key}
+                                    onChange={(e) => setTypeFormData({ ...typeFormData, key: e.target.value })}
+                                    placeholder="예: workshop"
+                                    className="w-full px-3 py-2 border border-toss-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-toss-blue text-sm"
+                                />
+                            </div>
+                        )}
+
+                        <div className="mb-3">
+                            <label className="block text-xs text-toss-gray-500 mb-1">
+                                유형 이름
+                            </label>
+                            <input
+                                type="text"
+                                value={typeFormData.label}
+                                onChange={(e) => setTypeFormData({ ...typeFormData, label: e.target.value })}
+                                placeholder="예: 워크숍"
+                                className="w-full px-3 py-2 border border-toss-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-toss-blue text-sm"
+                            />
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-xs text-toss-gray-500 mb-1">
+                                색상
+                            </label>
+                            <div className="flex flex-wrap gap-2">
+                                {COLOR_OPTIONS.map((color) => (
+                                    <button
+                                        key={color.key}
+                                        onClick={() => setTypeFormData({ ...typeFormData, color: color.key })}
+                                        className={`w-8 h-8 rounded-full ${color.dot} ${
+                                            typeFormData.color === color.key ? 'ring-2 ring-offset-2 ring-toss-blue' : ''
+                                        }`}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                            {editingTypeKey && (
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => {
+                                        setEditingTypeKey(null)
+                                        setTypeFormData({ key: '', label: '', color: 'blue' })
+                                    }}
+                                    className="flex-1"
+                                >
+                                    취소
+                                </Button>
+                            )}
+                            <Button
+                                size="sm"
+                                onClick={handleSaveType}
+                                className="flex-1"
+                            >
+                                {editingTypeKey ? '수정' : '추가'}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Alert Modal */}
+            {alertModal.isOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center p-4"
+                    style={{ zIndex: 10000 }}
+                    onClick={() => setAlertModal({ ...alertModal, isOpen: false })}
+                >
+                    <div
+                        className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex flex-col items-center text-center">
+                            <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 ${
+                                alertModal.type === 'success' ? 'bg-green-100' :
+                                alertModal.type === 'error' ? 'bg-red-100' : 'bg-blue-100'
+                            }`}>
+                                {alertModal.type === 'success' ? (
+                                    <CheckCircle className="w-7 h-7 text-green-600" />
+                                ) : alertModal.type === 'error' ? (
+                                    <AlertCircle className="w-7 h-7 text-red-600" />
+                                ) : (
+                                    <AlertCircle className="w-7 h-7 text-blue-600" />
+                                )}
+                            </div>
+                            <p className="text-toss-gray-900 font-medium mb-6 leading-relaxed">
+                                {alertModal.message}
+                            </p>
+                            <button
+                                onClick={() => setAlertModal({ ...alertModal, isOpen: false })}
+                                className={`w-full py-3 rounded-xl font-medium transition-colors ${
+                                    alertModal.type === 'success' ? 'bg-green-500 hover:bg-green-600 text-white' :
+                                    alertModal.type === 'error' ? 'bg-red-500 hover:bg-red-600 text-white' :
+                                    'bg-toss-blue hover:bg-blue-600 text-white'
+                                }`}
+                            >
+                                확인
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

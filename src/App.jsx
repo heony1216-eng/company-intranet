@@ -15,6 +15,7 @@ import MyPage from './pages/MyPage'
 import DocumentPage from './pages/DocumentPage'
 import AdminPage from './pages/AdminPage'
 import ArchivePage from './pages/ArchivePage'
+import DocumentLedgerPage from './pages/DocumentLedgerPage'
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -96,6 +97,7 @@ function AppRoutes() {
         <Route path="/document" element={<DocumentPage />} />
         <Route path="/archive" element={<Navigate to="/archive/forms" replace />} />
         <Route path="/archive/:type" element={<ArchivePage />} />
+        <Route path="/document-ledger" element={<DocumentLedgerPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/mypage" element={<MyPage />} />
       </Route>
