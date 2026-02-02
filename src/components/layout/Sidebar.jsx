@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar, CalendarDays, ExternalLink, ChevronDown, Settings, FolderOpen, BookOpen } from 'lucide-react'
+import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar, CalendarDays, ExternalLink, ChevronDown, Settings, FolderOpen, BookOpen, Palmtree, Smartphone } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -37,8 +37,10 @@ const Sidebar = () => {
         },
         { to: '/rescue', icon: AlertTriangle, label: '구조현황' },
         { to: '/meetings', icon: Calendar, label: '회의록' },
-        { to: '/document', icon: FileText, label: '기안서' },
         { to: '/document-ledger', icon: BookOpen, label: '수·발신대장' },
+        { to: '/document', icon: FileText, label: '근태 관리' },
+        // 근태 관리 - 비활성화 (기안서로 이전)
+        // { to: '/leave', icon: Palmtree, label: '근태 관리' },
         // 자료실 - 비활성화 (나중에 부활 시 주석 해제)
         // {
         //     icon: FolderOpen,
@@ -50,7 +52,8 @@ const Sidebar = () => {
         //         { to: '/archive/rescue', label: '문서' },
         //     ]
         // },
-        ...(canManageLeave ? [{ to: '/admin', icon: Settings, label: '관리' }] : []),
+        // 관리 페이지 - 비활성화 (근태 관리로 통합)
+        // ...(canManageLeave ? [{ to: '/admin', icon: Settings, label: '관리' }] : []),
         { to: '/mypage', icon: User, label: '마이페이지' },
     ]
 
@@ -99,10 +102,10 @@ const Sidebar = () => {
 
             {/* Sidebar */}
             <aside
-                className={`fixed top-0 left-0 h-full w-64 bg-white shadow-toss-lg z-50 transform transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+                className={`fixed top-0 left-0 h-full w-64 bg-white shadow-toss-lg z-50 transform transition-transform duration-300 flex flex-col ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
                     }`}
             >
-                <div className="flex items-center justify-between p-6 border-b border-toss-gray-100">
+                <div className="flex items-center justify-between p-6 border-b border-toss-gray-100 flex-shrink-0">
                     <h1 className="text-xl font-bold text-toss-gray-900">
                         <span className="text-toss-blue">한인구조단</span> 인트라넷
                     </h1>
@@ -114,7 +117,19 @@ const Sidebar = () => {
                     </button>
                 </div>
 
-                <nav className="p-4 space-y-2">
+                <nav className="p-4 space-y-2 flex-1 overflow-y-auto">
+                    {/* 앱 다운로드 버튼 */}
+                    <a
+                        href="https://www.dropbox.com/scl/fi/vz0zmnbpr1kfzw2w3fu6g/.apk?rlkey=lp7l2m97ssh1nixykcjxwiaqf&st=m08bikmg&dl=1"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setIsOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 rounded-toss transition-all bg-toss-gray-100 text-toss-gray-600 hover:bg-toss-gray-200 mb-4"
+                    >
+                        <Smartphone size={20} />
+                        <span className="font-medium">앱 다운로드</span>
+                    </a>
+
                     {navItems.map((item) => (
                         item.isSubmenu ? (
                             <div key={item.label}>

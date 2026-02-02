@@ -1,12 +1,13 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useDocument } from '../hooks/useDocument'
 import { useAuth } from '../hooks/useAuth'
 import { useAnnualLeave } from '../hooks/useAnnualLeave'
 import { Card, Button } from '../components/common'
-import { FileText, ArrowLeft, Plus, Clock, CheckCircle, XCircle, AlertCircle, Upload, X, Paperclip, ExternalLink, Edit3, Trash2, Calendar, Lock, Unlock, Search, ChevronDown, ChevronUp, Filter } from 'lucide-react'
+import { FileText, ArrowLeft, Plus, Clock, CheckCircle, XCircle, AlertCircle, Upload, X, Paperclip, ExternalLink, Edit3, Trash2, Calendar, Lock, Unlock, Search, ChevronDown, ChevronUp, Filter, Users, Save, Settings } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { uploadMultipleToDropbox } from '../lib/dropbox'
+import { ATTENDANCE_LABEL_CODE } from '../constants/leave'
 
 const DocumentPage = () => {
     const { user, isAdmin, isSubAdmin } = useAuth()
@@ -19,7 +20,10 @@ const DocumentPage = () => {
         loading,
         createDocument,
         updateDocument,
-        deleteDocument
+        deleteDocument,
+        approveDocument,
+        rejectDocument,
+        refresh
     } = useDocument()
     const { annualLeave, compLeave } = useAnnualLeave()
 
@@ -57,10 +61,26 @@ const DocumentPage = () => {
         status: ''
     })
 
-    // 선택된 라벨이 "근태관련"인지 확인
-    const selectedLabel = labels.find(l => l.id === parseInt(formData.label_id))
-    const isAttendanceLabel = selectedLabel?.code === 4
-    const isExpenseLabel = selectedLabel && [1, 2, 3].includes(selectedLabel.code)
+    // 탭 상태 (관리자용 연차 설정 탭 포함)
+    const [activeTab, setActiveTab] = useState('list') // 'list' | 'leaveSettings'
+
+    // 연차 설정 관련 상태
+    const [allLeaves, setAllLeaves] = useState([])
+    const [leaveSearchTerm, setLeaveSearchTerm] = useState('')
+    const [editingUserId, setEditingUserId] = useState(null)
+    const [editTotalDays, setEditTotalDays] = useState('')
+    const [savingUserId, setSavingUserId] = useState(null)
+
+    // 승인/반려 관련 상태
+    const [processing, setProcessing] = useState(false)
+    const [showRejectModal, setShowRejectModal] = useState(false)
+    const [rejectReason, setRejectReason] = useState('')
+    const [showDeleteModal, setShowDeleteModal] = useState(false)
+
+    // 근태관련 라벨 자동 선택 (code === 4)
+    const attendanceLabel = labels.find(l => l.code === 4)
+    const isAttendanceLabel = true // 근태 관리 페이지에서는 항상 근태관련
+    const isExpenseLabel = false
 
     // 휴가 유형 목록
     const hasCompLeave = compLeave && (compLeave.total_hours - compLeave.used_hours) >= 8
@@ -71,6 +91,7 @@ const DocumentPage = () => {
         { value: 'full', label: '연차', description: '1일 차감', days: 1 },
         { value: 'half_am', label: '오전 반차', description: '0.5일 차감', days: 0.5 },
         { value: 'half_pm', label: '오후 반차', description: '0.5일 차감', days: 0.5 },
+        { value: 'out_1h', label: '외출/조퇴 1시간', description: '0.125일 차감', days: 0.125 },
         { value: 'out_2h', label: '외출/조퇴 2시간', description: '0.25일 차감', days: 0.25 },
         { value: 'out_3h', label: '외출/조퇴 3시간', description: '0.375일 차감', days: 0.375 },
         { value: 'comp', label: '대체휴무', description: hasCompLeave ? `${compLeaveDays}일 사용가능` : '사용 불가', days: 1, disabled: !hasCompLeave }
@@ -129,6 +150,187 @@ const DocumentPage = () => {
         })
     }, [allDocuments, searchTerm, searchFilters])
 
+    // 연차 정보 조회 (관리자용) - documents 테이블에서 승인된 휴가 합계로 used_days 계산
+    const fetchAllLeaves = useCallback(async () => {
+        if (!canManage) return
+        try {
+            const currentYear = new Date().getFullYear()
+            const yearStart = `${currentYear}-01-01`
+            const yearEnd = `${currentYear}-12-31`
+
+            // annual_leaves 테이블 조회
+            const { data: leavesData, error } = await supabase
+                .from('annual_leaves')
+                .select('*')
+                .eq('year', currentYear)
+            if (error) throw error
+
+            // 근태관련 라벨 조회
+            const { data: labelData } = await supabase
+                .from('document_labels')
+                .select('id')
+                .eq('code', ATTENDANCE_LABEL_CODE)
+                .single()
+
+            // 승인된 휴가 기안서 조회
+            let approvedLeaves = []
+            if (labelData) {
+                const { data: docs } = await supabase
+                    .from('documents')
+                    .select('drafter_id, leave_days, leave_type')
+                    .eq('label_id', labelData.id)
+                    .eq('attendance_type', 'leave')
+                    .eq('status', 'approved')
+                    .gte('leave_start_date', yearStart)
+                    .lte('leave_start_date', yearEnd)
+                    .not('leave_type', 'is', null)
+                    .neq('leave_type', 'comp') // 대체휴무 제외
+                approvedLeaves = docs || []
+            }
+
+            // 사용자별 사용일 집계
+            const usedDaysMap = {}
+            approvedLeaves.forEach(doc => {
+                usedDaysMap[doc.drafter_id] = (usedDaysMap[doc.drafter_id] || 0) + (doc.leave_days || 0)
+            })
+
+            // annual_leaves에 계산된 used_days 반영
+            const leavesWithUsed = (leavesData || []).map(leave => ({
+                ...leave,
+                used_days: usedDaysMap[leave.user_id] || 0
+            }))
+
+            setAllLeaves(leavesWithUsed)
+        } catch (err) {
+            console.error('연차 정보 조회 에러:', err)
+        }
+    }, [canManage])
+
+    // 연차 설정 탭 활성화 시 데이터 조회
+    useEffect(() => {
+        if (activeTab === 'leaveSettings' && canManage) {
+            fetchAllLeaves()
+        }
+    }, [activeTab, canManage, fetchAllLeaves])
+
+    // 사용자별 연차 정보 가져오기
+    const getLeaveInfo = (userId) => {
+        return allLeaves.find(l => l.user_id === userId)
+    }
+
+    // 연차 수정 시작
+    const handleEditStart = (userId, total) => {
+        setEditingUserId(userId)
+        setEditTotalDays(total.toString())
+    }
+
+    // 연차 저장
+    const handleSaveTotalDays = async (userId) => {
+        const totalDays = parseFloat(editTotalDays)
+        if (isNaN(totalDays) || totalDays < 0) {
+            alert('올바른 연차 일수를 입력해주세요')
+            return
+        }
+        setSavingUserId(userId)
+        try {
+            const currentYear = new Date().getFullYear()
+            const existingLeave = allLeaves.find(l => l.user_id === userId)
+            if (existingLeave) {
+                await supabase
+                    .from('annual_leaves')
+                    .update({ total_days: totalDays, updated_at: new Date().toISOString() })
+                    .eq('id', existingLeave.id)
+            } else {
+                await supabase
+                    .from('annual_leaves')
+                    .insert({ user_id: userId, year: currentYear, total_days: totalDays, used_days: 0 })
+            }
+            await fetchAllLeaves()
+            setEditingUserId(null)
+        } catch (err) {
+            console.error('연차 저장 에러:', err)
+            alert('저장 중 오류가 발생했습니다')
+        } finally {
+            setSavingUserId(null)
+        }
+    }
+
+    // 연차 설정 검색 필터
+    const filteredLeaveUsers = useMemo(() => {
+        if (!leaveSearchTerm) return users
+        return users.filter(u =>
+            u.name?.toLowerCase().includes(leaveSearchTerm.toLowerCase()) ||
+            u.team?.toLowerCase().includes(leaveSearchTerm.toLowerCase())
+        )
+    }, [users, leaveSearchTerm])
+
+    // 승인 처리
+    const handleApprove = async () => {
+        if (!selectedDoc || !canManage) return
+        setProcessing(true)
+        try {
+            const { error } = await approveDocument(selectedDoc.id)
+            if (error) {
+                alert('승인에 실패했습니다: ' + error)
+            } else {
+                alert('승인되었습니다.')
+                setSelectedDoc(null)
+                refresh()
+            }
+        } catch (err) {
+            console.error('승인 에러:', err)
+            alert('승인 중 오류가 발생했습니다')
+        } finally {
+            setProcessing(false)
+        }
+    }
+
+    // 반려 처리
+    const handleReject = async () => {
+        if (!selectedDoc || !canManage || !rejectReason.trim()) {
+            alert('반려 사유를 입력해주세요')
+            return
+        }
+        setProcessing(true)
+        try {
+            const { error } = await rejectDocument(selectedDoc.id, rejectReason)
+            if (error) {
+                alert('반려에 실패했습니다: ' + error)
+            } else {
+                alert('반려되었습니다.')
+                setSelectedDoc(null)
+                setShowRejectModal(false)
+                setRejectReason('')
+                refresh()
+            }
+        } catch (err) {
+            console.error('반려 에러:', err)
+            alert('반려 중 오류가 발생했습니다')
+        } finally {
+            setProcessing(false)
+        }
+    }
+
+    // 삭제 처리
+    const handleDelete = async () => {
+        if (!selectedDoc) return
+        setProcessing(true)
+        try {
+            const { error } = await deleteDocument(selectedDoc.id, true)
+            if (error) {
+                alert('삭제에 실패했습니다.')
+            } else {
+                setSelectedDoc(null)
+                setShowDeleteModal(false)
+            }
+        } catch (err) {
+            console.error('삭제 에러:', err)
+            alert('삭제 중 오류가 발생했습니다')
+        } finally {
+            setProcessing(false)
+        }
+    }
+
     // 담당자 정보 가져오기
     const getDrafterInfo = (drafterId) => {
         const drafter = users.find(u => u.user_id === drafterId)
@@ -181,26 +383,28 @@ const DocumentPage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault()
-        if (!formData.label_id || !formData.title.trim()) {
-            alert('라벨과 제목을 입력해주세요.')
+        if (!attendanceLabel) {
+            alert('근태관련 라벨을 찾을 수 없습니다.')
+            return
+        }
+        if (!formData.title.trim()) {
+            alert('제목을 입력해주세요.')
             return
         }
 
         // 근태관련 유효성 검사
-        if (isAttendanceLabel) {
-            if (!formData.attendance_type) {
-                alert('신청 유형을 선택해주세요.')
+        if (!formData.attendance_type) {
+            alert('신청 유형을 선택해주세요.')
+            return
+        }
+        if (formData.attendance_type === 'leave') {
+            if (!formData.leave_type) {
+                alert('휴가 유형을 선택해주세요.')
                 return
             }
-            if (formData.attendance_type === 'leave') {
-                if (!formData.leave_type) {
-                    alert('휴가 유형을 선택해주세요.')
-                    return
-                }
-                if (!formData.leave_start_date) {
-                    alert('시작일을 선택해주세요.')
-                    return
-                }
+            if (!formData.leave_start_date) {
+                alert('시작일을 선택해주세요.')
+                return
             }
         }
 
@@ -208,7 +412,7 @@ const DocumentPage = () => {
 
         // 휴가 신청 시 일수 계산
         let leaveDays = 0
-        if (isAttendanceLabel && formData.attendance_type === 'leave') {
+        if (formData.attendance_type === 'leave') {
             const leaveType = leaveTypes.find(t => t.value === formData.leave_type)
             if (formData.leave_type === 'full' || formData.leave_type === 'comp') {
                 const start = new Date(formData.leave_start_date)
@@ -220,7 +424,7 @@ const DocumentPage = () => {
         }
 
         const documentData = {
-            label_id: parseInt(formData.label_id),
+            label_id: attendanceLabel.id,
             title: formData.title.trim(),
             content: formData.content.trim(),
             extra_work_hours: isAttendanceLabel && formData.attendance_type === 'overtime' ? parseFloat(formData.extra_work_hours) || 0 : 0,
@@ -376,16 +580,44 @@ const DocumentPage = () => {
                         <FileText className="text-white" size={28} />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-toss-gray-900">기안서</h1>
-                        <p className="text-toss-gray-500">기안서를 작성하고 관리합니다</p>
+                        <h1 className="text-2xl font-bold text-toss-gray-900">근태 관리</h1>
+                        <p className="text-toss-gray-500">근태를 관리합니다</p>
                     </div>
                 </div>
-                <Button onClick={() => setShowForm(!showForm)}>
-                    <Plus size={18} className="mr-1" />
-                    새 기안서
-                </Button>
+                {activeTab === 'list' && (
+                    <Button onClick={() => setShowForm(!showForm)}>
+                        <Plus size={18} className="mr-1" />
+                        신청
+                    </Button>
+                )}
             </div>
 
+            {/* 탭 (관리자만 연차 설정 탭 표시) */}
+            {canManage && (
+                <div className="flex gap-2 border-b border-toss-gray-200">
+                    <button
+                        onClick={() => setActiveTab('list')}
+                        className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors ${
+                            activeTab === 'list' ? 'border-toss-blue text-toss-blue' : 'border-transparent text-toss-gray-500 hover:text-toss-gray-700'
+                        }`}
+                    >
+                        전체 근태
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('leaveSettings')}
+                        className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors ${
+                            activeTab === 'leaveSettings' ? 'border-toss-blue text-toss-blue' : 'border-transparent text-toss-gray-500 hover:text-toss-gray-700'
+                        }`}
+                    >
+                        <Settings size={16} className="inline mr-1" />
+                        연차 설정
+                    </button>
+                </div>
+            )}
+
+            {/* 전체 근태 탭 */}
+            {activeTab === 'list' && (
+                <>
             {/* 기안서 작성 폼 */}
             {showForm && (
                 <Card>
@@ -401,34 +633,6 @@ const DocumentPage = () => {
                         </button>
                     </div>
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        {/* 라벨 선택 */}
-                        <div>
-                            <label className="block text-sm font-medium text-toss-gray-700 mb-2">
-                                라벨 <span className="text-red-500">*</span>
-                            </label>
-                            <div className="flex flex-wrap gap-2">
-                                {labels.map((label) => (
-                                    <button
-                                        key={label.id}
-                                        type="button"
-                                        onClick={() => setFormData({ ...formData, label_id: label.id })}
-                                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                                            formData.label_id === label.id
-                                                ? 'ring-2 ring-offset-2'
-                                                : 'opacity-70 hover:opacity-100'
-                                        }`}
-                                        style={{
-                                            backgroundColor: label.color + '20',
-                                            color: label.color,
-                                            ringColor: label.color
-                                        }}
-                                    >
-                                        {label.name}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
                         {/* 제목 */}
                         <div>
                             <label className="block text-sm font-medium text-toss-gray-700 mb-2">
@@ -438,7 +642,7 @@ const DocumentPage = () => {
                                 type="text"
                                 value={formData.title}
                                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                placeholder="기안서 제목을 입력하세요"
+                                placeholder="제목을 입력하세요"
                                 className="w-full px-4 py-3 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent"
                             />
                         </div>
@@ -858,7 +1062,7 @@ const DocumentPage = () => {
 
                 {/* 결과 수 */}
                 <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-bold text-toss-gray-900">전체 기안서</h2>
+                    <h2 className="text-lg font-bold text-toss-gray-900">전체 근태</h2>
                     <span className="text-sm text-toss-gray-500">총 {filteredDocuments.length}건</span>
                 </div>
 
@@ -873,7 +1077,9 @@ const DocumentPage = () => {
                         <p>검색 결과가 없습니다</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <>
+                    {/* PC: 테이블 */}
+                    <div className="hidden md:block overflow-x-auto">
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-toss-gray-200">
@@ -946,8 +1152,156 @@ const DocumentPage = () => {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* 모바일: 카드 */}
+                    <div className="md:hidden space-y-3">
+                        {filteredDocuments.map((doc) => {
+                            const isLocked = doc.is_private && !canManage && doc.drafter_id !== user?.user_id
+                            const drafter = getDrafterInfo(doc.drafter_id)
+
+                            return (
+                                <div
+                                    key={doc.id}
+                                    onClick={() => handleDocClick(doc)}
+                                    className={`p-4 rounded-xl ${
+                                        isLocked
+                                            ? 'bg-toss-gray-100 cursor-not-allowed'
+                                            : 'bg-toss-gray-50 cursor-pointer active:bg-toss-gray-100'
+                                    }`}
+                                >
+                                    <div className="flex items-start justify-between mb-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            {doc.document_labels && (
+                                                <span
+                                                    className="px-2 py-0.5 rounded-full text-xs font-medium"
+                                                    style={{
+                                                        backgroundColor: doc.document_labels.color + '20',
+                                                        color: doc.document_labels.color
+                                                    }}
+                                                >
+                                                    {doc.document_labels.name}
+                                                </span>
+                                            )}
+                                            {getStatusBadge(doc.status)}
+                                        </div>
+                                        <span className="text-xs text-toss-gray-400">{formatDate(doc.created_at)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        {doc.is_private && (
+                                            <Lock size={14} className={isLocked ? 'text-red-400' : 'text-toss-gray-400'} />
+                                        )}
+                                        <p className={`font-medium ${isLocked ? 'text-toss-gray-400' : 'text-toss-gray-900'}`}>
+                                            {isLocked ? '비공개 기안서' : doc.title}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-toss-gray-600">
+                                            {drafter.name}
+                                            {drafter.rank && <span className="text-toss-gray-400 ml-1">{drafter.rank}</span>}
+                                        </span>
+                                        {!isLocked && doc.attachments && doc.attachments.length > 0 && (
+                                            <span className="text-xs text-toss-gray-500 flex items-center gap-1">
+                                                <Paperclip size={12} />
+                                                {doc.attachments.length}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                    </>
                 )}
             </Card>
+                </>
+            )}
+
+            {/* 연차 설정 탭 (관리자 전용) */}
+            {activeTab === 'leaveSettings' && canManage && (
+                <Card>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-bold text-toss-gray-900 flex items-center gap-2">
+                            <Users className="text-toss-blue" size={20} />
+                            직원별 연차 현황
+                        </h2>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-toss-gray-400" size={16} />
+                            <input
+                                type="text"
+                                value={leaveSearchTerm}
+                                onChange={(e) => setLeaveSearchTerm(e.target.value)}
+                                placeholder="이름 또는 팀으로 검색"
+                                className="pl-9 pr-4 py-2 bg-toss-gray-50 border border-toss-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-toss-blue focus:border-transparent"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead>
+                                <tr className="border-b border-toss-gray-200">
+                                    <th className="text-left py-3 px-4 text-sm font-medium text-toss-gray-500">이름</th>
+                                    <th className="text-left py-3 px-4 text-sm font-medium text-toss-gray-500">팀</th>
+                                    <th className="text-center py-3 px-4 text-sm font-medium text-toss-gray-500">총 연차</th>
+                                    <th className="text-center py-3 px-4 text-sm font-medium text-toss-gray-500">사용</th>
+                                    <th className="text-center py-3 px-4 text-sm font-medium text-toss-gray-500">잔여</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredLeaveUsers.map((u) => {
+                                    const leave = getLeaveInfo(u.user_id)
+                                    const total = leave?.total_days || 15
+                                    const used = leave?.used_days || 0
+                                    const remaining = total - used
+                                    const isEditing = editingUserId === u.user_id
+                                    const isSaving = savingUserId === u.user_id
+
+                                    return (
+                                        <tr key={u.user_id} className="border-b border-toss-gray-100 hover:bg-toss-gray-50">
+                                            <td className="py-3 px-4">
+                                                <p className="font-medium text-toss-gray-900">{u.name}</p>
+                                                {u.rank && <p className="text-xs text-toss-gray-500">{u.rank}</p>}
+                                            </td>
+                                            <td className="py-3 px-4 text-toss-gray-600">{u.team || '-'}</td>
+                                            <td className="py-3 px-4 text-center">
+                                                {isEditing ? (
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <input
+                                                            type="number"
+                                                            value={editTotalDays}
+                                                            onChange={(e) => setEditTotalDays(e.target.value)}
+                                                            step="0.5"
+                                                            min="0"
+                                                            className="w-16 px-2 py-1 text-center bg-white border border-toss-gray-300 rounded-lg text-sm"
+                                                            autoFocus
+                                                        />
+                                                        <button onClick={() => handleSaveTotalDays(u.user_id)} disabled={isSaving} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded">
+                                                            {isSaving ? <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" /> : <Save size={16} />}
+                                                        </button>
+                                                        <button onClick={() => setEditingUserId(null)} disabled={isSaving} className="p-1 text-toss-gray-500 hover:bg-toss-gray-100 rounded"><X size={16} /></button>
+                                                    </div>
+                                                ) : (
+                                                    <button onClick={() => handleEditStart(u.user_id, total)} className="inline-flex items-center gap-1 text-toss-gray-900 hover:text-toss-blue transition-colors group">
+                                                        {total}일<Edit3 size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                    </button>
+                                                )}
+                                            </td>
+                                            <td className="py-3 px-4 text-center text-toss-blue font-medium">{used}일</td>
+                                            <td className="py-3 px-4 text-center">
+                                                <span className={`font-bold ${remaining <= 3 ? 'text-red-500' : 'text-emerald-600'}`}>{remaining}일</span>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {filteredLeaveUsers.length === 0 && (
+                        <div className="py-12 text-center text-toss-gray-500">검색 결과가 없습니다</div>
+                    )}
+                </Card>
+            )}
 
             {/* 상세보기 모달 */}
             {selectedDoc && (
@@ -1099,39 +1453,134 @@ const DocumentPage = () => {
                             </div>
 
                             {/* 버튼 */}
-                            <div className="mt-6 flex gap-3">
-                                {selectedDoc.status === 'pending' && selectedDoc.drafter_id === user?.user_id && (
-                                    <>
-                                        <Button onClick={() => handleEdit(selectedDoc)} className="flex-1">
+                            <div className="mt-6 space-y-3">
+                                {/* 관리자/부관리자: 승인 대기중일 때 승인/반려 버튼 */}
+                                {selectedDoc.status === 'pending' && canManage && !showRejectModal && (
+                                    <div className="flex gap-3">
+                                        <Button
+                                            onClick={handleApprove}
+                                            className="flex-1 bg-emerald-500 hover:bg-emerald-600"
+                                            disabled={processing}
+                                        >
+                                            {processing ? (
+                                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1" />
+                                            ) : (
+                                                <CheckCircle size={16} className="mr-1" />
+                                            )}
+                                            승인
+                                        </Button>
+                                        <Button
+                                            onClick={() => setShowRejectModal(true)}
+                                            variant="secondary"
+                                            className="flex-1 text-red-500 border-red-200 hover:bg-red-50"
+                                            disabled={processing}
+                                        >
+                                            <XCircle size={16} className="mr-1" />
+                                            반려
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {/* 반려 사유 입력 */}
+                                {showRejectModal && (
+                                    <div className="p-4 bg-red-50 rounded-lg space-y-3">
+                                        <p className="text-sm font-medium text-red-700">반려 사유를 입력해주세요</p>
+                                        <textarea
+                                            value={rejectReason}
+                                            onChange={(e) => setRejectReason(e.target.value)}
+                                            placeholder="반려 사유를 입력하세요"
+                                            rows={2}
+                                            className="w-full px-3 py-2 bg-white border border-red-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                            autoFocus
+                                        />
+                                        <div className="flex gap-2">
+                                            <Button
+                                                onClick={handleReject}
+                                                className="flex-1 bg-red-500 hover:bg-red-600"
+                                                disabled={processing || !rejectReason.trim()}
+                                            >
+                                                {processing ? '처리 중...' : '반려 확인'}
+                                            </Button>
+                                            <Button
+                                                onClick={() => { setShowRejectModal(false); setRejectReason('') }}
+                                                variant="secondary"
+                                                className="flex-1"
+                                                disabled={processing}
+                                            >
+                                                취소
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 본인 작성 문서 (대기중): 수정/삭제 버튼 */}
+                                {selectedDoc.status === 'pending' && selectedDoc.drafter_id === user?.user_id && !showRejectModal && !showDeleteModal && (
+                                    <div className="flex gap-3">
+                                        <Button onClick={() => handleEdit(selectedDoc)} variant="secondary" className="flex-1">
                                             <Edit3 size={16} className="mr-1" />
                                             수정
                                         </Button>
                                         <Button
-                                            onClick={async () => {
-                                                if (confirm('이 기안서를 삭제하시겠습니까?')) {
-                                                    const { error } = await deleteDocument(selectedDoc.id, true)
-                                                    if (error) {
-                                                        alert('삭제에 실패했습니다.')
-                                                    } else {
-                                                        setSelectedDoc(null)
-                                                    }
-                                                }
-                                            }}
+                                            onClick={() => setShowDeleteModal(true)}
                                             variant="secondary"
                                             className="flex-1 text-red-500 border-red-200 hover:bg-red-50"
                                         >
                                             <Trash2 size={16} className="mr-1" />
                                             삭제
                                         </Button>
-                                    </>
+                                    </div>
                                 )}
-                                <Button
-                                    onClick={() => setSelectedDoc(null)}
-                                    variant="secondary"
-                                    className={selectedDoc.status === 'pending' && selectedDoc.drafter_id === user?.user_id ? '' : 'w-full'}
-                                >
-                                    닫기
-                                </Button>
+
+                                {/* 관리자: 결재된 문서도 삭제 가능 */}
+                                {selectedDoc.status !== 'pending' && canManage && !showRejectModal && !showDeleteModal && (
+                                    <Button
+                                        onClick={() => setShowDeleteModal(true)}
+                                        variant="secondary"
+                                        className="w-full text-red-500 border-red-200 hover:bg-red-50"
+                                    >
+                                        <Trash2 size={16} className="mr-1" />
+                                        삭제
+                                    </Button>
+                                )}
+
+                                {/* 삭제 확인 모달 */}
+                                {showDeleteModal && (
+                                    <div className="p-4 bg-red-50 rounded-lg space-y-3">
+                                        <p className="text-sm font-medium text-red-700">
+                                            {selectedDoc.status === 'pending'
+                                                ? '이 기안서를 삭제하시겠습니까?'
+                                                : '결재된 문서를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.'}
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                onClick={handleDelete}
+                                                className="flex-1 bg-red-500 hover:bg-red-600"
+                                                disabled={processing}
+                                            >
+                                                {processing ? '삭제 중...' : '삭제'}
+                                            </Button>
+                                            <Button
+                                                onClick={() => setShowDeleteModal(false)}
+                                                variant="secondary"
+                                                className="flex-1"
+                                                disabled={processing}
+                                            >
+                                                취소
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 닫기 버튼 */}
+                                {!showRejectModal && !showDeleteModal && (
+                                    <Button
+                                        onClick={() => setSelectedDoc(null)}
+                                        variant="secondary"
+                                        className="w-full"
+                                    >
+                                        닫기
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     </div>
