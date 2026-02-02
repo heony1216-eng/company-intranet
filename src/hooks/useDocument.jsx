@@ -10,30 +10,37 @@ export const useDocument = () => {
     const [labels, setLabels] = useState([])
     const [users, setUsers] = useState([])
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
 
     const canManage = isAdmin || isSubAdmin
 
     // 라벨 목록 조회
     const fetchLabels = useCallback(async () => {
-        const { data } = await supabase
-            .from('document_labels')
-            .select('*')
-            .order('code')
+        try {
+            const { data, error } = await supabase
+                .from('document_labels')
+                .select('*')
+                .order('code')
 
-        if (data) {
-            setLabels(data)
+            if (error) throw error
+            setLabels(data || [])
+        } catch (err) {
+            setError('라벨 목록을 불러오는데 실패했습니다.')
         }
     }, [])
 
     // 사용자 목록 조회
     const fetchUsers = useCallback(async () => {
-        const { data } = await supabase
-            .from('users')
-            .select('user_id, name, rank, team')
-            .order('name')
+        try {
+            const { data, error } = await supabase
+                .from('users')
+                .select('user_id, name, rank, team')
+                .order('name')
 
-        if (data) {
-            setUsers(data)
+            if (error) throw error
+            setUsers(data || [])
+        } catch (err) {
+            setError('사용자 목록을 불러오는데 실패했습니다.')
         }
     }, [])
 
@@ -42,42 +49,44 @@ export const useDocument = () => {
         if (!user) return
 
         setLoading(true)
+        setError(null)
 
-        // 본인이 작성한 기안서
-        const { data: myDocs } = await supabase
-            .from('documents')
-            .select('*, document_labels(*)')
-            .eq('drafter_id', user.user_id)
-            .order('created_at', { ascending: false })
-
-        if (myDocs) {
-            setDocuments(myDocs)
-        }
-
-        // 전체 기안서 조회 (is_private이 true면 관리자만 볼 수 있음)
-        const { data: all } = await supabase
-            .from('documents')
-            .select('*, document_labels(*)')
-            .order('created_at', { ascending: false })
-
-        if (all) {
-            setAllDocuments(all)
-        }
-
-        // 관리자인 경우 대기중인 기안서도 조회 (pending + chairman_approved)
-        if (canManage) {
-            const { data: pending } = await supabase
+        try {
+            // 본인이 작성한 기안서
+            const { data: myDocs, error: myDocsError } = await supabase
                 .from('documents')
                 .select('*, document_labels(*)')
-                .in('status', ['pending', 'chairman_approved'])
+                .eq('drafter_id', user.user_id)
                 .order('created_at', { ascending: false })
 
-            if (pending) {
-                setPendingDocuments(pending)
-            }
-        }
+            if (myDocsError) throw myDocsError
+            setDocuments(myDocs || [])
 
-        setLoading(false)
+            // 전체 기안서 조회 (is_private이 true면 관리자만 볼 수 있음)
+            const { data: all, error: allError } = await supabase
+                .from('documents')
+                .select('*, document_labels(*)')
+                .order('created_at', { ascending: false })
+
+            if (allError) throw allError
+            setAllDocuments(all || [])
+
+            // 관리자인 경우 대기중인 기안서도 조회 (pending + chairman_approved)
+            if (canManage) {
+                const { data: pending, error: pendingError } = await supabase
+                    .from('documents')
+                    .select('*, document_labels(*)')
+                    .in('status', ['pending', 'chairman_approved'])
+                    .order('created_at', { ascending: false })
+
+                if (pendingError) throw pendingError
+                setPendingDocuments(pending || [])
+            }
+        } catch (err) {
+            setError('기안서 목록을 불러오는데 실패했습니다.')
+        } finally {
+            setLoading(false)
+        }
     }, [user, canManage])
 
     useEffect(() => {
@@ -290,7 +299,7 @@ export const useDocument = () => {
                                     .eq('id', compLeave.id)
                             }
                         } else {
-                            // 연차 차감 (full, half_am, half_pm, out_2h, out_3h)
+                            // 연차 차감 (full, half_am, half_pm, out_1h, out_2h, out_3h)
                             const { data: annualLeave } = await supabase
                                 .from('annual_leaves')
                                 .select('*')
@@ -323,6 +332,7 @@ export const useDocument = () => {
                             full: '연차',
                             half_am: '오전반차',
                             half_pm: '오후반차',
+                            out_1h: '외출',
                             out_2h: '조퇴',
                             out_3h: '조퇴',
                             comp: '대체휴무'
@@ -531,6 +541,7 @@ export const useDocument = () => {
         labels,
         users,
         loading,
+        error,
         canManage,
         createDocument,
         updateDocument,

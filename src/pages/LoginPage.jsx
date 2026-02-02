@@ -15,13 +15,11 @@ const LoginPage = () => {
     const { signInWithPassword } = useAuth()
     const navigate = useNavigate()
 
-    // Load saved credentials on mount
+    // Load saved ID on mount (비밀번호는 보안상 저장하지 않음)
     useEffect(() => {
         const savedId = localStorage.getItem('savedId')
-        const savedPassword = localStorage.getItem('savedPassword')
-        if (savedId && savedPassword) {
+        if (savedId) {
             setId(savedId)
-            setPassword(savedPassword)
             setRememberMe(true)
         }
     }, [])
@@ -36,13 +34,11 @@ const LoginPage = () => {
         if (error) {
             setError(error.message || '아이디 또는 비밀번호가 올바르지 않습니다.')
         } else {
-            // Save credentials if Remember Me is checked
+            // Save ID if Remember Me is checked (비밀번호는 저장하지 않음)
             if (rememberMe) {
                 localStorage.setItem('savedId', id)
-                localStorage.setItem('savedPassword', password)
             } else {
                 localStorage.removeItem('savedId')
-                localStorage.removeItem('savedPassword')
             }
             navigate('/')
         }

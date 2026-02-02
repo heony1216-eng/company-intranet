@@ -33,9 +33,6 @@ export const AuthProvider = ({ children }) => {
                 return { error: { message: '아이디 또는 비밀번호가 올바르지 않습니다.' } }
             }
 
-            console.log('Logged in user data:', data) // 디버깅용
-            console.log('User ID type:', typeof data.id, 'Value:', data.id) // 디버깅용
-
             // Save to localStorage
             localStorage.setItem('user', JSON.stringify(data))
             setUser(data)

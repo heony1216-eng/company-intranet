@@ -1,19 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './useAuth'
+import { LEAVE_TYPE_DAYS, DEFAULT_ANNUAL_LEAVE_DAYS, ATTENDANCE_LABEL_CODE } from '../constants/leave'
 
 /**
  * 연차 관리 훅
  */
-// 연차 유형별 차감 일수
-const LEAVE_TYPE_DAYS = {
-    full: 1,
-    half_am: 0.5,
-    half_pm: 0.5,
-    out_2h: 0.25,
-    out_3h: 0.375,
-    comp: 1  // 대체휴무 (연차에서 차감하지 않음, comp_leaves에서 차감)
-}
 
 export const useAnnualLeave = () => {
     const { user, isAdmin, isSubAdmin } = useAuth()
@@ -26,11 +18,11 @@ export const useAnnualLeave = () => {
 
     const currentYear = new Date().getFullYear()
 
-    // 연차 정보 조회
+    // 연차 정보 조회 - documents 테이블에서 승인된 휴가 합계로 used_days 계산
     const fetchAnnualLeave = useCallback(async () => {
         if (!user?.user_id) return
 
-        const { data, error } = await supabase
+        let { data, error } = await supabase
             .from('annual_leaves')
             .select('*')
             .eq('user_id', user.user_id)
@@ -48,17 +40,48 @@ export const useAnnualLeave = () => {
                 .insert([{
                     user_id: user.user_id,
                     year: currentYear,
-                    total_days: 15,
+                    total_days: DEFAULT_ANNUAL_LEAVE_DAYS,
                     used_days: 0
                 }])
                 .select()
                 .single()
 
             if (!insertError) {
-                setAnnualLeave(newData)
+                data = newData
             }
-        } else {
-            setAnnualLeave(data)
+        }
+
+        // documents 테이블에서 승인된 휴가 합계 조회
+        const yearStart = `${currentYear}-01-01`
+        const yearEnd = `${currentYear}-12-31`
+
+        // 근태관련 라벨 조회
+        const { data: labelData } = await supabase
+            .from('document_labels')
+            .select('id')
+            .eq('code', ATTENDANCE_LABEL_CODE)
+            .single()
+
+        let usedDays = 0
+        if (labelData) {
+            const { data: approvedLeaves } = await supabase
+                .from('documents')
+                .select('leave_days, leave_type')
+                .eq('drafter_id', user.user_id)
+                .eq('label_id', labelData.id)
+                .eq('attendance_type', 'leave')
+                .eq('status', 'approved')
+                .gte('leave_start_date', yearStart)
+                .lte('leave_start_date', yearEnd)
+                .not('leave_type', 'is', null)
+                .neq('leave_type', 'comp') // 대체휴무 제외
+
+            usedDays = (approvedLeaves || []).reduce((sum, doc) => sum + (doc.leave_days || 0), 0)
+        }
+
+        // 계산된 used_days로 설정
+        if (data) {
+            setAnnualLeave({ ...data, used_days: usedDays })
         }
     }, [user?.user_id, currentYear])
 

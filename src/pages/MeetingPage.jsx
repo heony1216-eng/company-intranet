@@ -321,8 +321,7 @@ const MeetingPage = () => {
                     .eq('id', existingMeeting.id)
                 if (error) throw error
             } else {
-                console.log('Inserting meeting with profile:', profile)
-                const { data, error } = await supabase
+                const { error } = await supabase
                     .from('meetings')
                     .insert([{
                         meeting_date: selectedDate,
@@ -332,7 +331,6 @@ const MeetingPage = () => {
                         file_urls: allFileUrls
                     }])
                     .select()
-                console.log('Insert result:', data, error)
                 if (error) throw error
             }
 
