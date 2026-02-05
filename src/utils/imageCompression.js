@@ -18,7 +18,6 @@ export const compressImageToWebP = async (file, options = {}) => {
 
     try {
         const compressedFile = await imageCompression(file, defaultOptions)
-        console.log(`이미지 압축 완료: ${(file.size / 1024).toFixed(1)}KB → ${(compressedFile.size / 1024).toFixed(1)}KB`)
 
         // 파일명을 .webp 확장자로 변경
         const newFileName = file.name.replace(/\.[^/.]+$/, '.webp')
@@ -29,7 +28,6 @@ export const compressImageToWebP = async (file, options = {}) => {
 
         return webpFile
     } catch (error) {
-        console.error('이미지 압축 실패:', error)
         throw error
     }
 }

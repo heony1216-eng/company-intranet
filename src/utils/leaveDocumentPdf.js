@@ -3,6 +3,7 @@ const LEAVE_TYPE_LABELS = {
     full: '연차',
     half_am: '오전 반차',
     half_pm: '오후 반차',
+    out_1h: '외출/조퇴 1시간',
     out_2h: '외출/조퇴 2시간',
     out_3h: '외출/조퇴 3시간'
 }

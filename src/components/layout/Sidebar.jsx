@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar, CalendarDays, ExternalLink, ChevronDown, Settings, FolderOpen, BookOpen, Palmtree, Smartphone } from 'lucide-react'
+import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar, CalendarDays, ExternalLink, ChevronDown, Settings, FolderOpen, BookOpen, Palmtree, Smartphone, Building2, Tag } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -7,17 +7,23 @@ const Sidebar = () => {
     const { isAdmin, isSubAdmin } = useAuth()
     const canManageLeave = isAdmin || isSubAdmin
     const [isOpen, setIsOpen] = useState(false)
-    const [worklogOpen, setWorklogOpen] = useState(false)
-    const [archiveOpen, setArchiveOpen] = useState(false)
+    const [menuOpen, setMenuOpen] = useState({})
     const location = useLocation()
 
-    // 업무보고 관련 페이지에 있으면 서브메뉴 열기
+    const toggleMenu = (key) => {
+        setMenuOpen(prev => ({ ...prev, [key]: !prev[key] }))
+    }
+
+    // 관련 페이지에 있으면 서브메뉴 열기
     useEffect(() => {
         if (location.pathname.startsWith('/worklogs')) {
-            setWorklogOpen(true)
+            setMenuOpen(prev => ({ ...prev, worklogs: true }))
         }
         if (location.pathname.startsWith('/archive')) {
-            setArchiveOpen(true)
+            setMenuOpen(prev => ({ ...prev, archive: true }))
+        }
+        if (location.pathname.startsWith('/admission')) {
+            setMenuOpen(prev => ({ ...prev, admission: true }))
         }
     }, [location.pathname])
 
@@ -29,6 +35,8 @@ const Sidebar = () => {
             icon: ClipboardList,
             label: '업무보고',
             isSubmenu: true,
+            menuKey: 'worklogs',
+            pathPrefix: '/worklogs',
             subItems: [
                 { to: '/worklogs/daily', label: '일일 업무보고' },
                 { to: '/worklogs/weekly', label: '주간 업무보고' },
@@ -36,6 +44,17 @@ const Sidebar = () => {
             ]
         },
         { to: '/rescue', icon: AlertTriangle, label: '구조현황' },
+        {
+            icon: Building2,
+            label: '입소현황',
+            isSubmenu: true,
+            menuKey: 'admission',
+            pathPrefix: '/admission',
+            subItems: [
+                { to: '/admission', label: '입소현황' },
+                { to: '/admission/nametag', label: '네임택 출력' },
+            ]
+        },
         { to: '/meetings', icon: Calendar, label: '회의록' },
         { to: '/document-ledger', icon: BookOpen, label: '수·발신대장' },
         { to: '/document', icon: FileText, label: '근태 관리' },
@@ -134,15 +153,9 @@ const Sidebar = () => {
                         item.isSubmenu ? (
                             <div key={item.label}>
                                 <button
-                                    onClick={() => {
-                                        if (item.menuKey === 'archive') {
-                                            setArchiveOpen(!archiveOpen)
-                                        } else {
-                                            setWorklogOpen(!worklogOpen)
-                                        }
-                                    }}
+                                    onClick={() => toggleMenu(item.menuKey)}
                                     className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-toss transition-all ${
-                                        (item.menuKey === 'archive' ? location.pathname.startsWith('/archive') : location.pathname.startsWith('/worklogs'))
+                                        location.pathname.startsWith(item.pathPrefix)
                                             ? 'bg-toss-blue/10 text-toss-blue'
                                             : 'text-toss-gray-900 hover:bg-toss-blue/10 hover:text-toss-blue'
                                     }`}
@@ -153,15 +166,16 @@ const Sidebar = () => {
                                     </div>
                                     <ChevronDown
                                         size={16}
-                                        className={`transition-transform ${(item.menuKey === 'archive' ? archiveOpen : worklogOpen) ? 'rotate-180' : ''}`}
+                                        className={`transition-transform ${menuOpen[item.menuKey] ? 'rotate-180' : ''}`}
                                     />
                                 </button>
-                                {(item.menuKey === 'archive' ? archiveOpen : worklogOpen) && (
+                                {menuOpen[item.menuKey] && (
                                     <div className="ml-4 mt-1 space-y-1">
                                         {item.subItems.map((subItem) => (
                                             <NavLink
                                                 key={subItem.to}
                                                 to={subItem.to}
+                                                end={subItem.to === '/admission'}
                                                 onClick={() => setIsOpen(false)}
                                                 className={({ isActive }) =>
                                                     `flex items-center gap-3 px-4 py-2 rounded-toss transition-all text-sm ${

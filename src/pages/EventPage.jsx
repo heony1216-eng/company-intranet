@@ -189,6 +189,7 @@ const EventPage = () => {
                 .select('*')
                 .gte('event_date', startDate)
                 .lte('event_date', endDate)
+                .neq('event_type', 'leave')
                 .order('event_date', { ascending: true })
 
             setEvents(data || [])
@@ -204,6 +205,7 @@ const EventPage = () => {
                 .from('events')
                 .select('*')
                 .gte('event_date', today)
+                .neq('event_type', 'leave')
                 .order('event_date', { ascending: true })
                 .limit(10)
 

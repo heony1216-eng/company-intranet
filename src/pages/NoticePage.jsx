@@ -67,7 +67,6 @@ const NoticePage = () => {
         }
 
         try {
-            console.log('Inserting notice with author_id:', profile.user_id, typeof profile.user_id)
             const { error } = await supabase.from('notices').insert({
                 title: formData.title,
                 content: formData.content,
