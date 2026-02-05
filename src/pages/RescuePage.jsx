@@ -433,11 +433,21 @@ const RescuePage = () => {
         setIsDetailModalOpen(true)
     }
 
+    // 완료되지 않은 항목을 먼저, 완료된 항목을 나중에 정렬
+    const sortedRescueSituations = [...rescueSituations].sort((a, b) => {
+        // 완료 여부로 먼저 정렬 (미완료가 위로)
+        if (a.is_completed !== b.is_completed) {
+            return a.is_completed ? 1 : -1
+        }
+        // 같은 완료 상태면 생성일 기준 내림차순
+        return new Date(b.created_at) - new Date(a.created_at)
+    })
+
     // 페이지네이션
     const indexOfLastItem = currentPage * itemsPerPage
     const indexOfFirstItem = indexOfLastItem - itemsPerPage
-    const currentItems = rescueSituations.slice(indexOfFirstItem, indexOfLastItem)
-    const totalPages = Math.ceil(rescueSituations.length / itemsPerPage)
+    const currentItems = sortedRescueSituations.slice(indexOfFirstItem, indexOfLastItem)
+    const totalPages = Math.ceil(sortedRescueSituations.length / itemsPerPage)
 
     const goToPage = (pageNumber) => {
         setCurrentPage(pageNumber)
@@ -972,7 +982,7 @@ const RescuePage = () => {
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900 w-20">성명</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900 w-24">구조요청</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900">현재 진행상황</th>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-900 w-16">완료</th>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-900 w-20">완료</th>
                                         <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-900 w-24">관리</th>
                                     </tr>
                                 </thead>
@@ -980,7 +990,7 @@ const RescuePage = () => {
                                     {currentItems.map((rescue, index) => (
                                         <tr
                                             key={rescue.id}
-                                            className={`hover:bg-toss-gray-50 transition-colors cursor-pointer ${rescue.is_completed ? 'opacity-60' : ''} ${selectedIds.has(rescue.id) ? 'bg-blue-50' : ''}`}
+                                            className={`transition-colors cursor-pointer ${rescue.is_completed ? 'bg-toss-gray-50 hover:bg-toss-gray-100' : 'bg-orange-50/50 hover:bg-orange-100/50'} ${selectedIds.has(rescue.id) ? '!bg-blue-50' : ''}`}
                                             onClick={() => openDetailModal(rescue)}
                                         >
                                             <td className="px-4 py-3 text-center w-10" onClick={(e) => e.stopPropagation()}>
@@ -998,13 +1008,17 @@ const RescuePage = () => {
                                             <td className="px-4 py-3 text-sm text-toss-gray-900 font-medium w-20 truncate">{rescue.name || '-'}</td>
                                             <td className="px-4 py-3 text-sm text-toss-gray-700 w-24 truncate">{rescue.request_date || '-'}</td>
                                             <td className="px-4 py-3 text-sm text-toss-gray-700 truncate">{rescue.status || '-'}</td>
-                                            <td className="px-4 py-3 text-center w-16" onClick={(e) => e.stopPropagation()}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={rescue.is_completed || false}
-                                                    onChange={() => toggleComplete(rescue)}
-                                                    className="w-5 h-5 text-toss-blue border-gray-300 rounded focus:ring-toss-blue cursor-pointer"
-                                                />
+                                            <td className="px-4 py-3 text-center w-20" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    onClick={() => toggleComplete(rescue)}
+                                                    className={`px-3 py-1 text-xs font-medium rounded-full transition-colors whitespace-nowrap ${
+                                                        rescue.is_completed
+                                                            ? 'bg-green-100 text-green-600 hover:bg-green-200'
+                                                            : 'bg-orange-100 text-orange-600 hover:bg-orange-200'
+                                                    }`}
+                                                >
+                                                    {rescue.is_completed ? '완료' : '진행중'}
+                                                </button>
                                             </td>
                                             <td className="px-4 py-3 text-center w-24" onClick={(e) => e.stopPropagation()}>
                                                 <div className="flex items-center justify-center gap-1">
@@ -1035,7 +1049,7 @@ const RescuePage = () => {
                             {currentItems.map((rescue, index) => (
                                 <div
                                     key={rescue.id}
-                                    className={`p-4 ${rescue.is_completed ? 'opacity-60' : ''} ${selectedIds.has(rescue.id) ? 'bg-blue-50' : ''}`}
+                                    className={`p-4 ${rescue.is_completed ? 'bg-toss-gray-50' : 'bg-orange-50/50'} ${selectedIds.has(rescue.id) ? '!bg-blue-50' : ''}`}
                                     onClick={() => openDetailModal(rescue)}
                                 >
                                     <div className="flex items-center justify-between mb-2">
@@ -1049,18 +1063,18 @@ const RescuePage = () => {
                                             />
                                             <span className="text-xs text-toss-gray-500">#{indexOfFirstItem + index + 1}</span>
                                             <span className="text-sm font-medium text-toss-gray-900">{rescue.name || '-'}</span>
-                                            <span className={`text-xs px-2 py-0.5 rounded-full ${rescue.is_completed ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
-                                                {rescue.is_completed ? '완료' : '진행중'}
-                                            </span>
                                         </div>
                                         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                            <input
-                                                type="checkbox"
-                                                checked={rescue.is_completed || false}
-                                                onChange={() => toggleComplete(rescue)}
-                                                className="w-4 h-4 text-green-500 border-gray-300 rounded focus:ring-green-500 cursor-pointer"
-                                                title="완료 체크"
-                                            />
+                                            <button
+                                                onClick={() => toggleComplete(rescue)}
+                                                className={`px-2 py-0.5 text-xs font-medium rounded-full transition-colors whitespace-nowrap ${
+                                                    rescue.is_completed
+                                                        ? 'bg-green-100 text-green-600 hover:bg-green-200'
+                                                        : 'bg-orange-100 text-orange-600 hover:bg-orange-200'
+                                                }`}
+                                            >
+                                                {rescue.is_completed ? '완료' : '진행중'}
+                                            </button>
                                             <button
                                                 onClick={() => openEditModal(rescue)}
                                                 className="p-1.5 text-blue-500 hover:bg-blue-100 rounded-lg"

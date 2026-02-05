@@ -1,14 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from './useAuth'
 
 export function useDocumentLedger() {
+  const { profile, isAdmin, isSubAdmin } = useAuth()
   const [labels, setLabels] = useState([])
   const [ledgerData, setLedgerData] = useState([])
   const [selectedLabel, setSelectedLabel] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  // 라벨 목록 조회
+  // 라벨 목록 조회 (모든 라벨 조회 - 누구나 볼 수 있음)
   const fetchLabels = useCallback(async () => {
     try {
       setLoading(true)
@@ -20,9 +22,10 @@ export function useDocumentLedger() {
       if (error) throw error
       setLabels(data || [])
 
-      // 첫 번째 라벨 자동 선택
+      // 첫 번째 라벨 자동 선택 (자기 팀 라벨 우선)
       if (data && data.length > 0 && !selectedLabel) {
-        setSelectedLabel(data[0])
+        const myTeamLabel = data.find(label => label.name === profile?.team)
+        setSelectedLabel(myTeamLabel || data[0])
       }
     } catch (err) {
       setError(err.message)
@@ -30,7 +33,7 @@ export function useDocumentLedger() {
     } finally {
       setLoading(false)
     }
-  }, [selectedLabel])
+  }, [selectedLabel, profile?.team])
 
   // 라벨 추가
   const addLabel = async (name) => {
@@ -229,10 +232,12 @@ export function useDocumentLedger() {
     return Math.max(...ledgerData.map(item => item.row_number)) + 1
   }
 
-  // 초기 라벨 로드
+  // 초기 라벨 로드 (프로필 로드 후)
   useEffect(() => {
-    fetchLabels()
-  }, [])
+    if (profile) {
+      fetchLabels()
+    }
+  }, [profile?.team, isAdmin, isSubAdmin])
 
   // 선택된 라벨 변경 시 데이터 로드
   useEffect(() => {

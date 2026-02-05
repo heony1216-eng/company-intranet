@@ -48,7 +48,8 @@ const Dashboard = () => {
                 .eq('user_id', profile.user_id)
                 .eq('type', 'daily')
                 .eq('work_date', today)
-                .single()
+                .limit(1)
+                .maybeSingle()
 
             if (!dailyLog) {
                 alerts.daily = true
@@ -73,7 +74,8 @@ const Dashboard = () => {
                 .eq('type', 'weekly')
                 .gte('work_date', mondayStr)
                 .lte('work_date', fridayStr)
-                .single()
+                .limit(1)
+                .maybeSingle()
 
             if (!weeklyLog) {
                 alerts.weekly = true
@@ -93,7 +95,8 @@ const Dashboard = () => {
                 .eq('type', 'monthly')
                 .gte('work_date', monthStart)
                 .lte('work_date', monthEnd)
-                .single()
+                .limit(1)
+                .maybeSingle()
 
             if (!monthlyLog) {
                 alerts.monthly = true
@@ -194,7 +197,7 @@ const Dashboard = () => {
                             <div className="space-y-2">
                                 {worklogAlerts.daily && (
                                     <Link
-                                        to="/worklog"
+                                        to="/worklogs/daily"
                                         className="flex items-center justify-between p-2 bg-white rounded-lg hover:bg-amber-100 transition-colors"
                                     >
                                         <div className="flex items-center gap-2">
@@ -206,7 +209,7 @@ const Dashboard = () => {
                                 )}
                                 {worklogAlerts.weekly && (
                                     <Link
-                                        to="/worklog/weekly"
+                                        to="/worklogs/weekly"
                                         className="flex items-center justify-between p-2 bg-white rounded-lg hover:bg-amber-100 transition-colors"
                                     >
                                         <div className="flex items-center gap-2">
@@ -218,7 +221,7 @@ const Dashboard = () => {
                                 )}
                                 {worklogAlerts.monthly && (
                                     <Link
-                                        to="/worklog/monthly"
+                                        to="/worklogs/monthly"
                                         className="flex items-center justify-between p-2 bg-white rounded-lg hover:bg-amber-100 transition-colors"
                                     >
                                         <div className="flex items-center gap-2">

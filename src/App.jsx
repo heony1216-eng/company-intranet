@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth'
+import { ErrorBoundary } from './components/common'
 import Layout from './components/layout/Layout'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -16,6 +17,9 @@ import DocumentPage from './pages/DocumentPage'
 import AdminPage from './pages/AdminPage'
 import ArchivePage from './pages/ArchivePage'
 import DocumentLedgerPage from './pages/DocumentLedgerPage'
+import LeavePage from './pages/LeavePage'
+import AdmissionPage from './pages/AdmissionPage'
+import NametagPage from './pages/NametagPage'
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -98,6 +102,9 @@ function AppRoutes() {
         <Route path="/archive" element={<Navigate to="/archive/forms" replace />} />
         <Route path="/archive/:type" element={<ArchivePage />} />
         <Route path="/document-ledger" element={<DocumentLedgerPage />} />
+        <Route path="/leave" element={<LeavePage />} />
+        <Route path="/admission" element={<AdmissionPage />} />
+        <Route path="/admission/nametag" element={<NametagPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/mypage" element={<MyPage />} />
       </Route>
@@ -108,11 +115,13 @@ function AppRoutes() {
 
 function App() {
   return (
-    <BrowserRouter basename={import.meta.env.BASE_URL}>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }
 

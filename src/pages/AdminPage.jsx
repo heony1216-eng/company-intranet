@@ -18,6 +18,7 @@ const LEAVE_TYPES = {
     full: { label: '연차', days: 1 },
     half_am: { label: '오전 반차', days: 0.5 },
     half_pm: { label: '오후 반차', days: 0.5 },
+    out_1h: { label: '외출/조퇴 1시간', days: 0.125 },
     out_2h: { label: '외출/조퇴 2시간', days: 0.25 },
     out_3h: { label: '외출/조퇴 3시간', days: 0.375 },
     comp: { label: '대체휴무', days: 1 }

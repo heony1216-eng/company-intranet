@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Card, Button, Modal } from '../components/common'
-import { Plus, Edit, Trash2, Tag, Check, X, Upload, Download } from 'lucide-react'
+import { Plus, Edit, Trash2, Tag, Check, X, Upload, Download, BookOpen } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useDocumentLedger } from '../hooks/useDocumentLedger'
 import * as XLSX from 'xlsx'
@@ -21,6 +21,11 @@ const DocumentLedgerPage = () => {
     deleteLedgerItem,
     getNextRowNumber,
   } = useDocumentLedger()
+
+  // 현재 선택된 라벨에 대해 편집 가능한지 확인
+  // 관리자/부관리자는 모든 라벨 편집 가능, 일반 사용자는 자기 팀 라벨만 편집 가능
+  // 라벨이 하나만 있으면 (필터링 결과) 그 사용자의 팀 라벨이므로 편집 가능
+  const canEdit = isAdmin || isSubAdmin || (labels.length === 1) || (selectedLabel?.name === profile?.team)
 
   // 모달 상태
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false)
@@ -60,7 +65,7 @@ const DocumentLedgerPage = () => {
 
   // 편집 시작
   const startEdit = (item, field) => {
-    if (!isAdmin && !isSubAdmin) return
+    if (!canEdit) return
     setEditingCell({ id: item.id, field })
     setEditValue(item[field] || '')
   }
@@ -413,7 +418,6 @@ const DocumentLedgerPage = () => {
   // 편집 가능한 셀 렌더링
   const EditableCell = ({ item, field, className = '', align = 'left' }) => {
     const isEditing = editingCell?.id === item.id && editingCell?.field === field
-    const canEdit = isAdmin || isSubAdmin
 
     if (isEditing) {
       return (
@@ -442,51 +446,58 @@ const DocumentLedgerPage = () => {
   return (
     <div className="space-y-6">
       {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-toss-gray-900">문서 수발신 대장</h1>
-          <p className="text-toss-gray-500 mt-1">{currentYear}년도</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {(isAdmin || isSubAdmin) && selectedLabel && (
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <Button
-                variant="secondary"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-              >
-                <Upload size={18} />
-                업로드
+      <Card className="bg-gradient-to-r from-toss-blue to-blue-600 text-white">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
+              <BookOpen size={24} />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold mb-1">문서 수발신 대장</h1>
+              <p className="text-white/90">{currentYear}년도</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            {canEdit && selectedLabel && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="flex-1 sm:flex-none text-sm bg-white/20 hover:bg-white/30 text-white border-0"
+                >
+                  <Upload size={16} />
+                  <span className="hidden sm:inline">업로드</span>
+                </Button>
+                <Button
+                  onClick={handleDownload}
+                  className="flex-1 sm:flex-none text-sm bg-white/20 hover:bg-white/30 text-white border-0"
+                >
+                  <Download size={16} />
+                  <span className="hidden sm:inline">다운로드</span>
+                </Button>
+              </>
+            )}
+            {(isAdmin || isSubAdmin) && (
+              <Button onClick={() => {
+                setLabelMode('list')
+                setNewLabelName('')
+                setEditingLabel(null)
+                setIsLabelModalOpen(true)
+              }} className="flex-1 sm:flex-none text-sm bg-white/20 hover:bg-white/30 text-white border-0">
+                <Tag size={16} />
+                <span className="hidden sm:inline">라벨 관리</span>
               </Button>
-              <Button
-                variant="secondary"
-                onClick={handleDownload}
-              >
-                <Download size={18} />
-                다운로드
-              </Button>
-            </>
-          )}
-          {(isAdmin || isSubAdmin) && (
-            <Button variant="secondary" onClick={() => {
-              setLabelMode('list')
-              setNewLabelName('')
-              setEditingLabel(null)
-              setIsLabelModalOpen(true)
-            }}>
-              <Tag size={18} />
-              라벨 관리
-            </Button>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      </Card>
 
       {/* 라벨 탭 */}
       <div className="flex items-center gap-2 border-b border-toss-gray-200">
@@ -513,10 +524,10 @@ const DocumentLedgerPage = () => {
         )}
       </div>
 
-      {/* 테이블 */}
-      <Card padding="p-0">
+      {/* 데스크톱 테이블 (lg 이상) */}
+      <Card padding="p-0" className="hidden lg:block">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[900px]">
             <thead>
               <tr className="border-b border-toss-gray-200 bg-toss-gray-50">
                 <th className="px-3 py-3 text-xs font-semibold text-toss-gray-500 text-center w-14">번호</th>
@@ -527,7 +538,7 @@ const DocumentLedgerPage = () => {
                 <th className="px-3 py-3 text-xs font-semibold text-toss-gray-500 text-center w-28 bg-green-50/50">발신 기관</th>
                 <th className="px-3 py-3 text-xs font-semibold text-toss-gray-500 text-center w-20 bg-green-50/50">발신일</th>
                 <th className="px-3 py-3 text-xs font-semibold text-toss-gray-500 text-left min-w-[120px]">비고</th>
-                {(isAdmin || isSubAdmin) && (
+                {canEdit && (
                   <th className="px-3 py-3 text-xs font-semibold text-toss-gray-500 text-center w-12"></th>
                 )}
               </tr>
@@ -535,14 +546,14 @@ const DocumentLedgerPage = () => {
             <tbody className="divide-y divide-toss-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={(isAdmin || isSubAdmin) ? 9 : 8} className="px-4 py-12 text-center text-toss-gray-500">
+                  <td colSpan={canEdit ? 9 : 8} className="px-4 py-12 text-center text-toss-gray-500">
                     로딩 중...
                   </td>
                 </tr>
               ) : (
                 <>
                   {/* 새 행 추가 - 상단에 배치 */}
-                  {isAddingRow && (isAdmin || isSubAdmin) && (
+                  {isAddingRow && canEdit && (
                     <tr className="bg-toss-blue/5">
                       <td className="px-3 py-2 text-sm text-center text-toss-gray-400">
                         {getNextRowNumber()}
@@ -672,7 +683,7 @@ const DocumentLedgerPage = () => {
                       <td className="px-1 py-1 text-sm">
                         <EditableCell item={item} field="note" />
                       </td>
-                      {(isAdmin || isSubAdmin) && (
+                      {canEdit && (
                         <td className="px-2 py-1 text-center">
                           <button
                             onClick={() => openDeleteModal(item)}
@@ -688,7 +699,7 @@ const DocumentLedgerPage = () => {
                   {/* 빈 상태 */}
                   {ledgerData.length === 0 && !isAddingRow && (
                     <tr>
-                      <td colSpan={(isAdmin || isSubAdmin) ? 9 : 8} className="px-4 py-12 text-center text-toss-gray-400">
+                      <td colSpan={canEdit ? 9 : 8} className="px-4 py-12 text-center text-toss-gray-400">
                         {selectedLabel ? '등록된 문서가 없습니다' : '라벨을 선택해주세요'}
                       </td>
                     </tr>
@@ -700,7 +711,7 @@ const DocumentLedgerPage = () => {
         </div>
 
         {/* 행 추가 버튼 */}
-        {selectedLabel && (isAdmin || isSubAdmin) && !isAddingRow && (
+        {selectedLabel && canEdit && !isAddingRow && (
           <div className="border-t border-toss-gray-100">
             <button
               onClick={() => setIsAddingRow(true)}
@@ -713,8 +724,191 @@ const DocumentLedgerPage = () => {
         )}
       </Card>
 
+      {/* 모바일 카드 리스트 (md 미만) */}
+      <div className="lg:hidden space-y-3">
+        {loading ? (
+          <Card>
+            <div className="py-8 text-center text-toss-gray-500">로딩 중...</div>
+          </Card>
+        ) : (
+          <>
+            {/* 새 문서 추가 버튼 (모바일) */}
+            {selectedLabel && canEdit && !isAddingRow && (
+              <button
+                onClick={() => setIsAddingRow(true)}
+                className="w-full p-4 bg-toss-gray-50 border-2 border-dashed border-toss-gray-200 rounded-xl text-toss-gray-500 hover:border-toss-blue hover:text-toss-blue transition-colors flex items-center justify-center gap-2"
+              >
+                <Plus size={18} />
+                새 문서 추가
+              </button>
+            )}
+
+            {/* 새 문서 입력 폼 (모바일) */}
+            {isAddingRow && canEdit && (
+              <Card>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-toss-gray-500">#{getNextRowNumber()}</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleAddRow(true)}
+                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                      >
+                        <Check size={18} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (newRowData.content.trim() || newRowData.doc_number.trim()) {
+                            handleAddRow(false)
+                          } else {
+                            setIsAddingRow(false)
+                          }
+                        }}
+                        className="p-2 text-toss-gray-400 hover:bg-toss-gray-100 rounded-lg transition-colors"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    value={newRowData.content}
+                    onChange={(e) => handleNewRowChange('content', e.target.value)}
+                    placeholder="내용"
+                    className="w-full px-3 py-2 text-sm bg-toss-gray-50 border-0 rounded-lg focus:ring-2 focus:ring-toss-blue"
+                    autoFocus
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={newRowData.doc_number}
+                      onChange={(e) => handleNewRowChange('doc_number', e.target.value)}
+                      placeholder="위치"
+                      className="px-3 py-2 text-sm bg-toss-gray-50 border-0 rounded-lg focus:ring-2 focus:ring-toss-blue"
+                    />
+                    <input
+                      type="text"
+                      value={newRowData.note}
+                      onChange={(e) => handleNewRowChange('note', e.target.value)}
+                      placeholder="비고"
+                      className="px-3 py-2 text-sm bg-toss-gray-50 border-0 rounded-lg focus:ring-2 focus:ring-toss-blue"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-xs text-blue-600 font-medium">수신</label>
+                      <div className="flex gap-1">
+                        <input
+                          type="text"
+                          value={newRowData.receiver_org}
+                          onChange={(e) => handleNewRowChange('receiver_org', e.target.value)}
+                          placeholder="기관"
+                          className="flex-1 px-2 py-1.5 text-sm bg-blue-50 border-0 rounded-lg focus:ring-2 focus:ring-blue-400"
+                        />
+                        <input
+                          type="text"
+                          value={newRowData.receiver_date}
+                          onChange={(e) => handleNewRowChange('receiver_date', e.target.value)}
+                          placeholder="날짜"
+                          className="w-16 px-2 py-1.5 text-sm bg-blue-50 border-0 rounded-lg focus:ring-2 focus:ring-blue-400 text-center"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-green-600 font-medium">발신</label>
+                      <div className="flex gap-1">
+                        <input
+                          type="text"
+                          value={newRowData.sender_org}
+                          onChange={(e) => handleNewRowChange('sender_org', e.target.value)}
+                          placeholder="기관"
+                          className="flex-1 px-2 py-1.5 text-sm bg-green-50 border-0 rounded-lg focus:ring-2 focus:ring-green-400"
+                        />
+                        <input
+                          type="text"
+                          value={newRowData.sender_date}
+                          onChange={(e) => handleNewRowChange('sender_date', e.target.value)}
+                          placeholder="날짜"
+                          className="w-16 px-2 py-1.5 text-sm bg-green-50 border-0 rounded-lg focus:ring-2 focus:ring-green-400 text-center"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {/* 데이터 카드 - 내림차순 (최신이 위) */}
+            {[...ledgerData].sort((a, b) => b.row_number - a.row_number).map((item) => (
+              <Card key={item.id} className="relative">
+                <div className="space-y-2">
+                  {/* 헤더 */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-toss-gray-400">#{item.row_number}</span>
+                      {item.doc_number && (
+                        <span className="text-xs px-2 py-0.5 bg-toss-gray-100 text-toss-gray-600 rounded-full">
+                          {item.doc_number}
+                        </span>
+                      )}
+                    </div>
+                    {canEdit && (
+                      <button
+                        onClick={() => openDeleteModal(item)}
+                        className="p-1.5 text-toss-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 내용 */}
+                  <p className="text-sm font-medium text-toss-gray-900">
+                    {item.content || <span className="text-toss-gray-300">내용 없음</span>}
+                  </p>
+
+                  {/* 수신/발신 정보 */}
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    {(item.receiver_org || item.receiver_date) && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-lg">
+                        <span className="font-medium">수신</span>
+                        {item.receiver_org}
+                        {item.receiver_date && <span className="text-blue-500">({item.receiver_date})</span>}
+                      </span>
+                    )}
+                    {(item.sender_org || item.sender_date) && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-lg">
+                        <span className="font-medium">발신</span>
+                        {item.sender_org}
+                        {item.sender_date && <span className="text-green-500">({item.sender_date})</span>}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 비고 */}
+                  {item.note && (
+                    <p className="text-xs text-toss-gray-500 pt-1 border-t border-toss-gray-100">
+                      {item.note}
+                    </p>
+                  )}
+                </div>
+              </Card>
+            ))}
+
+            {/* 빈 상태 */}
+            {ledgerData.length === 0 && !isAddingRow && (
+              <Card>
+                <div className="py-8 text-center text-toss-gray-400">
+                  {selectedLabel ? '등록된 문서가 없습니다' : '라벨을 선택해주세요'}
+                </div>
+              </Card>
+            )}
+          </>
+        )}
+      </div>
+
       {/* 안내 메시지 */}
-      {(isAdmin || isSubAdmin) && (
+      {canEdit && (
         <p className="text-xs text-toss-gray-400 text-center">
           셀 클릭하여 수정 · 새 문서 추가 시 Enter로 저장 후 계속 입력, Esc로 종료
         </p>
