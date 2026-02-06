@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, Button, Modal } from '../components/common'
-import { Plus, Trash2, Edit2, AlertTriangle, Eye, Building2, ChevronDown, ChevronUp, Download, Upload, LogOut, FileSpreadsheet } from 'lucide-react'
+import { Plus, Trash2, Edit2, AlertTriangle, Eye, Building2, ChevronDown, ChevronUp, Download, Upload, LogOut, FileSpreadsheet, Printer } from 'lucide-react'
+import { printReport } from '../utils/printReport'
 import * as XLSX from 'xlsx'
 import AdmissionDashboard from '../components/admission/AdmissionDashboard'
 import { supabase } from '../lib/supabase'
@@ -448,6 +449,45 @@ export default function AdmissionPage() {
   // 대시보드에는 입소 중인 기록만 전달
   const dashboardRecords = activeRecordsList
 
+  // 입소현황 보고서 인쇄
+  const handlePrintAdmission = () => {
+    const printRecords = activeRecordsList
+    const content = `
+      <div class="stats-grid">
+        <div class="stat-box"><div class="label">총 입소</div><div class="value">${totalRecords}<span class="unit"> 명</span></div></div>
+        <div class="stat-box highlight"><div class="label">현재 입소 중</div><div class="value">${activeCount}<span class="unit"> 명</span></div></div>
+        <div class="stat-box"><div class="label">퇴소 완료</div><div class="value">${dischargedCount}<span class="unit"> 명</span></div></div>
+      </div>
+      <div class="section-title">현재 입소 중 (${activeCount}명)</div>
+      <table>
+        <thead><tr><th>No</th><th>입소날짜</th><th>부평</th><th>강화</th><th>현재위치(호실)</th><th>퇴소예정</th><th>비고</th></tr></thead>
+        <tbody>
+          ${printRecords.map((r, i) => {
+            const dischargeDate = r.ganghwa
+              ? (r.discharge_date || calculateDischargeDate(r.admission_date))
+              : (r.discharge_date || '')
+            const locationDisplay = r.location && r.room
+              ? `${r.location}(${r.room})`
+              : r.location || r.room || '-'
+            const isDischargePending = !r.ganghwa && r.bupyeong && !dischargeDate
+            const dischargeTxt = isDischargePending ? '미정' : (dischargeDate ? formatDate(dischargeDate) : '-')
+            return `<tr>
+              <td style="text-align:center">${i + 1}</td>
+              <td style="text-align:center">${formatDate(r.admission_date)}</td>
+              <td style="text-align:center">${r.bupyeong || '-'}</td>
+              <td style="text-align:center">${r.ganghwa || '-'}</td>
+              <td style="text-align:center">${locationDisplay}</td>
+              <td style="text-align:center">${dischargeTxt}</td>
+              <td>${r.notes || '-'}</td>
+            </tr>`
+          }).join('')}
+        </tbody>
+      </table>
+    `
+
+    printReport({ title: '입소현황 보고서', content })
+  }
+
   return (
     <div className="space-y-6">
       {/* Header Card */}
@@ -481,6 +521,13 @@ export default function AdmissionPage() {
               title="입소현황판 보기"
             >
               <Eye size={18} />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); handlePrintAdmission(); }}
+              className="p-2 text-toss-gray-600 hover:bg-blue-100 rounded-lg transition-colors"
+              title="입소현황 인쇄"
+            >
+              <Printer size={18} />
             </button>
             {showStats ? <ChevronUp size={20} className="text-toss-gray-500" /> : <ChevronDown size={20} className="text-toss-gray-500" />}
           </div>

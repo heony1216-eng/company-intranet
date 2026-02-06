@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Card, Button, Modal } from '../components/common'
-import { Plus, Trash2, Edit2, AlertTriangle, Download, Camera, X, Image, Settings, ChevronDown, ChevronUp, ArrowUp, ArrowDown, Search, Eye } from 'lucide-react'
+import { Plus, Trash2, Edit2, AlertTriangle, Download, Camera, X, Image, Settings, ChevronDown, ChevronUp, ArrowUp, ArrowDown, Search, Eye, Printer } from 'lucide-react'
+import { printReport } from '../utils/printReport'
 import RescueDashboard from '../components/rescue/RescueDashboard'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -785,6 +786,81 @@ const RescuePage = () => {
         }
     }
 
+    // 구조통계 보고서 인쇄
+    const handlePrintStats = () => {
+        const statsRows = [
+            ...countryStats.in_progress.map(s => ({
+                name: s.country_name,
+                flag: countryFlags[s.country_code] || '',
+                count: s.rescue_count,
+                type: '구조 진행'
+            })),
+            ...countryStats.completed.map(s => ({
+                name: s.country_name,
+                flag: countryFlags[s.country_code] || '',
+                count: s.rescue_count,
+                type: '구조 난항'
+            })),
+        ]
+
+        const statsContent = `
+            <div class="stats-grid">
+                <div class="stat-box"><div class="label">이번 주</div><div class="value">${summaryStats.this_week || 0}<span class="unit"> 명</span></div></div>
+                <div class="stat-box"><div class="label">이번 달</div><div class="value">${summaryStats.this_month || 0}<span class="unit"> 명</span></div></div>
+                <div class="stat-box"><div class="label">2026년도</div><div class="value">${summaryStats.this_year || 0}<span class="unit"> 명</span></div></div>
+                <div class="stat-box highlight"><div class="label">총 구조자</div><div class="value">${summaryStats.total || 0}<span class="unit"> 명</span></div></div>
+            </div>
+            ${statsRows.length > 0 ? `
+            <div class="section-title">국가별 구조 현황</div>
+            <table>
+                <thead><tr><th>구분</th><th>국가</th><th>인원</th></tr></thead>
+                <tbody>
+                    ${statsRows.map(r => `<tr><td style="text-align:center">${r.type}</td><td style="text-align:center">${r.flag} ${r.name}</td><td style="text-align:center">${r.count}명</td></tr>`).join('')}
+                </tbody>
+            </table>` : ''}
+        `
+
+        printReport({ title: '구조 통계 보고서', content: statsContent })
+    }
+
+    // 구조현황 목록 보고서 인쇄
+    const handlePrintRescueList = () => {
+        // 체크된 항목이 있으면 그것만, 없으면 전체
+        const printList = selectedIds.size > 0
+            ? rescueSituations.filter(r => selectedIds.has(r.id))
+            : rescueSituations
+        const label = selectedIds.size > 0 ? `선택 항목 (${printList.length}건)` : `전체 (${printList.length}건)`
+
+        const listContent = `
+            <div class="section-title">구조현황 목록 - ${label}</div>
+            <table>
+                <colgroup>
+                    <col style="width:5%"/>
+                    <col style="width:12%"/>
+                    <col style="width:8%"/>
+                    <col style="width:10%"/>
+                    <col style="width:55%"/>
+                    <col style="width:10%"/>
+                </colgroup>
+                <thead><tr><th>No</th><th>체류지</th><th>성명</th><th>구조요청</th><th>현재 진행상황</th><th>상태</th></tr></thead>
+                <tbody>
+                    ${printList.map((r, i) => `
+                        <tr>
+                            <td>${i + 1}</td>
+                            <td>${r.location || '-'}</td>
+                            <td>${r.name || '-'}</td>
+                            <td>${r.request_date || '-'}</td>
+                            <td class="left" style="word-break:keep-all">${r.status || '-'}</td>
+                            <td>${r.is_completed ? '완료' : '진행중'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `
+
+        printReport({ title: '구조현황 보고서', content: listContent })
+    }
+
     return (
         <div className="space-y-6">
             {/* Header Card */}
@@ -821,6 +897,13 @@ const RescuePage = () => {
                             title="구조현황판 보기"
                         >
                             <Eye size={18} />
+                        </button>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handlePrintStats(); }}
+                            className="p-2 text-toss-gray-600 hover:bg-blue-100 rounded-lg transition-colors"
+                            title="구조통계 인쇄"
+                        >
+                            <Printer size={18} />
                         </button>
                         <button
                             onClick={(e) => { e.stopPropagation(); openStatsModal(); }}
@@ -947,6 +1030,10 @@ const RescuePage = () => {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <h1 className="text-2xl font-bold text-toss-gray-900">구조현황</h1>
                 <div className="flex items-center gap-2">
+                    <Button variant="secondary" onClick={handlePrintRescueList}>
+                        <Printer size={18} />
+                        인쇄
+                    </Button>
                     <Button variant="secondary" onClick={handleDownloadWord} disabled={selectedIds.size === 0}>
                         <Download size={18} />
                         Word 다운로드 {selectedIds.size > 0 && `(${selectedIds.size})`}
