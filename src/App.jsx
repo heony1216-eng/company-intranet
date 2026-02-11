@@ -19,6 +19,8 @@ import ArchivePage from './pages/ArchivePage'
 import DocumentLedgerPage from './pages/DocumentLedgerPage'
 import LeavePage from './pages/LeavePage'
 import AdmissionPage from './pages/AdmissionPage'
+import GanghwaAdmissionPage from './pages/GanghwaAdmissionPage'
+import BupyeongAdmissionPage from './pages/BupyeongAdmissionPage'
 import NametagPage from './pages/NametagPage'
 
 // Protected Route component
@@ -104,6 +106,8 @@ function AppRoutes() {
         <Route path="/document-ledger" element={<DocumentLedgerPage />} />
         <Route path="/leave" element={<LeavePage />} />
         <Route path="/admission" element={<AdmissionPage />} />
+        <Route path="/admission/ganghwa" element={<GanghwaAdmissionPage />} />
+        <Route path="/admission/bupyeong" element={<BupyeongAdmissionPage />} />
         <Route path="/admission/nametag" element={<NametagPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/mypage" element={<MyPage />} />

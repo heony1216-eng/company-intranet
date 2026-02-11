@@ -20,6 +20,8 @@
     "@capacitor/status-bar": "^8.0.0",
     "@capawesome/capacitor-live-update": "^8.1.0",
     "@supabase/supabase-js": "^2.90.1",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
     "browser-image-compression": "^2.0.2",
     "docx": "^9.5.1",
     "dropbox": "^10.34.0",

@@ -51,7 +51,8 @@ const Sidebar = () => {
             menuKey: 'admission',
             pathPrefix: '/admission',
             subItems: [
-                { to: '/admission', label: '입소현황' },
+                { to: '/admission/ganghwa', label: '강화센터' },
+                { to: '/admission/bupyeong', label: '부평센터' },
                 { to: '/admission/nametag', label: '네임택 출력' },
             ]
         },

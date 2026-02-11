@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import bcrypt from 'bcryptjs'
 import { supabase } from '../lib/supabase'
 
 const useAuthStore = create(
@@ -26,19 +27,41 @@ const useAuthStore = create(
 
             signInWithPassword: async (id, password) => {
                 try {
+                    // user_id로 사용자 조회 (password 포함)
                     const { data, error } = await supabase
                         .from('users')
-                        .select('id, user_id, name, team, rank, role, created_at')
+                        .select('id, user_id, name, team, rank, role, password, created_at')
                         .eq('user_id', id)
-                        .eq('password', password)
                         .single()
 
                     if (error || !data) {
                         return { error: { message: '아이디 또는 비밀번호가 올바르지 않습니다.' } }
                     }
 
-                    set({ user: data, profile: data })
-                    return { data, error: null }
+                    // bcrypt 해시 여부 확인
+                    const isHashed = data.password && data.password.startsWith('$2')
+
+                    if (isHashed) {
+                        const isMatch = await bcrypt.compare(password, data.password)
+                        if (!isMatch) {
+                            return { error: { message: '아이디 또는 비밀번호가 올바르지 않습니다.' } }
+                        }
+                    } else {
+                        if (data.password !== password) {
+                            return { error: { message: '아이디 또는 비밀번호가 올바르지 않습니다.' } }
+                        }
+                        // 자동 마이그레이션: 평문 → bcrypt
+                        const hashedPassword = await bcrypt.hash(password, 10)
+                        await supabase
+                            .from('users')
+                            .update({ password: hashedPassword })
+                            .eq('user_id', id)
+                    }
+
+                    // password 필드 제외
+                    const { password: _, ...userData } = data
+                    set({ user: userData, profile: userData })
+                    return { data: userData, error: null }
                 } catch (error) {
                     return { error: { message: '로그인 중 오류가 발생했습니다.' } }
                 }
@@ -61,11 +84,14 @@ const useAuthStore = create(
                         return { error: { message: '이미 사용 중인 아이디입니다.' } }
                     }
 
+                    // 비밀번호 해시 처리
+                    const hashedPassword = await bcrypt.hash(password, 10)
+
                     const { data, error } = await supabase
                         .from('users')
                         .insert([{
                             user_id: id,
-                            password: password,
+                            password: hashedPassword,
                             name: name,
                             team: team,
                             rank: rank,
