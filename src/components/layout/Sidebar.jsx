@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar, CalendarDays, ExternalLink, ChevronDown, Settings, FolderOpen, BookOpen, Palmtree, Smartphone, Building2, Tag } from 'lucide-react'
+import { Megaphone, ClipboardList, Home, X, User, FileText, AlertTriangle, Calendar, CalendarDays, ExternalLink, ChevronDown, Settings, FolderOpen, BookOpen, Palmtree, Smartphone, Building2, Tag, Globe } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -24,6 +24,9 @@ const Sidebar = () => {
         }
         if (location.pathname.startsWith('/admission')) {
             setMenuOpen(prev => ({ ...prev, admission: true }))
+        }
+        if (location.pathname.startsWith('/overseas-korean')) {
+            setMenuOpen(prev => ({ ...prev, overseasKorean: true }))
         }
     }, [location.pathname])
 
@@ -54,6 +57,17 @@ const Sidebar = () => {
                 { to: '/admission/ganghwa', label: '강화센터' },
                 { to: '/admission/bupyeong', label: '부평센터' },
                 { to: '/admission/nametag', label: '네임택 출력' },
+            ]
+        },
+        {
+            icon: Globe,
+            label: '재외동포현황',
+            isSubmenu: true,
+            menuKey: 'overseasKorean',
+            pathPrefix: '/overseas-korean',
+            subItems: [
+                { to: '/overseas-korean/status', label: '재외동포 현황조회' },
+                { to: '/overseas-korean/group', label: '재외동포 단체정보(한인회)' },
             ]
         },
         { to: '/meetings', icon: Calendar, label: '회의록' },

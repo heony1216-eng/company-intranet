@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Card, Button, Modal } from '../components/common'
-import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, Printer, RefreshCw, PlusCircle } from 'lucide-react'
+import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, Printer, RefreshCw, PlusCircle, Copy } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { uploadMultipleToDropbox, deleteMultipleFilesByUrl } from '../lib/dropbox'
@@ -1436,7 +1436,7 @@ const MonthlyWorkLogPage = () => {
                                 <X size={16} />
                             </button>
                         </div>
-                        <div className="flex-1 overflow-y-auto border-x border-b border-purple-200 rounded-b-xl bg-white px-4 py-3">
+                        <div className="flex-1 overflow-y-auto border-x border-purple-200 bg-white px-4 py-3">
                             {weeklyPreviewTasks.length > 0 ? (
                                 <div className="space-y-3">
                                     {weeklyPreviewTasks.map((task, idx) => {
@@ -1444,11 +1444,15 @@ const MonthlyWorkLogPage = () => {
                                         const weekMatch = (task.title || '').match(/^\[(\d+주차)\]\s*(.*)$/)
                                         const weekLabel = weekMatch ? weekMatch[1] : ''
                                         const taskTitle = weekMatch ? weekMatch[2] : (task.title || '')
+                                        // 이전 항목과 같은 주차면 주차 라벨 생략
+                                        const prevMatch = idx > 0 ? (weeklyPreviewTasks[idx - 1].title || '').match(/^\[(\d+주차)\]/) : null
+                                        const prevWeekLabel = prevMatch ? prevMatch[1] : ''
+                                        const showWeekLabel = weekLabel && weekLabel !== prevWeekLabel
                                         return (
                                             <div key={idx} className="bg-purple-50/50 rounded-lg p-3">
-                                                {weekLabel && <div className="text-sm font-semibold text-purple-600 mb-0.5">[{weekLabel}]</div>}
+                                                {showWeekLabel && <div className="text-sm font-semibold text-purple-600 mb-0.5">[{weekLabel}]</div>}
                                                 {taskTitle && <div className="text-sm font-semibold text-purple-800 mb-1">[{taskTitle}]</div>}
-                                                {!weekLabel && !taskTitle && <div className="text-sm font-semibold text-purple-800 mb-1">[-]</div>}
+                                                {!showWeekLabel && !taskTitle && <div className="text-sm font-semibold text-purple-800 mb-1">[-]</div>}
                                                 {task.details.map((d, di) => (
                                                     <div key={di} className="text-sm text-toss-gray-700 ml-2 mb-1">
                                                         {(d.content || '-').split('\n').map((line, li) => (
@@ -1466,6 +1470,39 @@ const MonthlyWorkLogPage = () => {
                                 </div>
                             )}
                         </div>
+                        {/* 하단 복사하기 버튼 */}
+                        {weeklyPreviewTasks.length > 0 && (
+                            <div className="border-x border-b border-purple-200 rounded-b-xl bg-purple-50/30 px-4 py-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        let lastWeekLabel = ''
+                                        const text = weeklyPreviewTasks.map(task => {
+                                            const weekMatch = (task.title || '').match(/^\[(\d+주차)\]\s*(.*)$/)
+                                            const weekLabel = weekMatch ? weekMatch[1] : ''
+                                            const taskTitle = weekMatch ? weekMatch[2] : (task.title || '')
+                                            const lines: string[] = []
+                                            if (weekLabel && weekLabel !== lastWeekLabel) lines.push(`[${weekLabel}]`)
+                                            lastWeekLabel = weekLabel
+                                            if (taskTitle) lines.push(`[${taskTitle}]`)
+                                            task.details.forEach(d => {
+                                                (d.content || '-').split('\n').forEach(line => {
+                                                    if (line.trim()) lines.push(`- ${line.trim()}`)
+                                                })
+                                            })
+                                            return lines.join('\n')
+                                        }).join('\n\n')
+                                        navigator.clipboard.writeText(text).then(() => {
+                                            alert('클립보드에 복사되었습니다.')
+                                        })
+                                    }}
+                                    className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-purple-700 hover:bg-purple-100 rounded-lg transition-colors"
+                                >
+                                    <Copy size={15} />
+                                    복사하기
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
                 </div>

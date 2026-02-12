@@ -9,6 +9,7 @@ interface AdmissionRecord {
   room: string
   discharge_date: string
   location: string
+  admin_status: string
   notes: string
 }
 
@@ -23,6 +24,8 @@ interface AdmissionDashboardProps {
   onClose: () => void
   records: AdmissionRecord[]
   stats: Stats
+  backgroundImage?: string
+  centerType?: 'ganghwa' | 'bupyeong'
 }
 
 // 입소날짜로부터 4개월 후 퇴소날짜 계산
@@ -31,6 +34,12 @@ const calculateDischargeDate = (admissionDate: string): string => {
   const date = new Date(admissionDate)
   date.setMonth(date.getMonth() + 4)
   return date.toISOString().split('T')[0]
+}
+
+// 호실이 순수 숫자+호 형태인지 (부평: 국문 포함 시 퇴소예정일 미표시)
+const isRoomOnly = (room: string): boolean => {
+  if (!room) return true
+  return /^\d+호?$/.test(room.trim())
 }
 
 // 날짜 포맷팅
@@ -49,9 +58,9 @@ const isWithinOneMonth = (dateStr: string): boolean => {
 }
 
 // 한 페이지에 표시 가능한 최대 행 수
-const ROWS_PER_PAGE = 16
+const ROWS_PER_PAGE = 6
 
-export default function AdmissionDashboard({ isOpen, onClose, records, stats }: AdmissionDashboardProps) {
+export default function AdmissionDashboard({ isOpen, onClose, records, stats, backgroundImage, centerType }: AdmissionDashboardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -110,10 +119,11 @@ export default function AdmissionDashboard({ isOpen, onClose, records, stats }: 
 
     const baseUrl = import.meta.env.BASE_URL || '/'
 
-    // 1. back_2.jpg 배경
+    // 1. 배경 이미지
+    const bgFile = backgroundImage || 'back_2.jpg'
     const backImg = new Image()
     backImg.crossOrigin = 'anonymous'
-    backImg.src = `${baseUrl}back_2.jpg`
+    backImg.src = `${baseUrl}${bgFile}`
     await new Promise<void>((resolve) => {
       backImg.onload = () => resolve()
       backImg.onerror = () => resolve()
@@ -142,9 +152,9 @@ export default function AdmissionDashboard({ isOpen, onClose, records, stats }: 
     // 2. 통계 박스 (첫 페이지에만)
     let tableStartY = contentStartY
     if (isFirstPage) {
-      const statsH = 90
-      const statsW = 260
-      const statsGap = 12
+      const statsH = 120
+      const statsW = 300
+      const statsGap = 16
       const totalStatsW = 3 * statsW + 2 * statsGap
       const statsStartX = (W - totalStatsW) / 2
 
@@ -159,28 +169,28 @@ export default function AdmissionDashboard({ isOpen, onClose, records, stats }: 
 
         // 파란 헤더 라벨 영역 (직각)
         ctx.fillStyle = BLUE_HEADER
-        ctx.fillRect(x, contentStartY, statsW, 36)
+        ctx.fillRect(x, contentStartY, statsW, 44)
 
         // 라벨 텍스트
         ctx.fillStyle = BLUE_HEADER_TEXT
-        ctx.font = 'bold 17px Pretendard, -apple-system, sans-serif'
+        ctx.font = 'bold 26px Pretendard, -apple-system, sans-serif'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
-        ctx.fillText(box.label, x + statsW / 2, contentStartY + 18)
+        ctx.fillText(box.label, x + statsW / 2, contentStartY + 22)
 
         // 흰색 숫자 영역 (직각)
         ctx.fillStyle = ROW_WHITE
-        ctx.fillRect(x, contentStartY + 36, statsW, statsH - 36)
+        ctx.fillRect(x, contentStartY + 44, statsW, statsH - 44)
 
         // 숫자 + 명
         ctx.fillStyle = TEXT_DARK
-        ctx.font = 'bold 38px Pretendard, -apple-system, sans-serif'
+        ctx.font = 'bold 50px Pretendard, -apple-system, sans-serif'
         const numStr = `${box.value}`
         const numW = ctx.measureText(numStr).width
-        ctx.fillText(numStr, x + statsW / 2 - 10, contentStartY + 36 + (statsH - 36) / 2)
+        ctx.fillText(numStr, x + statsW / 2 - 10, contentStartY + 44 + (statsH - 44) / 2)
         ctx.fillStyle = TEXT_LIGHT
-        ctx.font = '20px Pretendard, -apple-system, sans-serif'
-        ctx.fillText('명', x + statsW / 2 - 10 + numW / 2 + 8, contentStartY + 36 + (statsH - 36) / 2 + 2)
+        ctx.font = '28px Pretendard, -apple-system, sans-serif'
+        ctx.fillText('명', x + statsW / 2 - 10 + numW / 2 + 10, contentStartY + 44 + (statsH - 44) / 2 + 4)
       })
 
       tableStartY = contentStartY + statsH + 20
@@ -189,17 +199,21 @@ export default function AdmissionDashboard({ isOpen, onClose, records, stats }: 
     // 3. 테이블
     const tableLeft = 60
     const tableW = W - 120
-    const rowH = 46
-    const headerRowH = 48
+    const rowH = 100
+    const headerRowH = 50
 
-    // 컬럼 너비
+    // 컬럼 너비 (입소목록과 동일한 구조)
+    const roomLabel = centerType === 'bupyeong' ? '호실/병원명' : '호실'
+    const roomWidth = centerType === 'bupyeong' ? 180 : 80
     const cols = [
-      { label: 'No', width: 55 },
-      { label: '입소날짜', width: 160 },
-      { label: '부평', width: 190 },
-      { label: '강화', width: 190 },
-      { label: '현재위치(호실)', width: 280 },
-      { label: '퇴소예정', width: 160 },
+      { label: 'No', width: 60 },
+      { label: '국가', width: 140 },
+      { label: '입소일', width: 190 },
+      { label: '성명', width: 140 },
+      { label: '성별', width: 80 },
+      { label: roomLabel, width: roomWidth },
+      { label: '퇴소예정일', width: 200 },
+      { label: '행정상황', width: centerType === 'bupyeong' ? 160 : 250 },
       { label: '비고', width: 0 },
     ]
     const usedWidth = cols.reduce((sum, c) => sum + c.width, 0)
@@ -209,9 +223,9 @@ export default function AdmissionDashboard({ isOpen, onClose, records, stats }: 
     ctx.fillStyle = BLUE_HEADER
     ctx.fillRect(tableLeft, tableStartY, tableW, headerRowH)
 
-    // 헤더 텍스트 (흰색, 더 크게)
+    // 헤더 텍스트 (흰색)
     ctx.fillStyle = BLUE_HEADER_TEXT
-    ctx.font = 'bold 18px Pretendard, -apple-system, sans-serif'
+    ctx.font = 'bold 26px Pretendard, -apple-system, sans-serif'
     ctx.textBaseline = 'middle'
     let colX = tableLeft
     cols.forEach((col) => {
@@ -220,12 +234,18 @@ export default function AdmissionDashboard({ isOpen, onClose, records, stats }: 
       colX += col.width
     })
 
+    // 행정상황 컬럼 최대 텍스트 너비
+    const adminMaxTextWidth = cols[7].width - 20
+    // 비고 컬럼 최대 텍스트 너비
+    const noteMaxTextWidth = cols[8].width - 20
+
     // 테이블 데이터 행
     pageRecords.forEach((record, index) => {
       const globalIndex = page * ROWS_PER_PAGE + index
       const y = tableStartY + headerRowH + index * rowH
-      // 강화에 이름 있으면 자동 계산, 아니면 저장된 값
-      const dischargeDate = record.ganghwa
+      // 퇴소예정일 자동 계산 (부평: 호실이 국문 포함이면 미표시)
+      const showDischarge = centerType !== 'bupyeong' || isRoomOnly(record.room)
+      const dischargeDate = showDischarge
         ? (record.discharge_date || calculateDischargeDate(record.admission_date))
         : (record.discharge_date || '')
 
@@ -240,69 +260,78 @@ export default function AdmissionDashboard({ isOpen, onClose, records, stats }: 
 
       // No
       ctx.fillStyle = TEXT_LIGHT
-      ctx.font = '16px Pretendard, -apple-system, sans-serif'
+      ctx.font = '30px Pretendard, -apple-system, sans-serif'
       ctx.textAlign = 'center'
       ctx.fillText(`${globalIndex + 1}`, cx + cols[0].width / 2, cellY)
       cx += cols[0].width
 
-      // 입소날짜
-      ctx.fillStyle = TEXT_DARK
-      ctx.font = '600 17px Pretendard, -apple-system, sans-serif'
+      // 국가 (location)
+      ctx.fillStyle = TEXT_NORMAL
+      ctx.font = 'bold 30px Pretendard, -apple-system, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText(formatDateShort(record.admission_date), cx + cols[1].width / 2, cellY)
+      ctx.fillText(record.location || '-', cx + cols[1].width / 2, cellY)
       cx += cols[1].width
 
-      // 부평
-      ctx.fillStyle = TEXT_NORMAL
-      ctx.font = 'bold 17px Pretendard, -apple-system, sans-serif'
+      // 입소일
+      ctx.fillStyle = TEXT_DARK
+      ctx.font = '600 30px Pretendard, -apple-system, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText(record.bupyeong || '-', cx + cols[2].width / 2, cellY)
+      ctx.fillText(formatDateShort(record.admission_date), cx + cols[2].width / 2, cellY)
       cx += cols[2].width
 
-      // 강화
+      // 성명 (ganghwa)
+      ctx.fillStyle = TEXT_NORMAL
+      ctx.font = 'bold 30px Pretendard, -apple-system, sans-serif'
+      ctx.textAlign = 'center'
       ctx.fillText(record.ganghwa || '-', cx + cols[3].width / 2, cellY)
       cx += cols[3].width
 
-      // 현재위치(호실)
-      const locationDisplay = record.location && record.room
-        ? `${record.location}(${record.room})`
-        : record.location || record.room || '-'
-      ctx.fillText(locationDisplay, cx + cols[4].width / 2, cellY)
+      // 성별 (bupyeong)
+      ctx.fillText(record.bupyeong || '-', cx + cols[4].width / 2, cellY)
       cx += cols[4].width
 
-      // 퇴소예정 (부평에 이름 있고 날짜 없으면 미정, 한 달 이내면 빨간색, 없으면 '-')
-      const isDischargePending = !record.ganghwa && record.bupyeong && !dischargeDate
-      if (isDischargePending) {
-        ctx.fillStyle = '#2563eb'
-        ctx.font = '600 17px Pretendard, -apple-system, sans-serif'
-        ctx.textAlign = 'center'
-        ctx.fillText('미정', cx + cols[5].width / 2, cellY)
-      } else if (dischargeDate) {
-        ctx.fillStyle = isWithinOneMonth(dischargeDate) ? '#ef4444' : '#2563eb'
-        ctx.font = '600 17px Pretendard, -apple-system, sans-serif'
-        ctx.textAlign = 'center'
-        ctx.fillText(formatDateShort(dischargeDate), cx + cols[5].width / 2, cellY)
-      } else {
-        ctx.fillStyle = TEXT_LIGHT
-        ctx.font = '17px Pretendard, -apple-system, sans-serif'
-        ctx.textAlign = 'center'
-        ctx.fillText('-', cx + cols[5].width / 2, cellY)
-      }
+      // 호실
+      ctx.fillText(record.room || '-', cx + cols[5].width / 2, cellY)
       cx += cols[5].width
 
-      // 비고
+      // 퇴소예정일
+      if (dischargeDate) {
+        ctx.fillStyle = isWithinOneMonth(dischargeDate) ? '#ef4444' : '#2563eb'
+        ctx.font = '600 30px Pretendard, -apple-system, sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText(formatDateShort(dischargeDate), cx + cols[6].width / 2, cellY)
+      } else {
+        ctx.fillStyle = TEXT_LIGHT
+        ctx.font = '30px Pretendard, -apple-system, sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText('-', cx + cols[6].width / 2, cellY)
+      }
+      cx += cols[6].width
+
+      // 행정상황 (가운데 정렬)
       ctx.fillStyle = TEXT_NORMAL
-      ctx.font = '16px Pretendard, -apple-system, sans-serif'
-      ctx.textAlign = 'left'
-      const maxNoteWidth = cols[6].width - 20
+      ctx.font = '26px Pretendard, -apple-system, sans-serif'
+      ctx.textAlign = 'center'
+      let adminText = record.admin_status || '-'
+      while (ctx.measureText(adminText).width > adminMaxTextWidth && adminText.length > 1) {
+        adminText = adminText.slice(0, -1)
+      }
+      if (adminText !== (record.admin_status || '-') && adminText.length > 0) {
+        adminText += '..'
+      }
+      ctx.fillText(adminText, cx + cols[7].width / 2, cellY)
+      cx += cols[7].width
+
+      // 비고 (가운데 정렬)
+      ctx.font = '26px Pretendard, -apple-system, sans-serif'
       let noteText = record.notes || '-'
-      while (ctx.measureText(noteText).width > maxNoteWidth && noteText.length > 1) {
+      while (ctx.measureText(noteText).width > noteMaxTextWidth && noteText.length > 1) {
         noteText = noteText.slice(0, -1)
       }
       if (noteText !== (record.notes || '-') && noteText.length > 0) {
-        noteText += '...'
+        noteText += '..'
       }
-      ctx.fillText(noteText, cx + 10, cellY)
+      ctx.fillText(noteText, cx + cols[8].width / 2, cellY)
     })
 
     // 페이지 정보 (여러 페이지일 때)
@@ -310,14 +339,14 @@ export default function AdmissionDashboard({ isOpen, onClose, records, stats }: 
       const totalTableH = headerRowH + pageRecords.length * rowH
       const pageInfoY = tableStartY + totalTableH + 25
       ctx.fillStyle = TEXT_LIGHT
-      ctx.font = '600 16px Pretendard, -apple-system, sans-serif'
+      ctx.font = '600 28px Pretendard, -apple-system, sans-serif'
       ctx.textAlign = 'center'
       ctx.fillText(`${page + 1} / ${pages} 페이지`, W / 2, pageInfoY)
     }
 
     setCanvasDataUrl(canvas.toDataURL('image/png'))
     setIsLoading(false)
-  }, [records, stats])
+  }, [records, stats, backgroundImage, centerType])
 
   // isOpen이 true가 되면 Canvas 그리기
   useEffect(() => {

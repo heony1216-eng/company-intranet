@@ -1116,6 +1116,7 @@ export default function GanghwaAdmissionPage() {
         records={dashboardRecords}
         stats={{ total: totalRecords, active: activeCount, discharged: dischargedCount }}
         backgroundImage="back_gw.jpg"
+        centerType="ganghwa"
       />
     </div>
   )

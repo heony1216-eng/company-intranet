@@ -3,6 +3,56 @@
  * 이미지 기반이 아닌 텍스트 기반으로 생성되어 편집 가능
  */
 
+import { parseWeeklyTasks } from './weeklyTaskUtils'
+
+// HTML 이스케이프
+const escapeHtml = (str) => {
+    if (!str) return ''
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')
+}
+
+// WeeklyTask[] → 4열 HTML 테이블 렌더링 (구분/업무내용/진척률/비고)
+const tasksToHtmlTable = (morningWork) => {
+    const tasks = parseWeeklyTasks(morningWork)
+    if (!tasks || tasks.length === 0) return '<p style="color: #666; padding: 15px;">-</p>'
+
+    const rows = tasks.map((t, idx) => {
+        const totalRows = (t.title ? 1 : 0) + t.details.length
+        const result = []
+        // 제목 행
+        if (t.title) {
+            result.push(`<tr>
+                <td style="text-align:center;vertical-align:top;padding:8px;border:1px solid #333;width:40px" rowspan="${totalRows}">${idx + 1}</td>
+                <td style="text-align:left;font-weight:bold;padding:8px 10px;border:1px solid #333">[${escapeHtml(t.title)}]</td>
+                <td style="text-align:center;padding:8px;border:1px solid #333;width:60px"></td>
+                <td style="padding:8px 10px;border:1px solid #333;width:25%"></td>
+            </tr>`)
+        }
+        // detail 행들
+        t.details.forEach((d, di) => {
+            const contentHtml = (d.content || '-').split('\n').map(line => line.trim() ? `- ${escapeHtml(line)}` : '').filter(Boolean).join('<br/>')
+            const noCell = !t.title && di === 0 ? `<td style="text-align:center;vertical-align:top;padding:8px;border:1px solid #333;width:40px" rowspan="${totalRows}">${idx + 1}</td>` : ''
+            result.push(`<tr>
+                ${noCell}
+                <td style="text-align:left;padding:8px 10px;border:1px solid #333;white-space:pre-line">${contentHtml}</td>
+                <td style="text-align:center;padding:8px;border:1px solid #333;width:60px">${d.progress ? d.progress + '%' : '-'}</td>
+                <td style="padding:8px 10px;border:1px solid #333;width:25%">${escapeHtml(d.remark) || '-'}</td>
+            </tr>`)
+        })
+        return result.join('')
+    }).join('')
+
+    return `<table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr>
+            <th style="background:#fafafa;font-weight:600;padding:8px;border:1px solid #333;width:40px">No</th>
+            <th style="background:#fafafa;font-weight:600;padding:8px;border:1px solid #333">업무내용</th>
+            <th style="background:#fafafa;font-weight:600;padding:8px;border:1px solid #333;width:60px">진척률</th>
+            <th style="background:#fafafa;font-weight:600;padding:8px;border:1px solid #333;width:25%">비고</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+    </table>`
+}
+
 // 날짜를 YYYYMMDD 형식으로 변환
 const formatDateCompact = (dateString) => {
     const date = new Date(dateString)
@@ -162,8 +212,8 @@ export const generateWeeklyWorklogPdf = (worklog, getWeekNumber, formatDate) => 
             <td class="section-title">Ⅰ. 금주 업무 수행 내용</td>
         </tr>
         <tr>
-            <td class="section-body">
-                ${textToLines(worklog.morning_work)}
+            <td class="section-body" style="padding:0;">
+                ${tasksToHtmlTable(worklog.morning_work)}
             </td>
         </tr>
     </table>
@@ -355,8 +405,8 @@ export const generateMonthlyWorklogPdf = (worklog, getMonthLabel, formatDate) =>
             <td class="section-title">Ⅰ. 금월 업무 수행 내용</td>
         </tr>
         <tr>
-            <td class="section-body">
-                ${textToLines(worklog.morning_work)}
+            <td class="section-body" style="padding:0;">
+                ${tasksToHtmlTable(worklog.morning_work)}
             </td>
         </tr>
     </table>

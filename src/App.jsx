@@ -22,6 +22,8 @@ import AdmissionPage from './pages/AdmissionPage'
 import GanghwaAdmissionPage from './pages/GanghwaAdmissionPage'
 import BupyeongAdmissionPage from './pages/BupyeongAdmissionPage'
 import NametagPage from './pages/NametagPage'
+import OverseasKoreanStatusPage from './pages/OverseasKoreanStatusPage'
+import OverseasKoreanGroupPage from './pages/OverseasKoreanGroupPage'
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -109,6 +111,9 @@ function AppRoutes() {
         <Route path="/admission/ganghwa" element={<GanghwaAdmissionPage />} />
         <Route path="/admission/bupyeong" element={<BupyeongAdmissionPage />} />
         <Route path="/admission/nametag" element={<NametagPage />} />
+        <Route path="/overseas-korean" element={<Navigate to="/overseas-korean/status" replace />} />
+        <Route path="/overseas-korean/status" element={<OverseasKoreanStatusPage />} />
+        <Route path="/overseas-korean/group" element={<OverseasKoreanGroupPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/mypage" element={<MyPage />} />
       </Route>

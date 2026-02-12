@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Card, Button, Modal } from '../components/common'
-import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, Printer, RefreshCw, PlusCircle } from 'lucide-react'
+import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, Printer, RefreshCw, PlusCircle, Copy } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { uploadMultipleToDropbox, deleteMultipleFilesByUrl } from '../lib/dropbox'
@@ -253,7 +253,7 @@ const WeeklyWorkLogPage = () => {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [loadingDailyLogs, setLoadingDailyLogs] = useState(false)
     const [dailyPreviewOpen, setDailyPreviewOpen] = useState(false)
-    const [dailyPreviewText, setDailyPreviewText] = useState('')
+    const [dailyPreviewTasks, setDailyPreviewTasks] = useState<WeeklyTask[]>([])
 
     // 주간 업무보고 기본 날짜 계산 (월요일이면 전 주 금요일로 설정)
     const getDefaultWeeklyDate = () => {
@@ -549,9 +549,9 @@ const WeeklyWorkLogPage = () => {
                 return
             }
 
-            // 기존 방식처럼 텍스트로 포맷팅
+            // 요일별 WeeklyTask 구조로 변환
             const dayNames = ['일', '월', '화', '수', '목', '금', '토']
-            const lines: string[] = []
+            const tasks: WeeklyTask[] = []
 
             data.forEach((log: any) => {
                 const date = new Date(log.work_date)
@@ -562,28 +562,32 @@ const WeeklyWorkLogPage = () => {
                 const afternoonText = formatDailyWork(log.afternoon_work)
 
                 if (morningText || afternoonText) {
-                    lines.push(`[${dayName}(${dateStr})]`)
+                    const contentLines: string[] = []
                     if (morningText) {
                         morningText.split('\n').forEach((line: string) => {
-                            if (line.trim()) lines.push(`- ${line.trim()}`)
+                            if (line.trim()) contentLines.push(line.trim())
                         })
                     }
                     if (afternoonText) {
                         afternoonText.split('\n').forEach((line: string) => {
-                            if (line.trim()) lines.push(`- ${line.trim()}`)
+                            if (line.trim()) contentLines.push(line.trim())
                         })
                     }
-                    lines.push('')
+                    if (contentLines.length > 0) {
+                        tasks.push({
+                            title: `${dayName}(${dateStr})`,
+                            details: contentLines.map(line => ({ content: line, progress: '', remark: '' }))
+                        })
+                    }
                 }
             })
 
-            const previewText = lines.join('\n').trim()
-            if (!previewText) {
+            if (tasks.length === 0) {
                 alert('해당 주에 작성된 일일 업무 내용이 없습니다.')
                 return
             }
 
-            setDailyPreviewText(previewText)
+            setDailyPreviewTasks(tasks)
             setDailyPreviewOpen(true)
         } catch (error) {
             console.error('Error fetching daily worklogs:', error)
@@ -593,14 +597,17 @@ const WeeklyWorkLogPage = () => {
         }
     }
 
-    // 미리보기 확인 시 업무 항목 1개로 추가
+    // 미리보기 확인 시 일일 업무를 주간 업무 항목으로 적용
     const applyDailyPreview = () => {
         setFormData(prev => ({
             ...prev,
-            weekly_tasks: [{ title: '', details: [{ content: dailyPreviewText, progress: '', remark: '' }] }]
+            weekly_tasks: dailyPreviewTasks.map(task => ({
+                title: task.title,
+                details: task.details.map(d => ({ ...d }))
+            }))
         }))
         setDailyPreviewOpen(false)
-        setDailyPreviewText('')
+        setDailyPreviewTasks([])
     }
 
     const resetForm = () => {
@@ -1178,7 +1185,7 @@ const WeeklyWorkLogPage = () => {
             {/* ===== 작성/수정 모달 ===== */}
             <Modal
                 isOpen={isModalOpen}
-                onClose={() => { setIsModalOpen(false); resetForm(); setDailyPreviewOpen(false); setDailyPreviewText('') }}
+                onClose={() => { setIsModalOpen(false); resetForm(); setDailyPreviewOpen(false); setDailyPreviewTasks([]) }}
                 title={isEditMode ? '주간 업무보고 수정' : '새 주간 업무보고 작성'}
                 size={dailyPreviewOpen ? 'xl' : 'default'}
             >
@@ -1420,21 +1427,56 @@ const WeeklyWorkLogPage = () => {
                             </div>
                             <button
                                 type="button"
-                                onClick={() => { setDailyPreviewOpen(false); setDailyPreviewText('') }}
+                                onClick={() => { setDailyPreviewOpen(false); setDailyPreviewTasks([]) }}
                                 className="p-1.5 text-green-600 hover:bg-green-100 rounded-lg transition-colors"
                             >
                                 <X size={16} />
                             </button>
                         </div>
-                        <div className="flex-1 overflow-y-auto border-x border-b border-green-200 rounded-b-xl bg-white px-4 py-3">
-                            {dailyPreviewText ? (
-                                <pre className="text-sm text-toss-gray-800 whitespace-pre-wrap font-sans leading-relaxed">{dailyPreviewText}</pre>
+                        <div className="flex-1 overflow-y-auto border-x border-green-200 bg-white px-4 py-3">
+                            {dailyPreviewTasks.length > 0 ? (
+                                <div className="space-y-3">
+                                    {dailyPreviewTasks.map((task, idx) => (
+                                        <div key={idx} className="bg-green-50/50 rounded-lg p-3">
+                                            <div className="text-sm font-semibold text-green-800 mb-1">[{task.title}]</div>
+                                            {task.details.map((d, di) => (
+                                                <div key={di} className="text-sm text-toss-gray-700 ml-2 mb-0.5">
+                                                    - {d.content || '-'}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
                             ) : (
                                 <div className="flex items-center justify-center h-full text-toss-gray-400 text-sm">
                                     불러오는 중...
                                 </div>
                             )}
                         </div>
+                        {/* 하단 복사하기 버튼 */}
+                        {dailyPreviewTasks.length > 0 && (
+                            <div className="border-x border-b border-green-200 rounded-b-xl bg-green-50/30 px-4 py-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const text = dailyPreviewTasks.map(task => {
+                                            const lines = [`[${task.title}]`]
+                                            task.details.forEach(d => {
+                                                lines.push(`- ${d.content || '-'}`)
+                                            })
+                                            return lines.join('\n')
+                                        }).join('\n\n')
+                                        navigator.clipboard.writeText(text).then(() => {
+                                            alert('클립보드에 복사되었습니다.')
+                                        })
+                                    }}
+                                    className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-green-700 hover:bg-green-100 rounded-lg transition-colors"
+                                >
+                                    <Copy size={15} />
+                                    복사하기
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
                 </div>

@@ -1145,6 +1145,7 @@ export default function BupyeongAdmissionPage() {
         records={dashboardRecords}
         stats={{ total: totalRecords, active: activeCount, discharged: dischargedCount }}
         backgroundImage="back_bp.jpg"
+        centerType="bupyeong"
       />
     </div>
   )
