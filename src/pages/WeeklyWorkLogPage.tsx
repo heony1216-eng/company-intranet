@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Card, Button, Modal, PageHeader } from '../components/common'
-import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, Printer, RefreshCw, PlusCircle, Copy } from 'lucide-react'
+import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, Printer, RefreshCw, PlusCircle, Copy, AlertCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { uploadMultipleToDropbox, deleteMultipleFilesByUrl } from '../lib/dropbox'
@@ -240,6 +240,7 @@ const WeeklyWorkLogPage = () => {
     const [worklogs, setWorklogs] = useState<any[]>([])
     const [filteredWorklogs, setFilteredWorklogs] = useState<any[]>([])
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [showWriteTip, setShowWriteTip] = useState(true)
     const [isEditMode, setIsEditMode] = useState(false)
     const [loading, setLoading] = useState(true)
     const [uploading, setUploading] = useState(false)
@@ -872,6 +873,22 @@ const WeeklyWorkLogPage = () => {
     const indexOfFirstItem = indexOfLastItem - itemsPerPage
     const currentItems = filteredWorklogs.slice(indexOfFirstItem, indexOfLastItem)
     const totalPages = Math.ceil(filteredWorklogs.length / itemsPerPage)
+
+    // 작업일이 오늘인 경우에만 NEW 표시 (다음날 자동 사라짐)
+    const isNew = (log: any) => {
+        const n = new Date()
+        const today = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
+        return log?.work_date === today
+    }
+
+    // 주차별로 묶어 두 가지 회색으로 번갈아 표시 (가독성)
+    const weekParity: Record<string, number> = {}
+    let parityToggle = 0
+    currentItems.forEach((log: any) => {
+        const key = getWeekNumber(log.work_date)
+        if (!(key in weekParity)) { weekParity[key] = parityToggle % 2; parityToggle += 1 }
+    })
+    const rowBg = (log: any) => (weekParity[getWeekNumber(log.work_date)] === 1 ? 'bg-toss-gray-100' : 'bg-toss-gray-50')
     const goToPage = (pageNumber: number) => { setCurrentPage(pageNumber) }
 
     const toggleSelect = (id: string) => {
@@ -1060,7 +1077,7 @@ const WeeklyWorkLogPage = () => {
                                 </thead>
                                 <tbody className="divide-y divide-toss-gray-100">
                                     {currentItems.map((log: any, index: number) => (
-                                        <tr key={log.id} className={`hover:bg-toss-gray-50 transition-colors ${isAdmin && !log.is_read ? 'bg-green-50' : ''}`}>
+                                        <tr key={log.id} className={`${rowBg(log)} hover:bg-toss-blue/5 transition-colors`}>
                                             <td className="px-3 py-3 text-center w-10" onClick={(e) => e.stopPropagation()}>
                                                 <input type="checkbox" checked={selectedIds.has(log.id)} onChange={() => toggleSelect(log.id)} className="w-4 h-4 text-toss-blue border-gray-300 rounded focus:ring-toss-blue cursor-pointer" />
                                             </td>
@@ -1069,7 +1086,7 @@ const WeeklyWorkLogPage = () => {
                                                 <div className="flex items-center gap-1">
                                                     <Calendar size={14} className="text-toss-gray-400 flex-shrink-0" />
                                                     <span>{getWeekNumber(log.work_date)}</span>
-                                                    {isAdmin && !log.is_read && (
+                                                    {isNew(log) && (
                                                         <span className="inline-block bg-green-500 text-white px-1.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0">N</span>
                                                     )}
                                                 </div>
@@ -1108,14 +1125,14 @@ const WeeklyWorkLogPage = () => {
                         {/* Mobile Card View */}
                         <div className="md:hidden divide-y divide-toss-gray-100">
                             {currentItems.map((log: any, index: number) => (
-                                <div key={log.id} className={`p-4 ${isAdmin && !log.is_read ? 'bg-green-50' : ''}`} onClick={() => viewWorklogDetail(log)}>
+                                <div key={log.id} className={`p-4 ${rowBg(log)}`} onClick={() => viewWorklogDetail(log)}>
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-2">
                                             <input type="checkbox" checked={selectedIds.has(log.id)} onChange={() => toggleSelect(log.id)} onClick={(e) => e.stopPropagation()} className="w-4 h-4 text-toss-blue border-gray-300 rounded focus:ring-toss-blue cursor-pointer" />
                                             <span className="text-xs text-toss-gray-500">#{indexOfFirstItem + index + 1}</span>
                                             <Calendar size={14} className="text-toss-gray-400" />
                                             <span className="text-sm font-medium text-toss-gray-900">{getWeekNumber(log.work_date)}</span>
-                                            {isAdmin && !log.is_read && (
+                                            {isNew(log) && (
                                                 <span className="bg-green-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">NEW</span>
                                             )}
                                         </div>
@@ -1181,6 +1198,22 @@ const WeeklyWorkLogPage = () => {
                         <p className="text-sm text-toss-gray-500 mt-1">{getWeekNumber(formData.work_date)}</p>
                     </div>
 
+                    {/* 작성 가이드 */}
+                    <div className="rounded-toss border border-toss-blue/20 bg-toss-blue/5 overflow-hidden">
+                        <button type="button" onClick={() => setShowWriteTip(v => !v)} className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-semibold text-toss-blue">
+                            <span className="flex items-center gap-2"><AlertCircle size={16} /> 작성 팁 — 누가 읽어도 알 수 있게</span>
+                            <ChevronRight size={16} className={`transition-transform ${showWriteTip ? 'rotate-90' : ''}`} />
+                        </button>
+                        {showWriteTip && (
+                            <div className="px-4 pb-3 text-xs text-toss-gray-600 space-y-1.5">
+                                <p>업무를 <b className="text-toss-gray-800">무엇을 · 왜·대상 · 결과</b> 순서로 적으면 명확해져요.</p>
+                                <p className="text-green-600">○ 좋은 예: 강화센터 입소자 3명 주민등록 신청 완료 (OO주민센터 방문, 처리 완료)</p>
+                                <p className="text-toss-gray-400">△ 아쉬운 예: 주민등록 처리함</p>
+                                <p className="text-toss-gray-500">대상·수량·결과가 드러나게 적으면 누가 읽어도 이해하기 쉬워요.</p>
+                            </div>
+                        )}
+                    </div>
+
                     {/* 주간 업무 (테이블 입력) */}
                     <div>
                         <div className="flex items-center justify-between mb-2">
@@ -1239,7 +1272,7 @@ const WeeklyWorkLogPage = () => {
                                                     onChange={(e) => updateTaskDetail(index, dIdx, 'content', e.target.value)}
                                                     rows={2}
                                                     className="w-full flex-1 px-3 py-2 bg-white border border-toss-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all resize-none leading-relaxed"
-                                                    placeholder="업무 내용을 입력하세요"
+                                                    placeholder="예: 강화센터 입소자 5명 주민등록 신청 완료(주중 누적), 부평센터 상담 3건"
                                                 />
                                             </div>
                                             <div className="flex flex-col">

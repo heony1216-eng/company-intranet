@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Card, Button, Modal, PageHeader } from '../components/common'
-import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, Printer, RefreshCw, PlusCircle, Copy } from 'lucide-react'
+import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, Printer, RefreshCw, PlusCircle, Copy, AlertCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { uploadMultipleToDropbox, deleteMultipleFilesByUrl } from '../lib/dropbox'
@@ -240,6 +240,7 @@ const MonthlyWorkLogPage = () => {
     const [worklogs, setWorklogs] = useState<any[]>([])
     const [filteredWorklogs, setFilteredWorklogs] = useState<any[]>([])
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [showWriteTip, setShowWriteTip] = useState(true)
     const [isEditMode, setIsEditMode] = useState(false)
     const [loading, setLoading] = useState(true)
     const [uploading, setUploading] = useState(false)
@@ -803,6 +804,22 @@ const MonthlyWorkLogPage = () => {
     const indexOfLastItem = currentPage * itemsPerPage
     const indexOfFirstItem = indexOfLastItem - itemsPerPage
     const currentItems = filteredWorklogs.slice(indexOfFirstItem, indexOfLastItem)
+
+    // 작업일이 오늘인 경우에만 NEW 표시 (다음날 자동 사라짐)
+    const isNew = (log: any) => {
+        const n = new Date()
+        const today = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
+        return log?.work_date === today
+    }
+
+    // 월별로 묶어 두 가지 회색으로 번갈아 표시 (가독성)
+    const monthParity: Record<string, number> = {}
+    let parityToggle = 0
+    currentItems.forEach((log: any) => {
+        const key = getMonthLabel(log.work_date)
+        if (!(key in monthParity)) { monthParity[key] = parityToggle % 2; parityToggle += 1 }
+    })
+    const rowBg = (log: any) => (monthParity[getMonthLabel(log.work_date)] === 1 ? 'bg-toss-gray-100' : 'bg-toss-gray-50')
     const totalPages = Math.ceil(filteredWorklogs.length / itemsPerPage)
     const goToPage = (pageNumber: number) => { setCurrentPage(pageNumber) }
 
@@ -1002,7 +1019,7 @@ const MonthlyWorkLogPage = () => {
                                 </thead>
                                 <tbody className="divide-y divide-toss-gray-100">
                                     {currentItems.map((log: any, index: number) => (
-                                        <tr key={log.id} className={`hover:bg-toss-gray-50 transition-colors ${isAdmin && !log.is_read ? 'bg-purple-50' : ''}`}>
+                                        <tr key={log.id} className={`${rowBg(log)} hover:bg-toss-blue/5 transition-colors`}>
                                             <td className="px-3 py-3 text-center w-10" onClick={(e) => e.stopPropagation()}>
                                                 <input type="checkbox" checked={selectedIds.has(log.id)} onChange={() => toggleSelect(log.id)} className="w-4 h-4 text-toss-blue border-gray-300 rounded focus:ring-toss-blue cursor-pointer" />
                                             </td>
@@ -1011,7 +1028,7 @@ const MonthlyWorkLogPage = () => {
                                                 <div className="flex items-center gap-1">
                                                     <Calendar size={14} className="text-toss-gray-400 flex-shrink-0" />
                                                     <span>{getMonthLabel(log.work_date)}</span>
-                                                    {isAdmin && !log.is_read && (
+                                                    {isNew(log) && (
                                                         <span className="inline-block bg-purple-500 text-white px-1.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0">N</span>
                                                     )}
                                                 </div>
@@ -1052,7 +1069,7 @@ const MonthlyWorkLogPage = () => {
                             {currentItems.map((log: any, index: number) => (
                                 <div
                                     key={log.id}
-                                    className={`p-4 ${isAdmin && !log.is_read ? 'bg-purple-50' : ''}`}
+                                    className={`p-4 ${rowBg(log)}`}
                                     onClick={() => viewWorklogDetail(log)}
                                 >
                                     <div className="flex items-center justify-between mb-2">
@@ -1063,7 +1080,7 @@ const MonthlyWorkLogPage = () => {
                                             <span className="text-sm font-medium text-toss-gray-900">
                                                 {getMonthLabel(log.work_date)}
                                             </span>
-                                            {isAdmin && !log.is_read && (
+                                            {isNew(log) && (
                                                 <span className="bg-purple-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">
                                                     NEW
                                                 </span>
@@ -1166,6 +1183,22 @@ const MonthlyWorkLogPage = () => {
                         </p>
                     </div>
 
+                    {/* 작성 가이드 */}
+                    <div className="rounded-toss border border-toss-blue/20 bg-toss-blue/5 overflow-hidden">
+                        <button type="button" onClick={() => setShowWriteTip(v => !v)} className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-semibold text-toss-blue">
+                            <span className="flex items-center gap-2"><AlertCircle size={16} /> 작성 팁 — 누가 읽어도 알 수 있게</span>
+                            <ChevronRight size={16} className={`transition-transform ${showWriteTip ? 'rotate-90' : ''}`} />
+                        </button>
+                        {showWriteTip && (
+                            <div className="px-4 pb-3 text-xs text-toss-gray-600 space-y-1.5">
+                                <p>업무를 <b className="text-toss-gray-800">무엇을 · 왜·대상 · 결과</b> 순서로 적으면 명확해져요.</p>
+                                <p className="text-green-600">○ 좋은 예: 강화센터 입소자 3명 주민등록 신청 완료 (OO주민센터 방문, 처리 완료)</p>
+                                <p className="text-toss-gray-400">△ 아쉬운 예: 주민등록 처리함</p>
+                                <p className="text-toss-gray-500">대상·수량·결과가 드러나게 적으면 누가 읽어도 이해하기 쉬워요.</p>
+                            </div>
+                        )}
+                    </div>
+
                     <div>
                         <div className="flex items-center justify-between mb-2">
                             <label className="block text-sm font-medium text-toss-gray-700">
@@ -1225,7 +1258,7 @@ const MonthlyWorkLogPage = () => {
                                                     onChange={(e) => updateTaskDetail(index, dIdx, 'content', e.target.value)}
                                                     rows={2}
                                                     className="w-full flex-1 px-3 py-2 bg-white border border-toss-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none leading-relaxed"
-                                                    placeholder="업무 내용을 입력하세요"
+                                                    placeholder="예: 9월 강화 신규 입소 8명·퇴소 5명 처리, 재외동포 행사 1회 지원 완료"
                                                 />
                                             </div>
                                             <div className="flex flex-col">

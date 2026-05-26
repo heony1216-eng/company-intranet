@@ -30,6 +30,8 @@ const Sidebar = () => {
         ganghwa: null,
         bupyeong: null,
     })
+    // 올해 구조 인원
+    const [rescueThisYear, setRescueThisYear] = useState<number | null>(null)
 
     useEffect(() => {
         const fetchCounts = async () => {
@@ -44,6 +46,20 @@ const Sidebar = () => {
             }
         }
         fetchCounts()
+
+        const fetchRescueYear = async () => {
+            try {
+                const { data } = await supabase
+                    .from('rescue_summary_stats')
+                    .select('stat_key, stat_value')
+                    .eq('stat_key', 'this_year')
+                    .maybeSingle()
+                setRescueThisYear(data?.stat_value ?? null)
+            } catch (error) {
+                console.error('Error fetching rescue year count:', error)
+            }
+        }
+        fetchRescueYear()
     }, [])
 
     // 그룹별 메뉴 (실제 라우트 유지, 스크린샷처럼 섹션으로 펼침)
@@ -71,15 +87,15 @@ const Sidebar = () => {
         {
             title: '입소현황',
             items: [
-                { to: '/admission/ganghwa', icon: Building2, label: '강화센터', badge: admissionCounts.ganghwa, badgeTone: 'gray' },
-                { to: '/admission/bupyeong', icon: Building2, label: '부평센터', badge: admissionCounts.bupyeong, badgeTone: 'gray' },
+                { to: '/admission/ganghwa', icon: Building2, label: '강화센터', badge: admissionCounts.ganghwa != null ? `${admissionCounts.ganghwa}명` : null, badgeTone: 'gray' },
+                { to: '/admission/bupyeong', icon: Building2, label: '부평센터', badge: admissionCounts.bupyeong != null ? `${admissionCounts.bupyeong}명` : null, badgeTone: 'gray' },
                 { to: '/admission/nametag', icon: Tag, label: '네임택 출력' },
             ],
         },
         {
             title: '구조 · 동포',
             items: [
-                { to: '/rescue', icon: AlertTriangle, label: '구조현황' },
+                { to: '/rescue', icon: AlertTriangle, label: '구조현황', badge: rescueThisYear != null ? `${rescueThisYear}명` : null, badgeTone: 'gray' },
                 { to: '/overseas-korean/status', icon: Globe, label: '재외동포현황' },
             ],
         },
