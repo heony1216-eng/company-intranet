@@ -36,6 +36,17 @@ const calculateDischargeDate = (admissionDate: string): string => {
   return date.toISOString().split('T')[0]
 }
 
+// 이름 마스킹 (가운데 글자를 O로 처리)
+const maskName = (name: string): string => {
+  if (!name) return '-'
+  if (name.length === 1) return name
+  if (name.length === 2) return name[0] + 'O'
+  const first = name[0]
+  const last = name[name.length - 1]
+  const middle = 'O'.repeat(name.length - 2)
+  return first + middle + last
+}
+
 // 호실이 순수 숫자+호 형태인지 (부평: 국문 포함 시 퇴소예정일 미표시)
 const isRoomOnly = (room: string): boolean => {
   if (!room) return true
@@ -207,13 +218,12 @@ export default function AdmissionDashboard({ isOpen, onClose, records, stats, ba
     const roomWidth = centerType === 'bupyeong' ? 180 : 80
     const cols = [
       { label: 'No', width: 60 },
-      { label: '국가', width: 140 },
-      { label: '입소일', width: 190 },
-      { label: '성명', width: 140 },
-      { label: '성별', width: 80 },
+      { label: '국가', width: 160 },
+      { label: '입소일', width: 220 },
+      { label: '성명', width: 160 },
+      { label: '성별', width: 100 },
       { label: roomLabel, width: roomWidth },
-      { label: '퇴소예정일', width: 200 },
-      { label: '행정상황', width: centerType === 'bupyeong' ? 160 : 250 },
+      { label: '행정상황', width: centerType === 'bupyeong' ? 400 : 300 },
       { label: '비고', width: 0 },
     ]
     const usedWidth = cols.reduce((sum, c) => sum + c.width, 0)
@@ -235,9 +245,9 @@ export default function AdmissionDashboard({ isOpen, onClose, records, stats, ba
     })
 
     // 행정상황 컬럼 최대 텍스트 너비
-    const adminMaxTextWidth = cols[7].width - 20
+    const adminMaxTextWidth = cols[6].width - 20
     // 비고 컬럼 최대 텍스트 너비
-    const noteMaxTextWidth = cols[8].width - 20
+    const noteMaxTextWidth = cols[7].width - 20
 
     // 테이블 데이터 행
     pageRecords.forEach((record, index) => {
@@ -279,11 +289,11 @@ export default function AdmissionDashboard({ isOpen, onClose, records, stats, ba
       ctx.fillText(formatDateShort(record.admission_date), cx + cols[2].width / 2, cellY)
       cx += cols[2].width
 
-      // 성명 (ganghwa)
+      // 성명 (ganghwa) - 마스킹 처리
       ctx.fillStyle = TEXT_NORMAL
       ctx.font = 'bold 30px Pretendard, -apple-system, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText(record.ganghwa || '-', cx + cols[3].width / 2, cellY)
+      ctx.fillText(maskName(record.ganghwa), cx + cols[3].width / 2, cellY)
       cx += cols[3].width
 
       // 성별 (bupyeong)
@@ -294,33 +304,28 @@ export default function AdmissionDashboard({ isOpen, onClose, records, stats, ba
       ctx.fillText(record.room || '-', cx + cols[5].width / 2, cellY)
       cx += cols[5].width
 
-      // 퇴소예정일
-      if (dischargeDate) {
-        ctx.fillStyle = isWithinOneMonth(dischargeDate) ? '#ef4444' : '#2563eb'
-        ctx.font = '600 30px Pretendard, -apple-system, sans-serif'
-        ctx.textAlign = 'center'
-        ctx.fillText(formatDateShort(dischargeDate), cx + cols[6].width / 2, cellY)
-      } else {
-        ctx.fillStyle = TEXT_LIGHT
-        ctx.font = '30px Pretendard, -apple-system, sans-serif'
-        ctx.textAlign = 'center'
-        ctx.fillText('-', cx + cols[6].width / 2, cellY)
-      }
-      cx += cols[6].width
-
-      // 행정상황 (가운데 정렬)
+      // 행정상황 (여러 줄 지원)
       ctx.fillStyle = TEXT_NORMAL
-      ctx.font = '26px Pretendard, -apple-system, sans-serif'
+      ctx.font = '22px Pretendard, -apple-system, sans-serif'
       ctx.textAlign = 'center'
-      let adminText = record.admin_status || '-'
-      while (ctx.measureText(adminText).width > adminMaxTextWidth && adminText.length > 1) {
-        adminText = adminText.slice(0, -1)
-      }
-      if (adminText !== (record.admin_status || '-') && adminText.length > 0) {
-        adminText += '..'
-      }
-      ctx.fillText(adminText, cx + cols[7].width / 2, cellY)
-      cx += cols[7].width
+      const adminFullText = record.admin_status || '-'
+      // 쉼표로 분리하여 여러 줄로 표시
+      const adminParts = adminFullText.split(/[,،]\s*/).filter(Boolean)
+      const adminLineHeight = 26
+      const adminTotalHeight = adminParts.length * adminLineHeight
+      const adminStartY = cellY - adminTotalHeight / 2 + adminLineHeight / 2
+      adminParts.forEach((part, lineIdx) => {
+        let lineText = part.trim()
+        // 각 줄이 컬럼 너비를 초과하면 잘라내기
+        while (ctx.measureText(lineText).width > adminMaxTextWidth && lineText.length > 1) {
+          lineText = lineText.slice(0, -1)
+        }
+        if (lineText !== part.trim() && lineText.length > 0) {
+          lineText += '..'
+        }
+        ctx.fillText(lineText, cx + cols[6].width / 2, adminStartY + lineIdx * adminLineHeight)
+      })
+      cx += cols[6].width
 
       // 비고 (가운데 정렬)
       ctx.font = '26px Pretendard, -apple-system, sans-serif'
@@ -331,7 +336,7 @@ export default function AdmissionDashboard({ isOpen, onClose, records, stats, ba
       if (noteText !== (record.notes || '-') && noteText.length > 0) {
         noteText += '..'
       }
-      ctx.fillText(noteText, cx + cols[8].width / 2, cellY)
+      ctx.fillText(noteText, cx + cols[7].width / 2, cellY)
     })
 
     // 페이지 정보 (여러 페이지일 때)
