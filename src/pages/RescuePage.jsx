@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Card, Button, Modal } from '../components/common'
+import { useSearchParams } from 'react-router-dom'
+import { Card, Button, Modal, PageHeader } from '../components/common'
 import { Plus, Trash2, Edit2, AlertTriangle, Download, Camera, X, Image, Settings, ChevronDown, ChevronUp, ArrowUp, ArrowDown, Search, Eye, Printer } from 'lucide-react'
 import { printReport } from '../utils/printReport'
 import RescueDashboard from '../components/rescue/RescueDashboard'
@@ -434,6 +435,21 @@ const RescuePage = () => {
         setIsDetailModalOpen(true)
     }
 
+    // 통합검색에서 ?open=<id>로 진입 시 해당 구조현황 상세 모달 자동 오픈
+    const [searchParams, setSearchParams] = useSearchParams()
+    useEffect(() => {
+        const openId = searchParams.get('open')
+        if (!openId) return
+        let active = true
+        ;(async () => {
+            const { data } = await supabase.from('rescue_situations').select('*').eq('id', openId).single()
+            if (active && data) openDetailModal(data)
+            searchParams.delete('open')
+            setSearchParams(searchParams, { replace: true })
+        })()
+        return () => { active = false }
+    }, [searchParams])
+
     // 완료되지 않은 항목을 먼저, 완료된 항목을 나중에 정렬
     const sortedRescueSituations = [...rescueSituations].sort((a, b) => {
         // 완료 여부로 먼저 정렬 (미완료가 위로)
@@ -863,20 +879,11 @@ const RescuePage = () => {
 
     return (
         <div className="space-y-6">
-            {/* Header Card */}
-            <Card className="bg-gradient-to-r from-toss-blue to-blue-600 text-white">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
-                        <AlertTriangle size={24} />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold mb-1">구조현황 관리</h2>
-                        <p className="text-white/90">
-                            {isAdmin ? '전체 구조현황을 관리할 수 있습니다' : '구조현황을 등록하고 관리하세요'}
-                        </p>
-                    </div>
-                </div>
-            </Card>
+            <PageHeader
+                title="구조현황 관리"
+                subtitle={isAdmin ? '전체 구조현황을 관리할 수 있습니다' : '구조현황을 등록하고 관리하세요'}
+                icon={AlertTriangle}
+            />
 
             {/* 구조현황 통계 섹션 */}
             <Card padding="p-0">
@@ -1028,7 +1035,7 @@ const RescuePage = () => {
 
             {/* Header */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <h1 className="text-2xl font-bold text-toss-gray-900">구조현황</h1>
+                <h2 className="text-base font-bold text-toss-gray-900">구조현황 목록</h2>
                 <div className="flex items-center gap-2">
                     <Button variant="secondary" onClick={handlePrintRescueList}>
                         <Printer size={18} />
@@ -1054,9 +1061,9 @@ const RescuePage = () => {
                         {/* Desktop Table */}
                         <div className="hidden md:block overflow-x-auto">
                             <table className="w-full table-fixed">
-                                <thead className="bg-toss-blue/10 border-b-2 border-toss-blue/20">
+                                <thead className="bg-toss-gray-50 border-b border-toss-gray-200">
                                     <tr>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-900 w-10">
+                                        <th className="px-4 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase w-10">
                                             <input
                                                 type="checkbox"
                                                 checked={currentItems.length > 0 && currentItems.every(item => selectedIds.has(item.id))}
@@ -1064,13 +1071,13 @@ const RescuePage = () => {
                                                 className="w-4 h-4 text-toss-blue border-gray-300 rounded focus:ring-toss-blue cursor-pointer"
                                             />
                                         </th>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-900 w-14">No</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900 w-28">체류지</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900 w-20">성명</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900 w-24">구조요청</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-toss-gray-900">현재 진행상황</th>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-900 w-20">완료</th>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-toss-gray-900 w-24">관리</th>
+                                        <th className="px-4 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase w-14">No</th>
+                                        <th className="px-4 py-3 text-left text-xs font-bold text-toss-gray-600 uppercase w-28">체류지</th>
+                                        <th className="px-4 py-3 text-left text-xs font-bold text-toss-gray-600 uppercase w-20">성명</th>
+                                        <th className="px-4 py-3 text-left text-xs font-bold text-toss-gray-600 uppercase w-24">구조요청</th>
+                                        <th className="px-4 py-3 text-left text-xs font-bold text-toss-gray-600 uppercase">현재 진행상황</th>
+                                        <th className="px-4 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase w-20">완료</th>
+                                        <th className="px-4 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase w-24">관리</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-toss-gray-100">

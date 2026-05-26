@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Card } from '../components/common'
+import { Card, PageHeader } from '../components/common'
 import { Search, Building, RefreshCw, ChevronLeft, ChevronRight, ExternalLink, Mail, MapPin, User, Info } from 'lucide-react'
 
 // 한인회 단체 정보 API 응답 타입
@@ -95,16 +95,11 @@ export default function OverseasKoreanGroupPage() {
 
   return (
     <div className="space-y-6">
-      {/* 헤더 */}
-      <Card className="p-0 overflow-hidden">
-        <div className="bg-gradient-to-r from-emerald-500 to-green-600 text-white p-6 lg:p-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Building size={28} />
-            <h1 className="text-2xl font-bold">재외동포 단체정보 (한인회)</h1>
-          </div>
-          <p className="text-green-100">해외에 등록된 한인회, 한글학교 등 주요 단체 정보를 조회합니다</p>
-        </div>
-      </Card>
+      <PageHeader
+        title="재외동포 단체정보 (한인회)"
+        subtitle="해외에 등록된 한인회, 한글학교 등 주요 단체 정보를 조회합니다"
+        icon={Building}
+      />
 
       {/* 검색 */}
       <Card className="p-4">

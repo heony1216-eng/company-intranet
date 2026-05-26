@@ -30,16 +30,16 @@ interface SearchSource {
 
 const SEARCH_SOURCES: SearchSource[] = [
     { type: 'notice', table: 'notices', cols: ['title', 'content'], titleCol: 'title', dateCol: 'created_at', to: (r) => `/notices/${r.id}` },
-    { type: 'meeting', table: 'meetings', cols: ['title', 'content', 'participants'], titleCol: 'title', dateCol: 'meeting_date', to: () => '/meetings' },
-    { type: 'event', table: 'events', cols: ['title', 'description', 'location'], titleCol: 'title', dateCol: 'event_date', to: () => '/events' },
-    { type: 'rescue', table: 'rescue_situations', cols: ['name', 'location', 'status', 'details'], titleCol: 'name', dateCol: 'request_date', to: () => '/rescue' },
+    { type: 'meeting', table: 'meetings', cols: ['title', 'content', 'participants'], titleCol: 'title', dateCol: 'meeting_date', to: (r) => `/meetings?open=${r.id}` },
+    { type: 'event', table: 'events', cols: ['title', 'description', 'location'], titleCol: 'title', dateCol: 'event_date', to: (r) => `/events?open=${r.id}` },
+    { type: 'rescue', table: 'rescue_situations', cols: ['name', 'location', 'status', 'details'], titleCol: 'name', dateCol: 'request_date', to: (r) => `/rescue?open=${r.id}` },
     // 입소현황은 센터별로 테이블/컬럼이 다름
     // 강화: admission_records (ganghwa=성명, bupyeong=성별, location=국가)
-    { type: 'admission', table: 'admission_records', cols: ['ganghwa', 'location', 'room', 'notes', 'admin_status'], titleCol: 'ganghwa', dateCol: 'admission_date', to: () => '/admission/ganghwa' },
+    { type: 'admission', table: 'admission_records', cols: ['ganghwa', 'location', 'room', 'notes', 'admin_status'], titleCol: 'ganghwa', dateCol: 'admission_date', to: (r) => `/admission/ganghwa?focus=${r.id}` },
     // 부평: bupyeong_admission_records (name=성명, nationality=국가, gender=성별)
-    { type: 'admission', table: 'bupyeong_admission_records', cols: ['name', 'nationality', 'room', 'notes', 'admin_status'], titleCol: 'name', dateCol: 'admission_date', to: () => '/admission/bupyeong' },
-    { type: 'contact', table: 'contacts', cols: ['name', 'department', 'position', 'phone', 'email', 'memo'], titleCol: 'name', to: () => '/contacts' },
-    { type: 'ledger', table: 'document_ledger', cols: ['content', 'doc_number', 'receiver_org', 'sender_org', 'note'], titleCol: 'content', to: () => '/document-ledger' },
+    { type: 'admission', table: 'bupyeong_admission_records', cols: ['name', 'nationality', 'room', 'notes', 'admin_status'], titleCol: 'name', dateCol: 'admission_date', to: (r) => `/admission/bupyeong?focus=${r.id}` },
+    { type: 'contact', table: 'contacts', cols: ['name', 'department', 'position', 'phone', 'email', 'memo'], titleCol: 'name', to: (r) => `/contacts?focus=${r.id}` },
+    { type: 'ledger', table: 'document_ledger', cols: ['content', 'doc_number', 'receiver_org', 'sender_org', 'note'], titleCol: 'content', to: (r) => `/document-ledger?focus=${r.id}` },
 ]
 
 // 알림(최근 공지) 항목

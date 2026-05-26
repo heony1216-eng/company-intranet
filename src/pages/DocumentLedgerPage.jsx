@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Card, Button, Modal } from '../components/common'
+import { Card, Button, Modal, PageHeader } from '../components/common'
 import { Plus, Edit, Trash2, Tag, Check, X, Upload, Download, BookOpen } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useDocumentLedger } from '../hooks/useDocumentLedger'
@@ -445,19 +445,12 @@ const DocumentLedgerPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* 헤더 */}
-      <Card className="bg-gradient-to-r from-toss-blue to-blue-600 text-white">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
-              <BookOpen size={24} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold mb-1">문서 수발신 대장</h1>
-              <p className="text-white/90">{currentYear}년도</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+      <PageHeader
+        title="문서 수발신 대장"
+        subtitle={`${currentYear}년도`}
+        icon={BookOpen}
+        actions={
+          <>
             {canEdit && selectedLabel && (
               <>
                 <input
@@ -470,34 +463,36 @@ const DocumentLedgerPage = () => {
                 <Button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
-                  className="flex-1 sm:flex-none text-sm bg-white/20 hover:bg-white/30 text-white border-0"
+                  variant="secondary"
+                  size="sm"
                 >
                   <Upload size={16} />
                   <span className="hidden sm:inline">업로드</span>
                 </Button>
-                <Button
-                  onClick={handleDownload}
-                  className="flex-1 sm:flex-none text-sm bg-white/20 hover:bg-white/30 text-white border-0"
-                >
+                <Button onClick={handleDownload} variant="secondary" size="sm">
                   <Download size={16} />
                   <span className="hidden sm:inline">다운로드</span>
                 </Button>
               </>
             )}
             {(isAdmin || isSubAdmin) && (
-              <Button onClick={() => {
-                setLabelMode('list')
-                setNewLabelName('')
-                setEditingLabel(null)
-                setIsLabelModalOpen(true)
-              }} className="flex-1 sm:flex-none text-sm bg-white/20 hover:bg-white/30 text-white border-0">
+              <Button
+                onClick={() => {
+                  setLabelMode('list')
+                  setNewLabelName('')
+                  setEditingLabel(null)
+                  setIsLabelModalOpen(true)
+                }}
+                variant="secondary"
+                size="sm"
+              >
                 <Tag size={16} />
                 <span className="hidden sm:inline">라벨 관리</span>
               </Button>
             )}
-          </div>
-        </div>
-      </Card>
+          </>
+        }
+      />
 
       {/* 라벨 탭 */}
       <div className="flex items-center gap-2 border-b border-toss-gray-200">
@@ -530,16 +525,16 @@ const DocumentLedgerPage = () => {
           <table className="w-full min-w-[900px]">
             <thead>
               <tr className="border-b border-toss-gray-200 bg-toss-gray-50">
-                <th className="px-3 py-3 text-xs font-semibold text-toss-gray-500 text-center w-14">번호</th>
-                <th className="px-3 py-3 text-xs font-semibold text-toss-gray-500 text-center w-24">위치</th>
-                <th className="px-3 py-3 text-xs font-semibold text-toss-gray-500 text-left min-w-[200px]">내용</th>
-                <th className="px-3 py-3 text-xs font-semibold text-toss-gray-500 text-center w-28 bg-blue-50/50">수신 기관</th>
-                <th className="px-3 py-3 text-xs font-semibold text-toss-gray-500 text-center w-20 bg-blue-50/50">수신일</th>
-                <th className="px-3 py-3 text-xs font-semibold text-toss-gray-500 text-center w-28 bg-green-50/50">발신 기관</th>
-                <th className="px-3 py-3 text-xs font-semibold text-toss-gray-500 text-center w-20 bg-green-50/50">발신일</th>
-                <th className="px-3 py-3 text-xs font-semibold text-toss-gray-500 text-left min-w-[120px]">비고</th>
+                <th className="px-3 py-3 text-xs font-bold text-toss-gray-600 uppercase text-center w-14">번호</th>
+                <th className="px-3 py-3 text-xs font-bold text-toss-gray-600 uppercase text-center w-24">위치</th>
+                <th className="px-3 py-3 text-xs font-bold text-toss-gray-600 uppercase text-left min-w-[200px]">내용</th>
+                <th className="px-3 py-3 text-xs font-bold text-toss-gray-600 uppercase text-center w-28 bg-blue-50/50">수신 기관</th>
+                <th className="px-3 py-3 text-xs font-bold text-toss-gray-600 uppercase text-center w-20 bg-blue-50/50">수신일</th>
+                <th className="px-3 py-3 text-xs font-bold text-toss-gray-600 uppercase text-center w-28 bg-green-50/50">발신 기관</th>
+                <th className="px-3 py-3 text-xs font-bold text-toss-gray-600 uppercase text-center w-20 bg-green-50/50">발신일</th>
+                <th className="px-3 py-3 text-xs font-bold text-toss-gray-600 uppercase text-left min-w-[120px]">비고</th>
                 {canEdit && (
-                  <th className="px-3 py-3 text-xs font-semibold text-toss-gray-500 text-center w-12"></th>
+                  <th className="px-3 py-3 text-xs font-bold text-toss-gray-600 uppercase text-center w-12"></th>
                 )}
               </tr>
             </thead>

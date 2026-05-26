@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Card, Button, Modal } from '../components/common'
+import { Card, Button, Modal, PageHeader } from '../components/common'
 import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, FileDown, PlusCircle, Printer, Copy, AlertCircle, CheckCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -522,9 +522,7 @@ const WorkLogPage = () => {
                 .not('type', 'in', '("weekly","monthly","rescue")')
                 .order('work_date', { ascending: false })
 
-            if (!isAdmin && profile) {
-                query = query.eq('user_id', profile.user_id)
-            }
+            // 모든 사용자가 전체 보고서 열람 가능
 
             const { data: worklogsData, error: worklogsError } = await query
 
@@ -1488,33 +1486,21 @@ const WorkLogPage = () => {
 
     return (
         <div className="space-y-6">
-            {/* User Info Header */}
-            <Card className="bg-gradient-to-r from-toss-blue to-blue-600 text-white">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
-                        <FileText size={24} />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold mb-1">
-                            {isAdmin ? '전체 일일 업무보고' : `${profile?.name || '사용자'}님의 일일 업무보고`}
-                        </h2>
-                        <p className="text-white/90">
-                            {isAdmin ? '관리자 권한으로 모든 직원의 일일 업무보고를 확인할 수 있습니다' :
-                             `${profile?.team ? `${profile.team} · ` : ''}${profile?.rank || '직급 미설정'}`}
-                        </p>
-                    </div>
-                </div>
-            </Card>
+            <PageHeader
+                title={isAdmin ? '전체 일일 업무보고' : '일일 업무보고'}
+                subtitle={isAdmin ? '관리자 권한으로 모든 직원의 일일 업무보고를 확인할 수 있습니다' :
+                    `${profile?.name || '사용자'}님 · ${profile?.team ? `${profile.team} · ` : ''}${profile?.rank || '직급 미설정'}`}
+                icon={FileText}
+            />
 
             {/* Header with Filters */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <h1 className="text-2xl font-bold text-toss-gray-900">일일 업무보고</h1>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-4">
                 <div className="flex flex-wrap items-center gap-3">
                     {/* Year Filter */}
                     <select
                         value={selectedYear}
                         onChange={(e) => setSelectedYear(Number(e.target.value))}
-                        className="px-4 py-2 bg-white border border-toss-gray-300 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
+                        className="px-3.5 py-2 bg-white border border-toss-gray-200 rounded-toss text-sm text-toss-gray-700 focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
                     >
                         {years.map(year => (
                             <option key={year} value={year}>{year}년</option>
@@ -1525,19 +1511,19 @@ const WorkLogPage = () => {
                     <select
                         value={selectedMonth}
                         onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                        className="px-4 py-2 bg-white border border-toss-gray-300 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
+                        className="px-3.5 py-2 bg-white border border-toss-gray-200 rounded-toss text-sm text-toss-gray-700 focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
                     >
                         {months.map(month => (
                             <option key={month} value={month}>{month}월</option>
                         ))}
                     </select>
 
-                    {/* User Filter (관리자만) */}
-                    {isAdmin && uniqueUsers.length > 0 && (
+                    {/* User Filter */}
+                    {uniqueUsers.length > 0 && (
                         <select
                             value={selectedUserId}
                             onChange={(e) => setSelectedUserId(e.target.value)}
-                            className="px-4 py-2 bg-white border border-toss-gray-300 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
+                            className="px-3.5 py-2 bg-white border border-toss-gray-200 rounded-toss text-sm text-toss-gray-700 focus:ring-2 focus:ring-toss-blue focus:border-transparent transition-all"
                         >
                             <option value="all">전체 작성자</option>
                             {uniqueUsers.map(user => (
@@ -1556,28 +1542,24 @@ const WorkLogPage = () => {
             {/* Board-style Table */}
             <Card padding="p-0 sm:p-6">
                 {loading ? (
-                    <div className="text-center text-toss-gray-500 py-8">로딩 중...</div>
+                    <div className="text-center text-toss-gray-400 py-12">로딩 중...</div>
                 ) : currentItems.length > 0 ? (
                     <>
                         {/* Desktop Table */}
                         <div className="hidden md:block overflow-x-auto">
                             <table className="w-full min-w-[800px]">
-                                <thead className="bg-toss-gray-100 border-b-2 border-toss-gray-300">
+                                <thead className="bg-toss-gray-50 border-b border-toss-gray-200">
                                     <tr>
-                                        <th className="px-3 py-3 text-center text-sm font-semibold text-toss-gray-700 whitespace-nowrap">No</th>
-                                        <th className="px-3 py-3 text-left text-sm font-semibold text-toss-gray-700 whitespace-nowrap">작업일</th>
-                                        {isAdmin && (
-                                            <>
-                                                <th className="px-3 py-3 text-left text-sm font-semibold text-toss-gray-700 whitespace-nowrap">작성자</th>
-                                                <th className="px-3 py-3 text-left text-sm font-semibold text-toss-gray-700 whitespace-nowrap">팀</th>
-                                            </>
-                                        )}
-                                        <th className="px-3 py-3 text-left text-sm font-semibold text-toss-gray-700">오전 업무</th>
-                                        <th className="px-3 py-3 text-left text-sm font-semibold text-toss-gray-700">오후 업무</th>
-                                        <th className="px-3 py-3 text-center text-sm font-semibold text-toss-gray-700 whitespace-nowrap">관리</th>
+                                        <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase whitespace-nowrap">No</th>
+                                        <th className="px-3 py-3 text-left text-xs font-bold text-toss-gray-600 uppercase whitespace-nowrap">작업일</th>
+                                        <th className="px-3 py-3 text-left text-xs font-bold text-toss-gray-600 uppercase whitespace-nowrap">작성자</th>
+                                        <th className="px-3 py-3 text-left text-xs font-bold text-toss-gray-600 uppercase whitespace-nowrap">팀</th>
+                                        <th className="px-3 py-3 text-left text-xs font-bold text-toss-gray-600 uppercase">오전 업무</th>
+                                        <th className="px-3 py-3 text-left text-xs font-bold text-toss-gray-600 uppercase">오후 업무</th>
+                                        <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase whitespace-nowrap">관리</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-toss-gray-200">
+                                <tbody className="divide-y divide-toss-gray-100">
                                     {currentItems.map((log, index) => (
                                         <tr
                                             key={log.id}
@@ -1602,20 +1584,16 @@ const WorkLogPage = () => {
                                                     )}
                                                 </div>
                                             </td>
-                                            {isAdmin && (
-                                                <>
-                                                    <td
-                                                        className="px-3 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-toss-blue hover:underline whitespace-nowrap"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            setSelectedUserId(log.user_id)
-                                                        }}
-                                                    >
-                                                        {log.user?.name || '-'}
-                                                    </td>
-                                                    <td className="px-3 py-3 text-sm text-toss-gray-600 whitespace-nowrap">{log.user?.team || '-'}</td>
-                                                </>
-                                            )}
+                                            <td
+                                                className="px-3 py-3 text-sm text-toss-gray-900 cursor-pointer hover:text-toss-blue hover:underline whitespace-nowrap"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setSelectedUserId(log.user_id)
+                                                }}
+                                            >
+                                                {log.user?.name || '-'}
+                                            </td>
+                                            <td className="px-3 py-3 text-sm text-toss-gray-600 whitespace-nowrap">{log.user?.team || '-'}</td>
                                             <td
                                                 className="px-3 py-3 text-sm text-toss-gray-700 cursor-pointer max-w-[200px] truncate"
                                                 onClick={() => viewWorklogDetail(log)}
@@ -1730,13 +1708,11 @@ const WorkLogPage = () => {
                                             )}
                                         </div>
                                     </div>
-                                    {isAdmin && (
-                                        <div className="text-xs text-toss-gray-600 mb-2">
-                                            <span className="font-medium">{log.user?.name || '-'}</span>
-                                            <span className="mx-1">·</span>
-                                            <span>{log.user?.team || '-'}</span>
-                                        </div>
-                                    )}
+                                    <div className="text-xs text-toss-gray-600 mb-2">
+                                        <span className="font-medium">{log.user?.name || '-'}</span>
+                                        <span className="mx-1">·</span>
+                                        <span>{log.user?.team || '-'}</span>
+                                    </div>
                                     <div className="space-y-1">
                                         <p className="text-sm text-toss-gray-700 line-clamp-1">
                                             <span className="text-toss-gray-500 mr-1">오전:</span>
@@ -1757,7 +1733,7 @@ const WorkLogPage = () => {
                                 <button
                                     onClick={() => goToPage(currentPage - 1)}
                                     disabled={currentPage === 1}
-                                    className="px-3 py-1 rounded-lg text-sm font-medium text-toss-gray-700 hover:bg-toss-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-3 py-1 rounded-toss text-sm font-medium text-toss-gray-700 hover:bg-toss-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     이전
                                 </button>
@@ -1765,7 +1741,7 @@ const WorkLogPage = () => {
                                     <button
                                         key={i + 1}
                                         onClick={() => goToPage(i + 1)}
-                                        className={`px-3 py-1 rounded-lg text-sm font-medium ${
+                                        className={`px-3 py-1 rounded-toss text-sm font-medium ${
                                             currentPage === i + 1
                                                 ? 'bg-toss-blue text-white'
                                                 : 'text-toss-gray-700 hover:bg-toss-gray-100'
@@ -1777,7 +1753,7 @@ const WorkLogPage = () => {
                                 <button
                                     onClick={() => goToPage(currentPage + 1)}
                                     disabled={currentPage === totalPages}
-                                    className="px-3 py-1 rounded-lg text-sm font-medium text-toss-gray-700 hover:bg-toss-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-3 py-1 rounded-toss text-sm font-medium text-toss-gray-700 hover:bg-toss-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     다음
                                 </button>
@@ -1785,8 +1761,9 @@ const WorkLogPage = () => {
                         )}
                     </>
                 ) : (
-                    <div className="text-center text-toss-gray-500 py-8">
-                        {selectedYear}년 {selectedMonth}월에 등록된 업무보고가 없습니다
+                    <div className="flex flex-col items-center justify-center py-16 text-toss-gray-400">
+                        <FileText size={40} className="mb-3 opacity-40" />
+                        <p>{selectedYear}년 {selectedMonth}월에 등록된 업무보고가 없습니다</p>
                     </div>
                 )}
             </Card>

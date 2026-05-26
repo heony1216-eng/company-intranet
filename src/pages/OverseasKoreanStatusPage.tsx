@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Card } from '../components/common'
+import { Card, PageHeader } from '../components/common'
 import { Search, Globe, Users, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react'
 import {
   overseasKoreanData,
@@ -98,23 +98,18 @@ export default function OverseasKoreanStatusPage() {
 
   return (
     <div className="space-y-4">
-      {/* 헤더 */}
-      <Card className="bg-gradient-to-r from-toss-blue to-blue-600 text-white">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
-            <Globe size={24} />
-          </div>
-          <div className="flex-1">
-            <h2 className="text-xl font-bold mb-1">재외동포 현황조회</h2>
-            <p className="text-white/90 text-sm">2025 재외동포현황 (기준: 2024.12.31, 출처: 재외동포청)</p>
-          </div>
+      <PageHeader
+        title="재외동포 현황조회"
+        subtitle="2025 재외동포현황 (기준: 2024.12.31, 출처: 재외동포청)"
+        icon={Globe}
+        actions={
           <div className="text-right hidden sm:block">
-            <p className="text-white/70 text-xs">전 세계 재외동포</p>
-            <p className="text-2xl font-bold">{formatNumber(TOTAL_OVERSEAS_KOREANS)}<span className="text-sm font-normal text-white/80 ml-1">명</span></p>
-            <p className="text-white/70 text-xs">194개국</p>
+            <p className="text-toss-gray-400 text-xs">전 세계 재외동포</p>
+            <p className="text-2xl font-bold text-toss-gray-900">{formatNumber(TOTAL_OVERSEAS_KOREANS)}<span className="text-sm font-normal text-toss-gray-500 ml-1">명</span></p>
+            <p className="text-toss-gray-400 text-xs">194개국</p>
           </div>
-        </div>
-      </Card>
+        }
+      />
 
       {/* 상위 5개국 + 지역별 분포 요약 (가로 2단) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Card, Button, Modal } from '../components/common'
+import { useSearchParams } from 'react-router-dom'
+import { Card, Button, Modal, PageHeader } from '../components/common'
 import { ChevronLeft, ChevronRight, CalendarDays, MapPin, Clock, Plus, Edit3, Trash2, X, Settings, AlertCircle, CheckCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -214,6 +215,25 @@ const EventPage = () => {
             console.error('Error fetching recent events:', error)
         }
     }
+
+    // 통합검색에서 ?open=<id>로 진입 시 해당 일정 달로 이동 후 상세 모달 자동 오픈
+    const [searchParams, setSearchParams] = useSearchParams()
+    useEffect(() => {
+        const openId = searchParams.get('open')
+        if (!openId) return
+        let active = true
+        ;(async () => {
+            const { data } = await supabase.from('events').select('*').eq('id', openId).single()
+            if (active && data) {
+                if (data.event_date) setCurrentDate(new Date(data.event_date))
+                setSelectedEvent(data)
+                setIsDetailModalOpen(true)
+            }
+            searchParams.delete('open')
+            setSearchParams(searchParams, { replace: true })
+        })()
+        return () => { active = false }
+    }, [searchParams])
 
     const handleDateClick = (date) => {
         setSelectedDate(date)
@@ -434,20 +454,11 @@ const EventPage = () => {
 
     return (
         <div className="space-y-6">
-            {/* Header Card */}
-            <Card className="bg-gradient-to-r from-orange-500 to-amber-500 text-white">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
-                        <CalendarDays size={24} />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold mb-1">일정</h2>
-                        <p className="text-white/90">
-                            날짜를 클릭하여 일정을 등록하세요
-                        </p>
-                    </div>
-                </div>
-            </Card>
+            <PageHeader
+                title="일정"
+                subtitle="날짜를 클릭하여 일정을 등록하세요"
+                icon={CalendarDays}
+            />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Calendar */}

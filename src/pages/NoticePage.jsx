@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Card, Button, Modal } from '../components/common'
-import { Plus, Pin, ChevronLeft, Trash2, Edit } from 'lucide-react'
+import { Card, Button, Modal, PageHeader } from '../components/common'
+import { Plus, Pin, ChevronLeft, Trash2, Edit, Megaphone } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 
@@ -283,19 +283,21 @@ const NoticePage = () => {
     // List View
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold text-toss-gray-900">공지사항</h1>
-                {(isAdmin || isSubAdmin) && (
+            <PageHeader
+                title="공지사항"
+                subtitle="전사 공지를 확인하세요"
+                icon={Megaphone}
+                actions={(isAdmin || isSubAdmin) && (
                     <Button onClick={openCreateModal}>
                         <Plus size={18} />
                         새 공지 작성
                     </Button>
                 )}
-            </div>
+            />
 
             <Card padding="p-0">
                 {loading ? (
-                    <div className="p-8 text-center text-toss-gray-500">
+                    <div className="p-12 text-center text-toss-gray-400">
                         로딩 중...
                     </div>
                 ) : notices.length > 0 ? (
@@ -326,8 +328,9 @@ const NoticePage = () => {
                         ))}
                     </div>
                 ) : (
-                    <div className="p-8 text-center text-toss-gray-500">
-                        등록된 공지사항이 없습니다
+                    <div className="flex flex-col items-center justify-center py-16 text-toss-gray-400">
+                        <Megaphone size={40} className="mb-3 opacity-40" />
+                        <p>등록된 공지사항이 없습니다</p>
                     </div>
                 )}
             </Card>

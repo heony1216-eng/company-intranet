@@ -67,97 +67,24 @@ const MyPage = () => {
             </Link>
 
             {/* Header Card */}
-            <Card className="bg-gradient-to-r from-toss-blue to-blue-600 text-white">
-                <div className="flex items-center gap-6">
-                    <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-3xl font-bold">
+            <Card>
+                <div className="flex items-center gap-5">
+                    <div className="w-16 h-16 bg-toss-blue/10 text-toss-blue rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-2xl font-bold">
                             {formData.name?.charAt(0) || profile?.name?.charAt(0) || 'U'}
                         </span>
                     </div>
-                    <div className="flex-1">
-                        <h1 className="text-2xl font-bold mb-1">마이페이지</h1>
-                        <p className="text-white/90 flex items-center gap-2">
-                            <Mail size={16} />
+                    <div className="flex-1 min-w-0">
+                        <h1 className="text-2xl font-bold text-toss-gray-900">마이페이지</h1>
+                        <p className="text-sm text-toss-gray-500 flex items-center gap-2 mt-1">
+                            <Mail size={14} />
                             {profile?.team ? `${profile.team} · ${profile.rank || ''}` : (profile?.user_id || '로딩 중...')}
                         </p>
                     </div>
                 </div>
             </Card>
 
-            {/* Annual Leave Status Card */}
-            <Card>
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-                            <Calendar className="text-emerald-600" size={20} />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-bold text-toss-gray-900">연차 현황</h2>
-                            <p className="text-sm text-toss-gray-500">{new Date().getFullYear()}년</p>
-                        </div>
-                    </div>
-                    <Link
-                        to="/leave"
-                        className="flex items-center gap-1 text-sm text-toss-blue hover:text-blue-700 transition-colors"
-                    >
-                        연차 신청
-                        <ChevronRight size={16} />
-                    </Link>
-                </div>
-
-                {leaveLoading ? (
-                    <div className="h-20 flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-6 w-6 border-2 border-toss-blue border-t-transparent"></div>
-                    </div>
-                ) : annualLeave ? (
-                    <div className="grid grid-cols-4 gap-3">
-                        <div className="text-center p-4 bg-toss-gray-50 rounded-xl">
-                            <p className="text-sm text-toss-gray-500 mb-1">총 연차</p>
-                            <p className="text-2xl font-bold text-toss-gray-900">
-                                {annualLeave.total_days}<span className="text-sm font-normal text-toss-gray-500">일</span>
-                            </p>
-                        </div>
-                        <div className="text-center p-4 bg-blue-50 rounded-xl">
-                            <p className="text-sm text-toss-gray-500 mb-1">사용</p>
-                            <p className="text-2xl font-bold text-toss-blue">
-                                {annualLeave.used_days}<span className="text-sm font-normal text-toss-gray-500">일</span>
-                            </p>
-                        </div>
-                        <div className="text-center p-4 bg-emerald-50 rounded-xl">
-                            <p className="text-sm text-toss-gray-500 mb-1">잔여</p>
-                            <p className="text-2xl font-bold text-emerald-600">
-                                {annualLeave.total_days - annualLeave.used_days}<span className="text-sm font-normal text-toss-gray-500">일</span>
-                            </p>
-                        </div>
-                        <div className="text-center p-4 bg-amber-50 rounded-xl">
-                            <p className="text-xs text-toss-gray-500 mb-1">남은대체휴무</p>
-                            <p className="text-2xl font-bold text-amber-600">
-                                {compLeave ? Math.floor((compLeave.total_hours - compLeave.used_hours) / 8) : 0}<span className="text-sm font-normal text-toss-gray-500">일</span>
-                            </p>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="text-center py-6 text-toss-gray-500">
-                        연차 정보를 불러올 수 없습니다
-                    </div>
-                )}
-
-                {/* Progress Bar */}
-                {annualLeave && (
-                    <div className="mt-4">
-                        <div className="flex justify-between text-xs text-toss-gray-500 mb-2">
-                            <span>사용률</span>
-                            <span>{Math.round((annualLeave.used_days / annualLeave.total_days) * 100)}%</span>
-                        </div>
-                        <div className="h-2 bg-toss-gray-100 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-gradient-to-r from-toss-blue to-emerald-500 rounded-full transition-all duration-500"
-                                style={{ width: `${(annualLeave.used_days / annualLeave.total_days) * 100}%` }}
-                            />
-                        </div>
-                    </div>
-                )}
-            </Card>
+            {/* Annual Leave Status Card - 비활성화 (요청에 의해 숨김) */}
 
             {/* Edit Form Card */}
             <Card>

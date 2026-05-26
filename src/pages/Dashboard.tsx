@@ -325,14 +325,14 @@ const Dashboard = () => {
                         </span>
                     )}
                 </div>
-                <div className="relative overflow-hidden rounded-toss-lg bg-gradient-to-br from-toss-blue to-blue-700 text-white p-8 min-h-[180px] flex flex-col justify-center">
-                    <h3 className="text-2xl lg:text-3xl font-bold leading-tight">
+                <Card padding="p-8" className="relative overflow-hidden min-h-[180px] flex flex-col justify-center">
+                    <h3 className="text-2xl lg:text-3xl font-bold leading-tight text-toss-gray-900">
                         We build the<br />future together
                     </h3>
-                    <p className="mt-3 text-white/70 text-sm">함께 만들어가는 한인구조단</p>
-                    <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-white/10 rounded-full" />
-                    <div className="absolute right-10 top-6 w-20 h-20 bg-white/10 rounded-full" />
-                </div>
+                    <p className="mt-3 text-toss-gray-500 text-sm">함께 만들어가는 한인구조단</p>
+                    <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-toss-blue/5 rounded-full" />
+                    <div className="absolute right-12 top-6 w-20 h-20 bg-toss-blue/5 rounded-full" />
+                </Card>
             </div>
 
             {/* 퀵 액션 아이콘 그리드 */}

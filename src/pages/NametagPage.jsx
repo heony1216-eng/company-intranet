@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Card, Button } from '../components/common'
+import { Card, Button, PageHeader } from '../components/common'
 import { Plus, Trash2, RotateCcw, Printer, Settings, Copy, Tag, ChevronDown, ChevronUp } from 'lucide-react'
 
 const maskName = (s) => {
@@ -25,8 +25,8 @@ export default function NametagPage() {
   }])
   const [nextId, setNextId] = useState(2)
   const [showSettings, setShowSettings] = useState(false)
-  const [pos, setPos] = useState({ col1: 16.5, col2: 53.6, col3: 63.6, row1: 23.4, row2: 55.5 })
-  const [fonts, setFonts] = useState({ data: 23, name: 31, room: 22 })
+  const [pos, setPos] = useState({ col1: 34.7, col2: 55.9, col3: 64.4, row1: 20.4, row2: 61 })
+  const [fonts, setFonts] = useState({ data: 16, name: 33, room: 41 })
 
   const addRoom = () => {
     setRooms(prev => [...prev, {
@@ -133,20 +133,14 @@ export default function NametagPage() {
       `}</style>
 
       <div className="space-y-6">
-        {/* 헤더 배너 */}
-        <Card padding="p-0" className="print-hide overflow-hidden">
-          <div className="bg-gradient-to-r from-toss-blue to-blue-600 p-6 md:p-8">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white/20 rounded-toss flex items-center justify-center">
-                <Tag size={24} className="text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl md:text-2xl font-bold text-white">네임택 출력</h1>
-                <p className="text-blue-100 text-sm mt-1">아크릴 네임택을 간편하게 만들고 인쇄하세요</p>
-              </div>
-            </div>
-          </div>
-        </Card>
+        {/* 헤더 */}
+        <div className="print-hide">
+          <PageHeader
+            title="네임택 출력"
+            subtitle="아크릴 네임택을 간편하게 만들고 인쇄하세요"
+            icon={Tag}
+          />
+        </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
           {/* 좌측: 입력 패널 */}
@@ -188,9 +182,9 @@ export default function NametagPage() {
                 <div className="px-4 pb-4 space-y-3">
                   <div className="text-[11px] font-semibold text-toss-gray-500 uppercase tracking-wider">세로선 위치</div>
                   {[
-                    { label: '로고|입소일', key: 'col1', min: 5, max: 25 },
-                    { label: '입소일|성별', key: 'col2', min: 30, max: 65 },
-                    { label: '성별|이름', key: 'col3', min: 40, max: 75 },
+                    { label: '로고|입소일', key: 'col1', min: 0, max: 50 },
+                    { label: '입소일|성별', key: 'col2', min: 10, max: 80 },
+                    { label: '성별|이름', key: 'col3', min: 20, max: 95 },
                   ].map(s => (
                     <div key={s.key} className="flex items-center gap-2">
                       <span className="text-xs text-toss-gray-500 min-w-[80px]">{s.label}</span>
@@ -203,8 +197,8 @@ export default function NametagPage() {
 
                   <div className="text-[11px] font-semibold text-toss-gray-500 uppercase tracking-wider pt-2">가로선 위치</div>
                   {[
-                    { label: '헤더|1행', key: 'row1', min: 15, max: 35 },
-                    { label: '1행|2행', key: 'row2', min: 45, max: 70 },
+                    { label: '헤더|1행', key: 'row1', min: 0, max: 50 },
+                    { label: '1행|2행', key: 'row2', min: 20, max: 95 },
                   ].map(s => (
                     <div key={s.key} className="flex items-center gap-2">
                       <span className="text-xs text-toss-gray-500 min-w-[80px]">{s.label}</span>
@@ -217,9 +211,9 @@ export default function NametagPage() {
 
                   <div className="text-[11px] font-semibold text-toss-gray-500 uppercase tracking-wider pt-2">글씨 크기</div>
                   {[
-                    { label: '입소일/성별', key: 'data', min: 10, max: 30 },
-                    { label: '이름', key: 'name', min: 16, max: 40 },
-                    { label: '호실', key: 'room', min: 14, max: 36 },
+                    { label: '입소일/성별', key: 'data', min: 8, max: 40 },
+                    { label: '이름', key: 'name', min: 10, max: 50 },
+                    { label: '호실', key: 'room', min: 10, max: 50 },
                   ].map(s => (
                     <div key={s.key} className="flex items-center gap-2">
                       <span className="text-xs text-toss-gray-500 min-w-[80px]">{s.label}</span>
@@ -332,7 +326,7 @@ export default function NametagPage() {
                     <div className="nametag-box"
                       style={{
                         width: '130mm', height: '45mm', position: 'relative',
-                        backgroundImage: `url('${import.meta.env.BASE_URL}name.jpg')`,
+                        backgroundImage: `url('${import.meta.env.BASE_URL}name.png')`,
                         backgroundSize: '100% 100%', backgroundRepeat: 'no-repeat',
                         overflow: 'hidden',
                       }}>

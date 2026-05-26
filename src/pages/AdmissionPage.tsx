@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Card, Button, Modal } from '../components/common'
+import { Card, Button, Modal, PageHeader } from '../components/common'
 import { Plus, Trash2, Edit2, AlertTriangle, Eye, Building2, ChevronDown, ChevronUp, Download, Upload, LogOut, FileSpreadsheet, Printer } from 'lucide-react'
 import { printReport } from '../utils/printReport'
 import * as XLSX from 'xlsx'
@@ -490,20 +490,11 @@ export default function AdmissionPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header Card */}
-      <Card className="bg-gradient-to-r from-toss-blue to-blue-600 text-white">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
-            <Building2 size={24} />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold mb-1">입소현황 관리</h2>
-            <p className="text-white/90">
-              {isAdmin ? '전체 입소현황을 관리할 수 있습니다' : '입소현황을 등록하고 관리하세요'}
-            </p>
-          </div>
-        </div>
-      </Card>
+      <PageHeader
+        title="입소현황 관리"
+        subtitle={isAdmin ? '전체 입소현황을 관리할 수 있습니다' : '입소현황을 등록하고 관리하세요'}
+        icon={Building2}
+      />
 
       {/* 통계 섹션 */}
       <Card padding="p-0">

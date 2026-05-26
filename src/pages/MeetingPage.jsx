@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Card, Button, Modal } from '../components/common'
+import { useSearchParams } from 'react-router-dom'
+import { Card, Button, Modal, PageHeader } from '../components/common'
 import { ChevronLeft, ChevronRight, FileText, Upload, File, X, Download } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -203,8 +204,10 @@ const MeetingPage = () => {
         try {
             const year = currentDate.getFullYear()
             const month = currentDate.getMonth()
-            const startDate = new Date(year, month, 1).toISOString().split('T')[0]
-            const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0]
+            const pad = (n) => String(n).padStart(2, '0')
+            const startDate = `${year}-${pad(month + 1)}-01`
+            const lastDay = new Date(year, month + 1, 0).getDate()
+            const endDate = `${year}-${pad(month + 1)}-${pad(lastDay)}`
 
             const { data } = await supabase
                 .from('meetings')
@@ -278,6 +281,25 @@ const MeetingPage = () => {
         setSelectedMeeting(meeting)
         setIsDetailModalOpen(true)
     }
+
+    // 통합검색에서 ?open=<id>로 진입 시 해당 회의록 달로 이동 후 상세 모달 자동 오픈
+    const [searchParams, setSearchParams] = useSearchParams()
+    useEffect(() => {
+        const openId = searchParams.get('open')
+        if (!openId) return
+        let active = true
+        ;(async () => {
+            const { data } = await supabase.from('meetings').select('*').eq('id', openId).single()
+            if (active && data) {
+                if (data.meeting_date) setCurrentDate(new Date(data.meeting_date))
+                setSelectedMeeting(data)
+                setIsDetailModalOpen(true)
+            }
+            searchParams.delete('open')
+            setSearchParams(searchParams, { replace: true })
+        })()
+        return () => { active = false }
+    }, [searchParams])
 
     const handleSave = async () => {
         if (!formData.content.trim()) {
@@ -404,7 +426,10 @@ const MeetingPage = () => {
     }
 
     const formatDateString = (date) => {
-        return date.toISOString().split('T')[0]
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        return `${year}-${month}-${day}`
     }
 
     const formatDisplayDate = (dateStr) => {
@@ -435,20 +460,11 @@ const MeetingPage = () => {
 
     return (
         <div className="space-y-6">
-            {/* Header Card */}
-            <Card className="bg-gradient-to-r from-toss-blue to-blue-600 text-white">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
-                        <FileText size={24} />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold mb-1">회의록</h2>
-                        <p className="text-white/90">
-                            날짜를 클릭하여 회의 내용을 기록하세요
-                        </p>
-                    </div>
-                </div>
-            </Card>
+            <PageHeader
+                title="회의록"
+                subtitle="날짜를 클릭하여 회의 내용을 기록하세요"
+                icon={FileText}
+            />
 
             {/* 2-Column Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -473,65 +489,70 @@ const MeetingPage = () => {
                         </button>
                     </div>
 
-                    {/* Week Days Header */}
-                    <div className="grid grid-cols-7 mb-1">
+                    {/* Calendar Grid (일정 달력과 동일한 디자인) */}
+                    <div className="grid grid-cols-7 gap-1">
+                        {/* Week days header */}
                         {weekDays.map((day, index) => (
                             <div
                                 key={day}
-                                className={`text-center py-1 text-xs font-semibold ${
-                                    index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-500' : 'text-toss-gray-600'
-                                }`}
+                                className={`text-center text-sm font-medium py-2 ${index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-500' : 'text-toss-gray-500'
+                                    }`}
                             >
                                 {day}
                             </div>
                         ))}
-                    </div>
 
-                    {/* Calendar Grid */}
-                    <div className="grid grid-cols-7">
+                        {/* Days */}
                         {days.map((day, index) => {
                             const dateStr = formatDateString(day.date)
-                            const hasMeetingOnDay = hasMeeting(day.date)
-                            const isTodayDate = isToday(day.date)
+                            const dayMeetings = meetings.filter(m => m.meeting_date === dateStr)
                             const dayOfWeek = day.date.getDay()
 
                             return (
-                                <button
+                                <div
                                     key={index}
                                     onClick={() => day.isCurrentMonth && handleDateClick(dateStr)}
-                                    disabled={!day.isCurrentMonth}
                                     className={`
-                                        py-2 rounded transition-all relative
-                                        ${day.isCurrentMonth ? 'hover:bg-toss-gray-100 cursor-pointer' : 'opacity-30 cursor-default'}
-                                        ${isTodayDate ? 'bg-toss-blue/10 ring-1 ring-toss-blue' : ''}
+                                        min-h-[80px] p-1 border border-toss-gray-100 rounded-lg cursor-pointer
+                                        transition-all hover:bg-toss-gray-50
+                                        ${!day.isCurrentMonth && 'opacity-40'}
+                                        ${isToday(day.date) && 'ring-2 ring-toss-blue ring-inset'}
                                     `}
                                 >
-                                    <span className={`
-                                        text-sm font-medium
-                                        ${!day.isCurrentMonth ? 'text-toss-gray-300' : ''}
-                                        ${dayOfWeek === 0 ? 'text-red-500' : dayOfWeek === 6 ? 'text-blue-500' : 'text-toss-gray-900'}
-                                        ${hasMeetingOnDay && day.isCurrentMonth ? 'text-red-600 font-bold' : ''}
-                                    `}>
+                                    <div className={`text-sm font-medium mb-1 ${dayOfWeek === 0 ? 'text-red-500' : dayOfWeek === 6 ? 'text-blue-500' : ''
+                                        }`}>
                                         {day.date.getDate()}
-                                    </span>
-                                    {hasMeetingOnDay && day.isCurrentMonth && (
-                                        <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2">
-                                            <div className="w-1 h-1 bg-red-500 rounded-full"></div>
-                                        </div>
-                                    )}
-                                </button>
+                                    </div>
+                                    {/* 회의록 내용 표시 */}
+                                    <div className="space-y-0.5">
+                                        {dayMeetings.slice(0, 3).map((meeting, idx) => (
+                                            <div
+                                                key={idx}
+                                                onClick={(e) => { e.stopPropagation(); handleMeetingClick(meeting) }}
+                                                className="text-xs px-1 py-0.5 rounded truncate bg-toss-blue/10 text-toss-blue"
+                                            >
+                                                {meeting.title || '회의록'}
+                                            </div>
+                                        ))}
+                                        {dayMeetings.length > 3 && (
+                                            <div className="text-xs text-toss-gray-500 pl-1">
+                                                +{dayMeetings.length - 3}개 더
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             )
                         })}
                     </div>
 
                     {/* Legend */}
-                    <div className="mt-3 pt-3 border-t border-toss-gray-100 flex items-center gap-4 text-xs text-toss-gray-500">
+                    <div className="mt-4 pt-4 border-t border-toss-gray-100 flex items-center gap-4 text-xs text-toss-gray-500">
                         <div className="flex items-center gap-1.5">
-                            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                            <span>회의록 작성됨</span>
+                            <div className="w-2 h-2 bg-toss-blue rounded-full"></div>
+                            <span>회의록</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                            <div className="w-2 h-2 bg-toss-blue/30 rounded-full ring-1 ring-toss-blue"></div>
+                            <div className="w-2 h-2 rounded-full ring-1 ring-toss-blue"></div>
                             <span>오늘</span>
                         </div>
                     </div>

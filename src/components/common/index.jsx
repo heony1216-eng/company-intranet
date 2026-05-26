@@ -143,3 +143,4 @@ export const Modal = ({
 
 export { default as ImageGallery } from './ImageGallery'
 export { default as ErrorBoundary } from './ErrorBoundary'
+export { default as PageHeader } from './PageHeader'

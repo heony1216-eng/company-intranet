@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Card, Button, Modal } from '../components/common'
+import { useSearchParams } from 'react-router-dom'
+import { Card, Button, Modal, PageHeader } from '../components/common'
 import { Plus, Trash2, Edit2, AlertTriangle, Eye, Building2, ChevronDown, ChevronUp, Download, Upload, LogOut, FileSpreadsheet, Printer } from 'lucide-react'
 import { printReport } from '../utils/printReport'
 import * as XLSX from 'xlsx'
@@ -108,6 +109,27 @@ export default function BupyeongAdmissionPage() {
   const [showDischarged, setShowDischarged] = useState(true)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // 통합검색에서 ?focus=<id>로 진입 시 해당 행으로 스크롤 + 하이라이트
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [focusId, setFocusId] = useState<string | null>(null)
+  const focusRowRef = useRef<HTMLTableRowElement>(null)
+  useEffect(() => {
+    const f = searchParams.get('focus')
+    if (f) setFocusId(f)
+  }, [searchParams])
+  useEffect(() => {
+    if (!focusId || records.length === 0) return
+    const t1 = setTimeout(() => focusRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200)
+    const t2 = setTimeout(() => {
+      setFocusId(null)
+      const sp = new URLSearchParams(searchParams)
+      sp.delete('focus')
+      setSearchParams(sp, { replace: true })
+    }, 3000)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId, records])
 
   // 데이터 조회
   const fetchRecords = useCallback(async () => {
@@ -536,20 +558,11 @@ export default function BupyeongAdmissionPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header Card */}
-      <Card className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
-            <Building2 size={24} />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold mb-1">부평 센터 입소현황</h2>
-            <p className="text-white/90">
-              {isAdmin ? '부평 센터 입소현황을 관리할 수 있습니다' : '부평 센터 입소현황을 등록하고 관리하세요'}
-            </p>
-          </div>
-        </div>
-      </Card>
+      <PageHeader
+        title="부평 센터 입소현황"
+        subtitle={isAdmin ? '부평 센터 입소현황을 관리할 수 있습니다' : '부평 센터 입소현황을 등록하고 관리하세요'}
+        icon={Building2}
+      />
 
       {/* 통계 섹션 */}
       <Card padding="p-0">
@@ -673,7 +686,8 @@ export default function BupyeongAdmissionPage() {
                     return (
                       <tr
                         key={record.id}
-                        className="border-b border-toss-gray-100 hover:bg-toss-gray-50 transition-colors bg-emerald-50/30"
+                        ref={record.id === focusId ? focusRowRef : undefined}
+                        className={`border-b border-toss-gray-100 transition-colors ${record.id === focusId ? 'bg-toss-blue/10' : 'bg-emerald-50/30 hover:bg-toss-gray-50'}`}
                       >
                         <td className="px-3 py-3 text-sm text-toss-gray-500 text-center">{index + 1}</td>
                         <td className="px-3 py-3 text-sm text-toss-gray-700 text-center">{record.nationality || '-'}</td>
@@ -856,7 +870,8 @@ export default function BupyeongAdmissionPage() {
                     {dischargedRecordsList.map((record, index) => (
                       <tr
                         key={record.id}
-                        className="border-b border-toss-gray-100 hover:bg-toss-gray-50 transition-colors"
+                        ref={record.id === focusId ? focusRowRef : undefined}
+                        className={`border-b border-toss-gray-100 transition-colors ${record.id === focusId ? 'bg-toss-blue/10' : 'hover:bg-toss-gray-50'}`}
                       >
                         <td className="px-3 py-3 text-sm text-toss-gray-400 text-center">{index + 1}</td>
                         <td className="px-3 py-3 text-sm text-toss-gray-500 text-center">{record.nationality || '-'}</td>
