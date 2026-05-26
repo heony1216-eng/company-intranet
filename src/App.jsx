@@ -13,7 +13,6 @@ import RescuePage from './pages/RescuePage'
 import MeetingPage from './pages/MeetingPage'
 import EventPage from './pages/EventPage'
 import MyPage from './pages/MyPage'
-import DocumentPage from './pages/DocumentPage'
 import AdminPage from './pages/AdminPage'
 import ArchivePage from './pages/ArchivePage'
 import DocumentLedgerPage from './pages/DocumentLedgerPage'
@@ -24,6 +23,7 @@ import BupyeongAdmissionPage from './pages/BupyeongAdmissionPage'
 import NametagPage from './pages/NametagPage'
 import OverseasKoreanStatusPage from './pages/OverseasKoreanStatusPage'
 import OverseasKoreanGroupPage from './pages/OverseasKoreanGroupPage'
+import ContactPage from './pages/ContactPage'
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -102,7 +102,6 @@ function AppRoutes() {
         <Route path="/worklogs/monthly" element={<MonthlyWorkLogPage />} />
         <Route path="/rescue" element={<RescuePage />} />
         <Route path="/meetings" element={<MeetingPage />} />
-        <Route path="/document" element={<DocumentPage />} />
         <Route path="/archive" element={<Navigate to="/archive/forms" replace />} />
         <Route path="/archive/:type" element={<ArchivePage />} />
         <Route path="/document-ledger" element={<DocumentLedgerPage />} />
@@ -114,6 +113,7 @@ function AppRoutes() {
         <Route path="/overseas-korean" element={<Navigate to="/overseas-korean/status" replace />} />
         <Route path="/overseas-korean/status" element={<OverseasKoreanStatusPage />} />
         <Route path="/overseas-korean/group" element={<OverseasKoreanGroupPage />} />
+        <Route path="/contacts" element={<ContactPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/mypage" element={<MyPage />} />
       </Route>

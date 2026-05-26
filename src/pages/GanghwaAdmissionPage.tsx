@@ -21,6 +21,17 @@ const formatDate = (dateStr: string): string => {
   return dateStr.replace(/-/g, '.')
 }
 
+// 이름 마스킹 (가운데 글자를 O로 처리)
+const maskName = (name: string): string => {
+  if (!name) return '-'
+  if (name.length === 1) return name
+  if (name.length === 2) return name[0] + 'O'
+  const first = name[0]
+  const last = name[name.length - 1]
+  const middle = 'O'.repeat(name.length - 2)
+  return first + middle + last
+}
+
 // 퇴소예정일이 한 달 이내인지 확인
 const isWithinOneMonth = (dateStr: string): boolean => {
   if (!dateStr) return false
@@ -93,7 +104,7 @@ export default function GanghwaAdmissionPage() {
       const { data, error } = await supabase
         .from('admission_records')
         .select('*')
-        .order('admission_date', { ascending: false })
+        .order('admission_date', { ascending: true })
 
       if (error) throw error
       setRecords(data || [])
@@ -115,17 +126,13 @@ export default function GanghwaAdmissionPage() {
     return isNaN(num) ? Infinity : num
   }
 
-  // 입소 중 / 퇴소 완료 분리 + 호실 오름차순 정렬 (호실 없으면 입소일 기준)
+  // 입소 중 / 퇴소 완료 분리 + 입소일 오름차순 (먼저 입소한 사람이 위)
   const activeRecordsList = records
     .filter(r => !r.is_discharged)
-    .sort((a, b) => {
-      const roomA = getRoomNumber(a.room)
-      const roomB = getRoomNumber(b.room)
-      if (roomA !== Infinity || roomB !== Infinity) return roomA - roomB
-      // 둘 다 호실 없으면 입소일 기준 정렬
-      return (a.admission_date || '').localeCompare(b.admission_date || '')
-    })
-  const dischargedRecordsList = records.filter(r => r.is_discharged)
+    .sort((a, b) => (a.admission_date || '').localeCompare(b.admission_date || ''))
+  const dischargedRecordsList = records
+    .filter(r => r.is_discharged)
+    .sort((a, b) => (a.admission_date || '').localeCompare(b.admission_date || ''))
 
   // 추가 모달 열기
   const handleAdd = () => {
@@ -450,10 +457,11 @@ export default function GanghwaAdmissionPage() {
     }
   }
 
-  // 통계 계산
-  const totalRecords = records.length
+  // 통계 계산 (올해 기준)
+  const currentYear = new Date().getFullYear().toString()
+  const totalRecords = records.filter(r => r.admission_date?.startsWith(currentYear)).length
   const activeCount = activeRecordsList.length
-  const dischargedCount = dischargedRecordsList.length
+  const dischargedCount = dischargedRecordsList.filter(r => r.discharge_date?.startsWith(currentYear)).length
 
   // 대시보드에는 입소 중인 기록만 전달
   const dashboardRecords = activeRecordsList
@@ -614,7 +622,7 @@ export default function GanghwaAdmissionPage() {
           <>
             {/* 데스크탑 테이블 */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[1080px]">
                 <thead>
                   <tr className="bg-toss-gray-50 border-b border-toss-gray-200">
                     <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase w-12">No</th>
@@ -799,7 +807,7 @@ export default function GanghwaAdmissionPage() {
             <>
               {/* 데스크탑 테이블 */}
               <div className="hidden md:block overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[1080px]">
                   <thead>
                     <tr className="bg-toss-gray-50 border-b border-toss-gray-200">
                       <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase w-12">No</th>
