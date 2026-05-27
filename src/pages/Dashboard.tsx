@@ -3,11 +3,13 @@ import { Card, Modal } from '../components/common'
 import {
     AlertTriangle, MapPin, Phone, User, Calendar, FileText, ClipboardList, AlertCircle,
     Megaphone, CalendarDays, Building2, Globe, BookOpen, ChevronRight, Clock,
-    Sun, Cloud
+    Sun, Cloud, CloudRain, CloudSnow, RefreshCw
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { type SkyState } from '../hooks/useWeather'
+import { useWeatherContext } from '../hooks/WeatherContext'
 
 // 진행중 구조현황 레코드
 interface RescueSituation {
@@ -253,10 +255,11 @@ const Dashboard = () => {
     })
 
     // 날씨 (정적 placeholder - 강화도 / 인천 부평구)
-    const weatherList = [
-        { name: '강화도', temp: 22, condition: '맑음', icon: Sun, iconColor: 'text-amber-400' },
-        { name: '인천 부평구', temp: 24, condition: '구름조금', icon: Cloud, iconColor: 'text-toss-gray-400' },
-    ]
+    // 실시간 날씨 (헤더와 동일한 훅 사용)
+    const { data: weather, loading: weatherLoading, refresh: refreshWeather } = useWeatherContext()
+    const skyIcon = (sky: SkyState) => sky === 'rain' ? CloudRain : sky === 'snow' ? CloudSnow : sky === 'cloudy' ? Cloud : Sun
+    const skyColor = (sky: SkyState) => sky === 'rain' ? 'text-blue-400' : sky === 'snow' ? 'text-sky-300' : sky === 'cloudy' ? 'text-toss-gray-400' : 'text-amber-400'
+    const skyLabel = (sky: SkyState) => sky === 'rain' ? '비' : sky === 'snow' ? '눈' : sky === 'cloudy' ? '구름' : sky === 'clear' ? '맑음' : '—'
 
     const formatDate = (dateStr: string) =>
         new Date(dateStr).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replace(/\.$/, '')
@@ -476,25 +479,38 @@ const Dashboard = () => {
                     )}
                 </Card>
 
-                {/* 오늘의 날씨 (강화도 / 인천 부평구) */}
+                {/* 오늘의 날씨 (강화도 / 부평) - 실시간 */}
                 <Card>
-                    <h3 className="text-base font-bold text-toss-gray-900 mb-4">오늘의 날씨</h3>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-base font-bold text-toss-gray-900">오늘의 날씨</h3>
+                        <button
+                            onClick={refreshWeather}
+                            disabled={weatherLoading}
+                            className="p-1.5 text-toss-gray-400 hover:text-toss-blue hover:bg-toss-gray-100 rounded-full transition-all disabled:opacity-50"
+                            title="날씨 새로고침"
+                        >
+                            <RefreshCw size={16} className={weatherLoading ? 'animate-spin' : ''} />
+                        </button>
+                    </div>
                     <div className="space-y-3">
-                        {weatherList.map((w) => (
-                            <div key={w.name} className="flex items-center justify-between p-4 rounded-toss bg-toss-gray-50">
-                                <div>
-                                    <p className="text-sm font-semibold text-toss-gray-700">{w.name}</p>
-                                    <p className="text-xs text-toss-gray-400 mt-0.5">{w.condition}</p>
+                        {weather.map((w) => {
+                            const Icon = skyIcon(w.sky)
+                            return (
+                                <div key={w.name} className="flex items-center justify-between p-4 rounded-toss bg-toss-gray-50">
+                                    <div>
+                                        <p className="text-sm font-semibold text-toss-gray-700">{w.name}</p>
+                                        <p className="text-xs text-toss-gray-400 mt-0.5">{skyLabel(w.sky)}</p>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="flex items-baseline gap-0.5">
+                                            <span className="text-3xl font-bold text-toss-gray-900">{w.temp != null ? Math.round(w.temp) : '—'}</span>
+                                            <span className="text-base text-toss-gray-500">℃</span>
+                                        </span>
+                                        <Icon size={36} className={skyColor(w.sky)} />
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="flex items-baseline gap-0.5">
-                                        <span className="text-3xl font-bold text-toss-gray-900">{w.temp}</span>
-                                        <span className="text-base text-toss-gray-500">℃</span>
-                                    </span>
-                                    <w.icon size={36} className={w.iconColor} />
-                                </div>
-                            </div>
-                        ))}
+                            )
+                        })}
                     </div>
                 </Card>
             </div>

@@ -1,9 +1,11 @@
 import { useAuth } from '../../hooks/useAuth'
 import {
-    LogOut, User, Search, Bell, Bookmark, Megaphone, Calendar, CalendarDays,
-    AlertTriangle, Building2, Phone, BookOpen
+    LogOut, User, Search, Bell, Megaphone, Calendar, CalendarDays,
+    AlertTriangle, Building2, Phone, BookOpen, Sun, Cloud, CloudRain, CloudSnow, RefreshCw
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { type SkyState } from '../../hooks/useWeather'
+import { useWeatherContext } from '../../hooks/WeatherContext'
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 
@@ -52,6 +54,15 @@ interface NotiItem {
 const Header = () => {
     const { profile, signOut, isAdmin } = useAuth()
     const navigate = useNavigate()
+    const { data: weather, loading: weatherLoading, refresh: refreshWeather } = useWeatherContext()
+
+    // 날씨 상태 → 아이콘
+    const WeatherIcon = ({ sky }: { sky: SkyState }) => {
+        if (sky === 'rain') return <CloudRain size={16} className="text-blue-400" />
+        if (sky === 'snow') return <CloudSnow size={16} className="text-sky-300" />
+        if (sky === 'cloudy') return <Cloud size={16} className="text-toss-gray-400" />
+        return <Sun size={16} className="text-amber-400" />
+    }
 
     const [query, setQuery] = useState('')
     const [results, setResults] = useState<SearchResult[]>([])
@@ -280,14 +291,26 @@ const Header = () => {
                         )}
                     </div>
 
-                    {/* 즐겨찾기 */}
-                    <button
-                        className="hidden sm:flex items-center gap-1.5 px-3 py-2 text-sm text-toss-gray-600 hover:text-toss-gray-900 hover:bg-toss-gray-100 rounded-full transition-all"
-                        title="즐겨찾기"
-                    >
-                        <Bookmark size={18} />
-                        <span className="hidden md:inline">즐겨찾기</span>
-                    </button>
+                    {/* 날씨 (강화도 · 부평) - 실시간 */}
+                    <div className="hidden lg:flex items-center gap-3 px-2 text-xs">
+                        {weather.map((w) => (
+                            <span key={w.name} className="flex items-center gap-1">
+                                <WeatherIcon sky={w.sky} />
+                                <span className="text-toss-gray-500">{w.name}</span>
+                                <span className="font-semibold text-toss-gray-900">
+                                    {w.temp != null ? `${Math.round(w.temp)}°` : '—'}
+                                </span>
+                            </span>
+                        ))}
+                        <button
+                            onClick={refreshWeather}
+                            disabled={weatherLoading}
+                            className="p-1 text-toss-gray-400 hover:text-toss-blue hover:bg-toss-gray-100 rounded-full transition-all disabled:opacity-50"
+                            title="날씨 새로고침"
+                        >
+                            <RefreshCw size={14} className={weatherLoading ? 'animate-spin' : ''} />
+                        </button>
+                    </div>
 
                     <div className="w-px h-6 bg-toss-gray-200 mx-1 hidden sm:block" />
 

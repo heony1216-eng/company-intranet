@@ -5,6 +5,10 @@ import {
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { Modal, Button } from '../common'
+
+// 앱(APK) 다운로드 링크
+const APK_URL = 'https://www.dropbox.com/scl/fi/vz0zmnbpr1kfzw2w3fu6g/.apk?rlkey=lp7l2m97ssh1nixykcjxwiaqf&st=m08bikmg&dl=1'
 
 // 사이드바 메뉴 타입 정의
 type IconType = typeof Home
@@ -25,6 +29,13 @@ interface MenuGroup {
 const Sidebar = () => {
     const [isOpen, setIsOpen] = useState(false)
     const [systemOpen, setSystemOpen] = useState(true)
+    const [appDownloadOpen, setAppDownloadOpen] = useState(false)
+
+    // 앱 다운로드 실행
+    const handleAppDownload = () => {
+        setAppDownloadOpen(false)
+        window.open(APK_URL, '_blank', 'noopener,noreferrer')
+    }
     // 입소현황 현재 입소 인원 (정원 없이 현재 인원만)
     const [admissionCounts, setAdmissionCounts] = useState<{ ganghwa: number | null; bupyeong: number | null }>({
         ganghwa: null,
@@ -197,17 +208,14 @@ const Sidebar = () => {
                 </div>
 
                 <nav className="px-3 py-4 flex-1 overflow-y-auto sidebar-scroll">
-                    {/* 앱 다운로드 버튼 */}
-                    <a
-                        href="https://www.dropbox.com/scl/fi/vz0zmnbpr1kfzw2w3fu6g/.apk?rlkey=lp7l2m97ssh1nixykcjxwiaqf&st=m08bikmg&dl=1"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => setIsOpen(false)}
-                        className="flex items-center gap-3 px-3 py-2.5 mb-3 rounded-toss text-sm transition-all bg-white/10 text-toss-gray-200 hover:bg-white/20"
+                    {/* 앱 다운로드 버튼 (확인 모달) */}
+                    <button
+                        onClick={() => { setIsOpen(false); setAppDownloadOpen(true) }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 mb-3 rounded-toss text-sm transition-all bg-white/10 text-toss-gray-200 hover:bg-white/20"
                     >
                         <Smartphone size={18} />
                         <span className="font-medium">앱 다운로드</span>
-                    </a>
+                    </button>
 
                     {menuGroups.map((group, gi) => (
                         <div key={group.title ?? `group-${gi}`} className={group.title ? 'mt-5' : ''}>
@@ -274,6 +282,21 @@ const Sidebar = () => {
                     </div>
                 </nav>
             </aside>
+
+            {/* 앱 다운로드 확인 모달 */}
+            <Modal isOpen={appDownloadOpen} onClose={() => setAppDownloadOpen(false)} title="앱 다운로드">
+                <div className="space-y-6">
+                    <p className="text-toss-gray-700">앱을 다운로드 하시겠습니까?</p>
+                    <div className="flex gap-3">
+                        <Button variant="secondary" onClick={() => setAppDownloadOpen(false)} className="flex-1">
+                            취소
+                        </Button>
+                        <Button onClick={handleAppDownload} className="flex-1">
+                            확인
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </>
     )
 }

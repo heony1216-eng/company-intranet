@@ -803,7 +803,13 @@ const MonthlyWorkLogPage = () => {
 
     const indexOfLastItem = currentPage * itemsPerPage
     const indexOfFirstItem = indexOfLastItem - itemsPerPage
-    const currentItems = filteredWorklogs.slice(indexOfFirstItem, indexOfLastItem)
+    const currentItems = [...filteredWorklogs]
+        .sort((a, b) => {
+            const dateCmp = (b.work_date || '').localeCompare(a.work_date || '') // 최신 날짜 먼저(그룹 유지)
+            if (dateCmp !== 0) return dateCmp
+            return (a.user?.name || '').localeCompare(b.user?.name || '', 'ko') // 같은 날짜는 작성자 가나다
+        })
+        .slice(indexOfFirstItem, indexOfLastItem)
 
     // 작업일이 오늘인 경우에만 NEW 표시 (다음날 자동 사라짐)
     const isNew = (log: any) => {
