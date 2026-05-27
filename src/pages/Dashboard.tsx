@@ -57,6 +57,16 @@ const Dashboard = () => {
         monthly: false
     })
 
+    // 실시간 시계 (1초마다 갱신, API 불필요 — 기기 시간 사용)
+    const [now, setNow] = useState(new Date())
+    useEffect(() => {
+        const id = setInterval(() => setNow(new Date()), 1000)
+        return () => clearInterval(id)
+    }, [])
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const clockTime = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+    const clockDate = now.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
+
     useEffect(() => {
         fetchRescueCount()
         fetchRecentMeetings()
@@ -329,10 +339,10 @@ const Dashboard = () => {
                     )}
                 </div>
                 <Card padding="p-8" className="relative overflow-hidden min-h-[180px] flex flex-col justify-center">
-                    <h3 className="text-2xl lg:text-3xl font-bold leading-tight text-toss-gray-900">
-                        We build the<br />future together
-                    </h3>
-                    <p className="mt-3 text-toss-gray-500 text-sm">함께 만들어가는 한인구조단</p>
+                    <p className="text-sm text-toss-gray-400">{clockDate}</p>
+                    <p className="mt-2 text-3xl lg:text-4xl font-bold text-toss-gray-900 tabular-nums tracking-tight">
+                        {clockTime}
+                    </p>
                     <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-toss-blue/5 rounded-full" />
                     <div className="absolute right-12 top-6 w-20 h-20 bg-toss-blue/5 rounded-full" />
                 </Card>
