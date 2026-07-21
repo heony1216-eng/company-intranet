@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
     Megaphone, ClipboardList, Home, X, User, AlertTriangle, Calendar, CalendarDays,
-    ExternalLink, ChevronDown, BookOpen, Palmtree, Smartphone, Building2, Globe, Phone, Menu, Tag
+    ExternalLink, ChevronDown, BookOpen, Palmtree, Smartphone, Building2, Globe, Phone, Menu, Tag, FileSignature
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -225,6 +225,19 @@ const Sidebar = () => {
                                 </p>
                             )}
                             <div className="space-y-0.5">
+                                {/* 자료·소통 그룹 상단: 업무협약서(외부 링크) */}
+                                {group.title === '자료 · 소통' && (
+                                    <a
+                                        href="https://business-agreement.pages.dev"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={() => setIsOpen(false)}
+                                        className="flex items-center gap-3 px-3 py-2.5 rounded-toss text-sm transition-all text-toss-gray-300 hover:bg-white/5"
+                                    >
+                                        <FileSignature size={18} className="text-toss-gray-400" />
+                                        <span>업무협약서</span>
+                                    </a>
+                                )}
                                 {group.items.map((item) => <NavItem key={item.to} {...item} />)}
 
                                 {/* 인사·복지 그룹에 연차 관리(외부, 툴팁) 포함 */}
