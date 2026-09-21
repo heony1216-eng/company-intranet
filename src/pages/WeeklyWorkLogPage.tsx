@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Card, Button, Modal, PageHeader } from '../components/common'
-import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, Printer, RefreshCw, PlusCircle, Copy, AlertCircle } from 'lucide-react'
+import { Plus, FileText, Upload, Trash2, Calendar, Download, File, X, Edit2, ChevronLeft, ChevronRight, Printer, RefreshCw, PlusCircle, Copy, AlertCircle, Presentation } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { uploadMultipleToDropbox, deleteMultipleFilesByUrl } from '../lib/dropbox'
@@ -8,6 +8,8 @@ import { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, T
 import { saveAs } from 'file-saver'
 import { generateWeeklyWorklogPdf } from '../utils/worklogPdf'
 import { printReport } from '../utils/printReport'
+import WeeklyPresentation from '../components/worklog/WeeklyPresentation'
+import { isMultiScreen, canPickScreen, getScreens, describeScreen, getSavedScreenLabel, saveScreenLabel, type ScreenInfo } from '../utils/screens'
 import {
     WeeklyTask,
     TaskDetail,
@@ -255,6 +257,16 @@ const WeeklyWorkLogPage = () => {
     const [loadingDailyLogs, setLoadingDailyLogs] = useState(false)
     const [dailyPreviewOpen, setDailyPreviewOpen] = useState(false)
     const [dailyPreviewTasks, setDailyPreviewTasks] = useState<WeeklyTask[]>([])
+    // === 발표 모드 ===
+    const [presentation, setPresentation] = useState<{ reports: any[]; title: string; screen: ScreenInfo | null } | null>(null)
+    const [weekChooserOpen, setWeekChooserOpen] = useState(false)
+    const [chosenWeek, setChosenWeek] = useState('')
+    // 체크한 항목만 발표할 때 시작 창에 표시할 내용 (주차 목록 대신)
+    const [pickedReports, setPickedReports] = useState<{ reports: any[]; title: string } | null>(null)
+    // 표시할 모니터 (모니터가 2대 이상이고 브라우저가 지원할 때만 고를 수 있다)
+    const [screens, setScreens] = useState<ScreenInfo[]>([])
+    const [screensError, setScreensError] = useState('')
+    const [chosenScreenIndex, setChosenScreenIndex] = useState(-1)
 
     // 주간 업무보고 기본 날짜 계산 (월요일이면 전 주 금요일로 설정)
     const getDefaultWeeklyDate = () => {
@@ -979,6 +991,93 @@ const WeeklyWorkLogPage = () => {
     }
 
     // === 상세 보기 업무 테이블 렌더링 ===
+    // === 발표 모드 ===
+    // 현재 필터(연·월·작성자) 안의 보고서를 주차별로 묶는다 (목록이 최신순이라 최신 주차가 먼저 온다)
+    const weekOptions = (() => {
+        const map = new Map<string, any[]>()
+        filteredWorklogs.forEach((log: any) => {
+            const key = getWeekNumber(log.work_date)
+            if (!map.has(key)) map.set(key, [])
+            map.get(key)!.push(log)
+        })
+        return Array.from(map, ([label, reports]) => ({ label, reports }))
+    })()
+
+    // 모니터가 2대 이상이고 크롬·엣지처럼 모니터 지정을 지원하면 시작 창에 모니터 선택을 보여준다
+    const showScreenPicker = isMultiScreen() && canPickScreen()
+
+    // 모니터 목록을 불러온다 (처음이면 브라우저가 "창 관리" 권한을 묻는다)
+    const loadScreens = async () => {
+        try {
+            const list = await getScreens()
+            const saved = getSavedScreenLabel()
+            const preferred = Math.max(
+                list.findIndex(s => s.label === saved),
+                list.findIndex(s => s.isCurrent),
+                0
+            )
+            setScreens(list)
+            setScreensError('')
+            setChosenScreenIndex(list.length > 0 ? preferred : -1)
+        } catch {
+            setScreens([])
+            setChosenScreenIndex(-1)
+            setScreensError('모니터 정보를 가져오지 못했습니다. 주소창 왼쪽 아이콘에서 "창 관리" 권한을 허용한 뒤 "다시 불러오기"를 눌러 주세요.')
+        }
+    }
+
+    // 발표 시작 창을 연다. picked가 있으면 체크한 항목 발표, 없으면 주차 선택.
+    const openPresentationDialog = (picked: { reports: any[]; title: string } | null) => {
+        setPickedReports(picked)
+        if (!picked) setChosenWeek(weekOptions[0]?.label || '')
+        setWeekChooserOpen(true)
+        if (showScreenPicker) loadScreens()
+    }
+
+    const startPresentation = (reports: any[], title: string) => {
+        const screen = showScreenPicker ? screens[chosenScreenIndex] || null : null
+        if (screen) saveScreenLabel(screen.label)
+        setWeekChooserOpen(false)
+        setPresentation({ reports, title, screen })
+    }
+
+    // 발표 버튼: 체크한 항목이 있으면 그 항목만, 없으면 주차 선택 창을 연다 (인쇄와 같은 규칙)
+    const handlePresentClick = () => {
+        if (selectedIds.size > 0) {
+            const picked = filteredWorklogs.filter((r: any) => selectedIds.has(r.id))
+            const weeks = Array.from(new Set(picked.map((r: any) => getWeekNumber(r.work_date))))
+            const title = weeks.length === 1
+                ? `${selectedYear}년 ${weeks[0]} 주간업무보고`
+                : `${selectedYear}년 ${selectedMonth}월 주간업무보고 (선택 ${picked.length}건)`
+            // 모니터가 여러 대면 어느 모니터에 띄울지 고르는 창을 거친다
+            if (showScreenPicker) openPresentationDialog({ reports: picked, title })
+            else startPresentation(picked, title)
+            return
+        }
+        if (weekOptions.length === 0) {
+            alert('발표할 주간 업무보고가 없습니다.')
+            return
+        }
+        openPresentationDialog(null)
+    }
+
+    // 행의 발표 아이콘: 그 보고서 하나만 바로 발표한다 (모니터가 여러 대면 모니터 선택 창을 거친다)
+    const handlePresentOne = (log: any) => {
+        const title = `${selectedYear}년 ${getWeekNumber(log.work_date)} 주간업무보고 · ${log.user?.name || ''}`
+        if (showScreenPicker) openPresentationDialog({ reports: [log], title })
+        else startPresentation([log], title)
+    }
+
+    const handleStartChosenWeek = () => {
+        if (pickedReports) {
+            startPresentation(pickedReports.reports, pickedReports.title)
+            return
+        }
+        const option = weekOptions.find(o => o.label === chosenWeek)
+        if (!option) return
+        startPresentation(option.reports, `${selectedYear}년 ${option.label} 주간업무보고`)
+    }
+
     const renderTaskDetailTable = (morningWork: string) => {
         const tasks = parseWeeklyTasks(morningWork)
 
@@ -1053,6 +1152,10 @@ const WeeklyWorkLogPage = () => {
                         <Printer size={18} />
                         인쇄 {selectedIds.size > 0 && `(${selectedIds.size})`}
                     </Button>
+                    <Button variant="secondary" onClick={handlePresentClick} disabled={loading || filteredWorklogs.length === 0}>
+                        <Presentation size={18} />
+                        발표 {selectedIds.size > 0 && `(${selectedIds.size})`}
+                    </Button>
                     <Button onClick={openCreateModal} className="bg-green-500 hover:bg-green-600">
                         <Plus size={18} />
                         새 주간 업무보고
@@ -1104,6 +1207,9 @@ const WeeklyWorkLogPage = () => {
                                             </td>
                                             <td className="px-3 py-3 text-center whitespace-nowrap">
                                                 <div className="flex items-center justify-center gap-1">
+                                                    <button onClick={(e) => { e.stopPropagation(); handlePresentOne(log); }} className="p-2 text-toss-blue hover:bg-blue-100 rounded-lg transition-colors" title="발표">
+                                                        <Presentation size={16} />
+                                                    </button>
                                                     <button onClick={(e) => { e.stopPropagation(); handleDownloadPdf(log); }} className="p-2 text-green-600 hover:bg-green-100 rounded-lg transition-colors" title="인쇄">
                                                         <Printer size={16} />
                                                     </button>
@@ -1143,6 +1249,7 @@ const WeeklyWorkLogPage = () => {
                                             )}
                                         </div>
                                         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                            <button onClick={() => handlePresentOne(log)} className="p-1.5 text-toss-blue hover:bg-blue-100 rounded-lg" title="발표"><Presentation size={14} /></button>
                                             <button onClick={() => handleSaveAsWord(log)} className="p-1.5 text-toss-gray-600 hover:bg-toss-gray-100 rounded-lg"><Download size={14} /></button>
                                             {((profile as any)?.user_id === log.user_id || isAdmin) && (
                                                 <>
@@ -1565,6 +1672,91 @@ const WeeklyWorkLogPage = () => {
                     </div>
                 )}
             </Modal>
+
+            {/* ===== 발표 시작 창: 주차 선택 + 표시할 모니터 ===== */}
+            <Modal isOpen={weekChooserOpen} onClose={() => setWeekChooserOpen(false)} title={pickedReports ? '발표 시작' : '발표할 주차 선택'}>
+                <div className="space-y-4">
+                    <p className="text-sm text-toss-gray-500">
+                        {pickedReports
+                            ? pickedReports.reports.length === 1
+                                ? `${pickedReports.reports[0].user?.name || ''}님의 ${getWeekNumber(pickedReports.reports[0].work_date)} 보고서를 전체화면 슬라이드로 보여줍니다.`
+                                : `목록에서 체크한 ${pickedReports.reports.length}건을 팀 · 이름 순으로 한 사람씩 전체화면 슬라이드로 보여줍니다.`
+                            : '선택한 주차의 보고서를 팀 · 이름 순으로 한 사람씩 전체화면 슬라이드로 보여줍니다. 목록에서 체크한 보고서가 있으면 그 항목만 발표합니다.'}
+                    </p>
+                    {!pickedReports && <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+                        {weekOptions.map(option => (
+                            <label
+                                key={option.label}
+                                className={`flex items-center justify-between px-4 py-3 rounded-xl border cursor-pointer transition-colors ${chosenWeek === option.label ? 'border-toss-blue bg-blue-50' : 'border-toss-gray-200 hover:bg-toss-gray-50'}`}
+                            >
+                                <span className="flex items-center gap-3">
+                                    <input
+                                        type="radio"
+                                        name="presentation-week"
+                                        checked={chosenWeek === option.label}
+                                        onChange={() => setChosenWeek(option.label)}
+                                        className="w-4 h-4 text-toss-blue"
+                                    />
+                                    <span className="font-medium text-toss-gray-900">{selectedYear}년 {option.label}</span>
+                                </span>
+                                <span className="text-sm text-toss-gray-500">{option.reports.length}건</span>
+                            </label>
+                        ))}
+                    </div>}
+
+                    {/* 표시할 모니터 (모니터가 2대 이상일 때만) */}
+                    {showScreenPicker && (
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-toss-gray-700">표시할 모니터</span>
+                                <button type="button" onClick={loadScreens} className="text-xs text-toss-blue hover:underline">다시 불러오기</button>
+                            </div>
+                            {screensError ? (
+                                <p className="text-sm text-red-500">{screensError}</p>
+                            ) : screens.length === 0 ? (
+                                <p className="text-sm text-toss-gray-500">모니터 목록을 불러오는 중입니다. 브라우저가 권한을 물으면 허용해 주세요.</p>
+                            ) : (
+                                screens.map((screen, index) => (
+                                    <label
+                                        key={index}
+                                        className={`flex items-center justify-between px-4 py-3 rounded-xl border cursor-pointer transition-colors ${chosenScreenIndex === index ? 'border-toss-blue bg-blue-50' : 'border-toss-gray-200 hover:bg-toss-gray-50'}`}
+                                    >
+                                        <span className="flex items-center gap-3 min-w-0">
+                                            <input
+                                                type="radio"
+                                                name="presentation-screen"
+                                                checked={chosenScreenIndex === index}
+                                                onChange={() => setChosenScreenIndex(index)}
+                                                className="w-4 h-4 text-toss-blue"
+                                            />
+                                            <span className="font-medium text-toss-gray-900 truncate">{screen.label}</span>
+                                        </span>
+                                        <span className="text-sm text-toss-gray-500 shrink-0 ml-3">{describeScreen(screen)}</span>
+                                    </label>
+                                ))
+                            )}
+                        </div>
+                    )}
+
+                    <div className="flex gap-3 pt-2">
+                        <Button variant="secondary" onClick={() => setWeekChooserOpen(false)} className="flex-1">취소</Button>
+                        <Button onClick={handleStartChosenWeek} className="flex-1" disabled={!pickedReports && !chosenWeek}>
+                            <Presentation size={18} />
+                            발표 시작
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* ===== 발표 모드 (전체화면 슬라이드) ===== */}
+            {presentation && (
+                <WeeklyPresentation
+                    reports={presentation.reports}
+                    title={presentation.title}
+                    screen={presentation.screen}
+                    onClose={() => setPresentation(null)}
+                />
+            )}
         </div>
     )
 }
