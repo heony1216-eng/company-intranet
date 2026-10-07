@@ -5,6 +5,7 @@ import { Plus, Trash2, Edit2, AlertTriangle, Eye, Building2, ChevronDown, Chevro
 import { printReport } from '../utils/printReport'
 import * as XLSX from 'xlsx'
 import AdmissionDashboard from '../components/admission/AdmissionDashboard'
+import AdmissionRecordList, { type AdmissionView } from '../components/admission/AdmissionRecordList'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 
@@ -92,6 +93,19 @@ const emptyForm: FormData = {
   notes: '',
 }
 
+// 목록 표시용 공통 형태로 변환 (병원 입원 등 호실 번호가 아니면 퇴소 예정일을 계산하지 않음)
+const toListView = (r: AdmissionRecord): AdmissionView => ({
+  name: r.name,
+  gender: r.gender,
+  country: r.nationality,
+  room: r.room,
+  admissionDate: r.admission_date,
+  expectedDischarge: isRoomOnly(r.room) ? calculateDischargeDate(r.admission_date) : '',
+  dischargeDate: r.discharge_date,
+  adminStatus: r.admin_status,
+  notes: r.notes,
+})
+
 export default function BupyeongAdmissionPage() {
   const { profile, isAdmin } = useAuth()
   const [records, setRecords] = useState<AdmissionRecord[]>([])
@@ -113,7 +127,8 @@ export default function BupyeongAdmissionPage() {
   // 통합검색에서 ?focus=<id>로 진입 시 해당 행으로 스크롤 + 하이라이트
   const [searchParams, setSearchParams] = useSearchParams()
   const [focusId, setFocusId] = useState<string | null>(null)
-  const focusRowRef = useRef<HTMLTableRowElement>(null)
+  // PC 표의 행 또는 모바일 카드 중 화면에 보이는 쪽을 가리킨다
+  const focusRowRef = useRef<HTMLElement | null>(null)
   useEffect(() => {
     const f = searchParams.get('focus')
     if (f) setFocusId(f)
@@ -612,10 +627,10 @@ export default function BupyeongAdmissionPage() {
         )}
       </Card>
 
-      {/* 입소 목록 (현재 입소 중) */}
+      {/* 입소 목록 (현재 입소 중) — 모바일은 제목 아래로 버튼을 내린다 */}
       <Card padding="p-0">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-toss-gray-100">
-          <h3 className="font-bold text-toss-gray-900">입소 목록 <span className="text-sm font-normal text-emerald-600 ml-1">({activeCount}명)</span></h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-toss-gray-100">
+          <h3 className="font-bold text-toss-gray-900 whitespace-nowrap">입소 목록 <span className="text-sm font-normal text-emerald-600 ml-1">({activeCount}명)</span></h3>
           <div className="flex items-center gap-2 flex-wrap">
             <Button variant="secondary" size="sm" onClick={handleTemplateDownload}>
               <FileSpreadsheet size={16} className="mr-1" />
@@ -655,183 +670,18 @@ export default function BupyeongAdmissionPage() {
           </div>
         ) : (
           <>
-            {/* 데스크탑 테이블 */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full min-w-[1080px]">
-                <thead>
-                  <tr className="bg-toss-gray-50 border-b border-toss-gray-200">
-                    <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase w-12">No</th>
-                    <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase">국가</th>
-                    <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase">입소일</th>
-                    <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase">성명</th>
-                    <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase">성별</th>
-                    <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase">호실 또는 병원명(호실)</th>
-                    <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase" colSpan={2}>퇴소일</th>
-                    <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase">행정상황</th>
-                    <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase">비고</th>
-                    <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase w-24">관리</th>
-                  </tr>
-                  <tr className="bg-toss-gray-50 border-b border-toss-gray-200">
-                    <th colSpan={6}></th>
-                    <th className="px-2 py-1 text-center text-[10px] font-medium text-toss-gray-500">퇴소 예정일</th>
-                    <th className="px-2 py-1 text-center text-[10px] font-medium text-toss-gray-500">실제 퇴소일</th>
-                    <th colSpan={3}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeRecordsList.map((record, index) => {
-                    const roomOnly = isRoomOnly(record.room)
-                    const autoDischarge = roomOnly ? calculateDischargeDate(record.admission_date) : ''
-                    const manualDischarge = record.discharge_date
-                    return (
-                      <tr
-                        key={record.id}
-                        ref={record.id === focusId ? focusRowRef : undefined}
-                        className={`border-b border-toss-gray-100 transition-colors ${record.id === focusId ? 'bg-toss-blue/10' : 'bg-emerald-50/30 hover:bg-toss-gray-50'}`}
-                      >
-                        <td className="px-3 py-3 text-sm text-toss-gray-500 text-center">{index + 1}</td>
-                        <td className="px-3 py-3 text-sm text-toss-gray-700 text-center">{record.nationality || '-'}</td>
-                        <td className="px-3 py-3 text-sm font-medium text-toss-gray-900 text-center">{formatDate(record.admission_date)}</td>
-                        <td className="px-3 py-3 text-sm font-medium text-toss-gray-900 text-center">{record.name || '-'}</td>
-                        <td className="px-3 py-3 text-sm text-toss-gray-700 text-center">{record.gender || '-'}</td>
-                        <td className="px-3 py-3 text-sm text-toss-gray-700 text-center">{record.room || '-'}</td>
-                        <td className="px-3 py-3 text-sm text-center">
-                          {autoDischarge ? (
-                            <span className={`font-medium ${isWithinOneMonth(autoDischarge) ? 'text-red-500' : 'text-emerald-600'}`}>
-                              {formatDate(autoDischarge)}
-                            </span>
-                          ) : (
-                            <span className="text-toss-gray-400">-</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-3 text-sm text-center">
-                          {manualDischarge && manualDischarge !== autoDischarge ? (
-                            <span className={`font-medium ${isWithinOneMonth(manualDischarge) ? 'text-red-500' : 'text-orange-600'}`}>
-                              {formatDate(manualDischarge)}
-                            </span>
-                          ) : (
-                            <span className="text-toss-gray-400">-</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-3 text-sm text-toss-gray-500 text-center whitespace-pre-line">{record.admin_status || '-'}</td>
-                        <td className="px-3 py-3 text-sm text-toss-gray-500 max-w-[150px] truncate">{record.notes || '-'}</td>
-                        <td className="px-2 py-3">
-                          <div className="flex items-center justify-center gap-1 whitespace-nowrap">
-                            <button
-                              onClick={() => handleDischargeConfirm(record.id)}
-                              className="px-2 py-1 text-xs font-medium text-orange-500 hover:bg-orange-100 rounded-lg transition-colors"
-                              title="퇴소"
-                            >
-                              퇴소
-                            </button>
-                            <button
-                              onClick={() => handleEdit(record)}
-                              className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
-                              title="수정"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteConfirm(record.id)}
-                              className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
-                              title="삭제"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* 모바일 카드 뷰 */}
-            <div className="md:hidden divide-y divide-toss-gray-100">
-              {activeRecordsList.map((record, index) => {
-                const roomOnly = isRoomOnly(record.room)
-                const autoDischarge = roomOnly ? calculateDischargeDate(record.admission_date) : ''
-                const manualDischarge = record.discharge_date
-                return (
-                  <div key={record.id} className="px-3 py-2 bg-emerald-50/30">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-toss-gray-400">No. {index + 1}</span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleDischargeConfirm(record.id)}
-                          className="px-2 py-0.5 text-xs font-medium text-orange-500 hover:bg-orange-100 rounded-lg transition-colors"
-                        >
-                          퇴소
-                        </button>
-                        <button
-                          onClick={() => handleEdit(record)}
-                          className="p-1 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteConfirm(record.id)}
-                          className="p-1 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-sm">
-                      <div>
-                        <span className="text-toss-gray-400 text-[11px]">성명</span>
-                        <p className="font-medium text-toss-gray-900">{record.name || '-'}</p>
-                      </div>
-                      <div>
-                        <span className="text-toss-gray-400 text-[11px]">국가</span>
-                        <p className="text-toss-gray-700">{record.nationality || '-'}</p>
-                      </div>
-                      <div>
-                        <span className="text-toss-gray-400 text-[11px]">성별</span>
-                        <p className="text-toss-gray-700">{record.gender || '-'}</p>
-                      </div>
-                      <div>
-                        <span className="text-toss-gray-400 text-[11px]">입소일</span>
-                        <p className="font-medium text-toss-gray-900">{formatDate(record.admission_date)}</p>
-                      </div>
-                      {autoDischarge && (
-                        <div>
-                          <span className="text-toss-gray-400 text-[11px]">퇴소 예정일</span>
-                          <p className={`font-medium ${isWithinOneMonth(autoDischarge) ? 'text-red-500' : 'text-emerald-600'}`}>
-                            {formatDate(autoDischarge)}
-                          </p>
-                        </div>
-                      )}
-                      <div>
-                        <span className="text-toss-gray-400 text-[11px]">호실/병원명</span>
-                        <p className="text-toss-gray-700">{record.room || '-'}</p>
-                      </div>
-                      {manualDischarge && manualDischarge !== autoDischarge && (
-                        <div>
-                          <span className="text-toss-gray-400 text-[11px]">실제 퇴소일</span>
-                          <p className={`font-medium ${isWithinOneMonth(manualDischarge) ? 'text-red-500' : 'text-orange-600'}`}>
-                            {formatDate(manualDischarge)}
-                          </p>
-                        </div>
-                      )}
-                      {record.admin_status && (
-                        <div className="col-span-2">
-                          <span className="text-toss-gray-400 text-[11px]">행정상황</span>
-                          <p className="text-toss-gray-500 whitespace-pre-line">{record.admin_status}</p>
-                        </div>
-                      )}
-                      {record.notes && (
-                        <div className="col-span-3">
-                          <span className="text-toss-gray-400 text-[11px]">비고</span>
-                          <p className="text-toss-gray-500">{record.notes}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+            <AdmissionRecordList
+              records={activeRecordsList}
+              toView={toListView}
+              variant="active"
+              accent="emerald"
+              roomLabel="호실·병원"
+              focusId={focusId}
+              focusRef={focusRowRef}
+              onDischarge={handleDischargeConfirm}
+              onEdit={handleEdit}
+              onDelete={handleDeleteConfirm}
+            />
           </>
         )}
       </Card>
@@ -849,125 +699,17 @@ export default function BupyeongAdmissionPage() {
 
           {showDischarged && (
             <>
-              {/* 데스크탑 테이블 */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full min-w-[1080px]">
-                  <thead>
-                    <tr className="bg-toss-gray-50 border-b border-toss-gray-200">
-                      <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase w-12">No</th>
-                      <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase">국가</th>
-                      <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase">입소일</th>
-                      <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase">성명</th>
-                      <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase">성별</th>
-                      <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase">호실 또는 병원명(호실)</th>
-                      <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase">퇴소일</th>
-                      <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase">행정상황</th>
-                      <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase">비고</th>
-                      <th className="px-3 py-3 text-center text-xs font-bold text-toss-gray-600 uppercase w-20">관리</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dischargedRecordsList.map((record, index) => (
-                      <tr
-                        key={record.id}
-                        ref={record.id === focusId ? focusRowRef : undefined}
-                        className={`border-b border-toss-gray-100 transition-colors ${record.id === focusId ? 'bg-toss-blue/10' : 'hover:bg-toss-gray-50'}`}
-                      >
-                        <td className="px-3 py-3 text-sm text-toss-gray-400 text-center">{index + 1}</td>
-                        <td className="px-3 py-3 text-sm text-toss-gray-500 text-center">{record.nationality || '-'}</td>
-                        <td className="px-3 py-3 text-sm text-toss-gray-500 text-center">{formatDate(record.admission_date)}</td>
-                        <td className="px-3 py-3 text-sm text-toss-gray-500 text-center">{record.name || '-'}</td>
-                        <td className="px-3 py-3 text-sm text-toss-gray-500 text-center">{record.gender || '-'}</td>
-                        <td className="px-3 py-3 text-sm text-toss-gray-500 text-center">{record.room || '-'}</td>
-                        <td className="px-3 py-3 text-sm text-toss-gray-500 text-center">{formatDate(record.discharge_date)}</td>
-                        <td className="px-3 py-3 text-sm text-toss-gray-400 text-center whitespace-pre-line">{record.admin_status || '-'}</td>
-                        <td className="px-3 py-3 text-sm text-toss-gray-400 max-w-[150px] truncate">{record.notes || '-'}</td>
-                        <td className="px-3 py-3">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => handleEdit(record)}
-                              className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
-                              title="수정"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteConfirm(record.id)}
-                              className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
-                              title="삭제"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* 모바일 카드 뷰 */}
-              <div className="md:hidden divide-y divide-toss-gray-100">
-                {dischargedRecordsList.map((record, index) => (
-                  <div key={record.id} className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-toss-gray-400">No. {index + 1}</span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleEdit(record)}
-                          className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteConfirm(record.id)}
-                          className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-toss-gray-400 text-xs">성명</span>
-                        <p className="text-toss-gray-500">{record.name || '-'}</p>
-                      </div>
-                      <div>
-                        <span className="text-toss-gray-400 text-xs">국가</span>
-                        <p className="text-toss-gray-500">{record.nationality || '-'}</p>
-                      </div>
-                      <div>
-                        <span className="text-toss-gray-400 text-xs">입소일</span>
-                        <p className="text-toss-gray-500">{formatDate(record.admission_date)}</p>
-                      </div>
-                      <div>
-                        <span className="text-toss-gray-400 text-xs">퇴소일</span>
-                        <p className="text-toss-gray-500">{formatDate(record.discharge_date)}</p>
-                      </div>
-                      <div>
-                        <span className="text-toss-gray-400 text-xs">성별</span>
-                        <p className="text-toss-gray-500">{record.gender || '-'}</p>
-                      </div>
-                      <div>
-                        <span className="text-toss-gray-400 text-xs">호실 또는 병원명(호실)</span>
-                        <p className="text-toss-gray-500">{record.room || '-'}</p>
-                      </div>
-                      {record.admin_status && (
-                        <div>
-                          <span className="text-toss-gray-400 text-xs">행정상황</span>
-                          <p className="text-toss-gray-400 whitespace-pre-line">{record.admin_status}</p>
-                        </div>
-                      )}
-                      {record.notes && (
-                        <div className="col-span-2">
-                          <span className="text-toss-gray-400 text-xs">비고</span>
-                          <p className="text-toss-gray-400">{record.notes}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <AdmissionRecordList
+                records={dischargedRecordsList}
+                toView={toListView}
+                variant="discharged"
+                accent="emerald"
+                roomLabel="호실·병원"
+                focusId={focusId}
+                focusRef={focusRowRef}
+                onEdit={handleEdit}
+                onDelete={handleDeleteConfirm}
+              />
             </>
           )}
         </Card>
