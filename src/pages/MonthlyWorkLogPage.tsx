@@ -201,10 +201,10 @@ const ImageGallery = ({ urls }: { urls: any[] }) => {
             {/* 이미지 확대 모달 */}
             {selectedIndex !== null && (
                 <div className="fixed inset-0 bg-black/95 flex items-center justify-center select-none" style={{ zIndex: 9999 }} onClick={closeModal} onMouseUp={handleDragEnd} onMouseLeave={handleDragEnd} onTouchEnd={handleDragEnd}>
-                    <button className="absolute top-4 right-4 z-10 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors" onClick={closeModal}>
+                    <button className="absolute top-safe-4 right-safe-4 z-10 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors" onClick={closeModal}>
                         <X size={24} />
                     </button>
-                    <div className="absolute top-4 left-4 z-10 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full text-white text-sm font-medium">
+                    <div className="absolute top-safe-4 left-safe-4 z-10 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full text-white text-sm font-medium">
                         {selectedIndex + 1} / {imageUrls.length}
                     </div>
                     <div className="flex items-center gap-2 sm:gap-4">
@@ -223,7 +223,7 @@ const ImageGallery = ({ urls }: { urls: any[] }) => {
                         )}
                     </div>
                     {imageUrls.length > 1 && (
-                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
+                        <div className="absolute bottom-safe-6 left-1/2 -translate-x-1/2 flex gap-2">
                             {imageUrls.map((_: any, index: number) => (
                                 <div key={index} className={`w-2 h-2 rounded-full transition-colors ${index === selectedIndex ? 'bg-white' : 'bg-white/30'}`} />
                             ))}
@@ -1230,7 +1230,7 @@ const MonthlyWorkLogPage = () => {
                                             type="text"
                                             value={task.title}
                                             onChange={(e) => updateTaskTitle(index, e.target.value)}
-                                            className="flex-1 px-3 py-2 bg-white border border-toss-gray-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                                            className="flex-1 min-w-0 px-3 py-2 bg-white border border-toss-gray-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                                             placeholder="제목"
                                         />
                                         {formData.monthly_tasks.length > 1 && (

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Card, Button, PageHeader } from '../components/common'
 import { Plus, Trash2, RotateCcw, Printer, Settings, Copy, Tag, ChevronDown, ChevronUp } from 'lucide-react'
 
@@ -27,6 +27,21 @@ export default function NametagPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [pos, setPos] = useState({ col1: 34.7, col2: 55.9, col3: 64.4, row1: 20.4, row2: 61 })
   const [fonts, setFonts] = useState({ data: 16, name: 33, room: 41 })
+
+  // 화면 미리보기 배율: 130mm(약 491px) 네임택이 좁은 화면(모바일)에서 잘리지 않게 폭에 맞춰 줄인다
+  // (zoom은 화면에만 적용, 인쇄 스타일에서 1로 되돌려 실제 크기로 출력)
+  const previewRef = useRef(null)
+  const [previewScale, setPreviewScale] = useState(1)
+  useEffect(() => {
+    const el = previewRef.current
+    if (!el) return
+    const tagWidthPx = (130 * 96) / 25.4
+    const update = () => setPreviewScale(Math.min(1, el.clientWidth / tagWidthPx))
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   const addRoom = () => {
     setRooms(prev => [...prev, {
@@ -115,6 +130,7 @@ export default function NametagPage() {
             padding: 5mm !important;
           }
           .nametag-tag-wrap {
+            zoom: 1 !important;
             background: transparent !important; padding: 0 !important; margin: 0 !important;
             box-shadow: none !important; border: none !important;
             page-break-inside: avoid; break-inside: avoid;
@@ -315,14 +331,14 @@ export default function NametagPage() {
             <Card className="print-hide mb-4">
               <span className="text-xs font-semibold text-toss-gray-500 uppercase tracking-wider">미리보기</span>
             </Card>
-            <div className="nametag-print-area flex flex-col gap-6 items-center">
+            <div ref={previewRef} className="nametag-print-area flex flex-col gap-6 items-center">
               {rooms.length === 0 ? (
                 <Card className="w-full text-center py-16">
                   <p className="text-toss-gray-400 text-sm">네임택을 추가하세요</p>
                 </Card>
               ) : (
                 rooms.map(r => (
-                  <div key={r.id} className="nametag-tag-wrap">
+                  <div key={r.id} className="nametag-tag-wrap" style={{ zoom: previewScale }}>
                     <div className="nametag-box"
                       style={{
                         width: '130mm', height: '45mm', position: 'relative',

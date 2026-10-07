@@ -292,7 +292,7 @@ function RescueDashboard({ isOpen, onClose, summaryStats, countryStats }) {
       {!isFullscreen && (
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-[60] p-3 bg-white rounded-full shadow-lg hover:bg-gray-100 transition-colors"
+          className="absolute top-safe-4 right-safe-4 z-[60] p-3 bg-white rounded-full shadow-lg hover:bg-gray-100 transition-colors"
           title="닫기 (ESC)"
         >
           <X size={28} />
@@ -321,7 +321,7 @@ function RescueDashboard({ isOpen, onClose, summaryStats, countryStats }) {
 
             {/* 하단 버튼들 - 전체화면일 때는 숨김 */}
             {!isFullscreen && (
-              <div className="absolute bottom-4 right-4 flex gap-3 z-50">
+              <div className="absolute bottom-safe-4 right-safe-4 flex gap-3 z-50">
                 <button
                   onClick={handleDownload}
                   className="flex items-center gap-2 px-4 py-2 bg-white/90 hover:bg-white rounded-lg shadow-lg transition-all text-gray-800"

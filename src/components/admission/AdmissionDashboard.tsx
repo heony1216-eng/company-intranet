@@ -419,7 +419,7 @@ export default function AdmissionDashboard({ isOpen, onClose, records, stats, ba
       {!isFullscreen && (
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-[60] p-3 bg-white rounded-full shadow-lg hover:bg-gray-100 transition-colors"
+          className="absolute top-safe-4 right-safe-4 z-[60] p-3 bg-white rounded-full shadow-lg hover:bg-gray-100 transition-colors"
           title="닫기 (ESC)"
         >
           <X size={28} />
@@ -445,7 +445,7 @@ export default function AdmissionDashboard({ isOpen, onClose, records, stats, ba
             />
 
             {!isFullscreen && (
-              <div className="absolute bottom-4 right-4 flex gap-3 z-50">
+              <div className="absolute bottom-safe-4 right-safe-4 flex gap-3 z-50">
                 {totalPages > 1 && (
                   <div className="flex items-center gap-1 bg-white/90 rounded-lg shadow-lg px-2">
                     <button

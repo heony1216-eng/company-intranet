@@ -521,7 +521,7 @@ const ArchivePage = () => {
                             value={newLabelName}
                             onChange={(e) => setNewLabelName(e.target.value)}
                             placeholder="새 라벨 이름"
-                            className="flex-1 px-4 py-2 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent"
+                            className="flex-1 min-w-0 px-4 py-2 bg-toss-gray-50 border border-toss-gray-200 rounded-xl focus:ring-2 focus:ring-toss-blue focus:border-transparent"
                             onKeyDown={(e) => e.key === 'Enter' && handleAddLabel()}
                         />
                         <Button onClick={handleAddLabel}>

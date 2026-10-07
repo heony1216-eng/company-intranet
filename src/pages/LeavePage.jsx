@@ -514,25 +514,25 @@ const LeavePage = () => {
         </div>
       )}
 
-      {/* 탭 */}
-      <div className="flex items-center gap-2 border-b border-toss-gray-200">
+      {/* 탭 (모바일: 아이콘 숨김·글자 줄바꿈 없음, 그래도 넘치면 가로 스크롤) */}
+      <div className="flex items-center gap-1 sm:gap-2 border-b border-toss-gray-200 overflow-x-auto scrollbar-none">
         <button
           onClick={() => setActiveTab('my')}
-          className={`px-4 py-3 font-medium text-sm transition-colors relative ${
+          className={`flex-shrink-0 whitespace-nowrap px-3 sm:px-4 py-3 font-medium text-sm transition-colors relative ${
             activeTab === 'my' ? 'text-toss-blue' : 'text-toss-gray-500 hover:text-toss-gray-700'
           }`}
         >
-          <Clock size={16} className="inline mr-1" />
+          <Clock size={16} className="hidden sm:inline mr-1" />
           내 근태
           {activeTab === 'my' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-toss-blue" />}
         </button>
         <button
           onClick={() => setActiveTab('calendar')}
-          className={`px-4 py-3 font-medium text-sm transition-colors relative ${
+          className={`flex-shrink-0 whitespace-nowrap px-3 sm:px-4 py-3 font-medium text-sm transition-colors relative ${
             activeTab === 'calendar' ? 'text-toss-blue' : 'text-toss-gray-500 hover:text-toss-gray-700'
           }`}
         >
-          <CalendarIcon size={16} className="inline mr-1" />
+          <CalendarIcon size={16} className="hidden sm:inline mr-1" />
           캘린더
           {activeTab === 'calendar' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-toss-blue" />}
         </button>
@@ -540,21 +540,21 @@ const LeavePage = () => {
           <>
             <button
               onClick={() => setActiveTab('manage')}
-              className={`px-4 py-3 font-medium text-sm transition-colors relative ${
+              className={`flex-shrink-0 whitespace-nowrap px-3 sm:px-4 py-3 font-medium text-sm transition-colors relative ${
                 activeTab === 'manage' ? 'text-toss-blue' : 'text-toss-gray-500 hover:text-toss-gray-700'
               }`}
             >
-              <Users size={16} className="inline mr-1" />
+              <Users size={16} className="hidden sm:inline mr-1" />
               승인 관리
               {activeTab === 'manage' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-toss-blue" />}
             </button>
             <button
               onClick={() => setActiveTab('settings')}
-              className={`px-4 py-3 font-medium text-sm transition-colors relative ${
+              className={`flex-shrink-0 whitespace-nowrap px-3 sm:px-4 py-3 font-medium text-sm transition-colors relative ${
                 activeTab === 'settings' ? 'text-toss-blue' : 'text-toss-gray-500 hover:text-toss-gray-700'
               }`}
             >
-              <Settings size={16} className="inline mr-1" />
+              <Settings size={16} className="hidden sm:inline mr-1" />
               연차 설정
               {activeTab === 'settings' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-toss-blue" />}
             </button>
@@ -815,18 +815,18 @@ const LeavePage = () => {
       {/* 연차 설정 탭 */}
       {activeTab === 'settings' && canManage && (
         <Card padding="p-0">
-          <div className="p-4 border-b border-toss-gray-100 flex items-center justify-between">
+          <div className="p-4 border-b border-toss-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Users size={18} className="text-toss-gray-500" />
               <h3 className="font-medium text-toss-gray-900">직원별 연차 현황</h3>
             </div>
-            <div className="relative">
+            <div className="relative w-full sm:w-auto">
               <input
                 type="text"
                 placeholder="이름 또는 팀으로 검색"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-4 py-2 bg-toss-gray-100 border-0 rounded-toss text-sm focus:ring-2 focus:ring-toss-blue w-56"
+                className="pl-9 pr-4 py-2 bg-toss-gray-100 border-0 rounded-toss text-sm focus:ring-2 focus:ring-toss-blue w-full sm:w-56"
               />
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-toss-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -837,11 +837,11 @@ const LeavePage = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-toss-gray-100">
-                  <th className="px-6 py-3 text-left text-xs font-medium text-toss-gray-500 uppercase tracking-wider">이름</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-toss-gray-500 uppercase tracking-wider">팀</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-toss-gray-500 uppercase tracking-wider">총 연차</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-toss-gray-500 uppercase tracking-wider">사용</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-toss-gray-500 uppercase tracking-wider">잔여</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-toss-gray-500 uppercase tracking-wider whitespace-nowrap">이름</th>
+                  <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-toss-gray-500 uppercase tracking-wider whitespace-nowrap">팀</th>
+                  <th className="px-3 sm:px-6 py-3 text-center text-xs font-medium text-toss-gray-500 uppercase tracking-wider whitespace-nowrap">총 연차</th>
+                  <th className="px-3 sm:px-6 py-3 text-center text-xs font-medium text-toss-gray-500 uppercase tracking-wider whitespace-nowrap">사용</th>
+                  <th className="px-3 sm:px-6 py-3 text-center text-xs font-medium text-toss-gray-500 uppercase tracking-wider whitespace-nowrap">잔여</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-toss-gray-100">
@@ -860,11 +860,13 @@ const LeavePage = () => {
 
                     return (
                       <tr key={user.id} className="hover:bg-toss-gray-50">
-                        <td className="px-6 py-4">
-                          <p className="font-medium text-toss-gray-900">{user.name}</p>
+                        <td className="px-3 sm:px-6 py-4">
+                          <p className="font-medium text-toss-gray-900 whitespace-nowrap">{user.name}</p>
+                          {/* 모바일: 팀 */}
+                          <p className="sm:hidden text-xs text-toss-gray-500">{user.team || '-'}</p>
                         </td>
-                        <td className="px-6 py-3 text-sm text-toss-gray-700">{user.team || '-'}</td>
-                        <td className="px-6 py-3 text-center">
+                        <td className="hidden sm:table-cell px-6 py-3 text-sm text-toss-gray-700">{user.team || '-'}</td>
+                        <td className="px-3 sm:px-6 py-3 text-center whitespace-nowrap">
                           {isEditing ? (
                             <input
                               type="number"
@@ -897,7 +899,7 @@ const LeavePage = () => {
                             </span>
                           )}
                         </td>
-                        <td className="px-6 py-3 text-center text-sm text-toss-blue font-medium">{used}일</td>
+                        <td className="px-3 sm:px-6 py-3 text-center text-sm text-toss-blue font-medium whitespace-nowrap">{used}일</td>
                         <td className="px-6 py-3 text-center text-sm text-green-600 font-bold">{remaining}일</td>
                       </tr>
                     )

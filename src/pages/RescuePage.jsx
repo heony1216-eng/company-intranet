@@ -932,8 +932,8 @@ const RescuePage = () => {
 
                 {showStatsSection && (
                     <div className="p-4 sm:p-6 space-y-6">
-                        {/* 요약 통계 */}
-                        <div className="grid grid-cols-4 gap-3">
+                        {/* 요약 통계 (모바일 2칸, sm 이상 4칸) */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div className="bg-white border-2 border-toss-gray-200 rounded-xl p-3 text-center">
                                 <p className="text-xs text-toss-gray-500 mb-1">이번 주</p>
                                 <p className="text-2xl font-bold text-toss-gray-900">{summaryStats.this_week || 0}<span className="text-sm font-normal ml-1">명</span></p>
@@ -1036,7 +1036,8 @@ const RescuePage = () => {
             {/* Header */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <h2 className="text-base font-bold text-toss-gray-900">구조현황 목록</h2>
-                <div className="flex items-center gap-2">
+                {/* 좁은 화면에서는 버튼이 다음 줄로 넘어가고, 버튼 글자는 쪼개지지 않게 한다 */}
+                <div className="flex flex-wrap items-center gap-2 [&>button]:whitespace-nowrap">
                     <Button variant="secondary" onClick={handlePrintRescueList}>
                         <Printer size={18} />
                         인쇄

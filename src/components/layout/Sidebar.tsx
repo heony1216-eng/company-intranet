@@ -170,10 +170,10 @@ const Sidebar = () => {
 
     return (
         <>
-            {/* Mobile menu button */}
+            {/* Mobile menu button (헤더 왼쪽 빈자리에 고정, 앱에서는 상태바 높이만큼 내린다) */}
             <button
                 onClick={() => setIsOpen(true)}
-                className="lg:hidden fixed top-4 left-4 z-40 p-2 bg-white rounded-toss shadow-toss"
+                className="lg:hidden fixed top-safe-4 left-safe-4 z-40 p-2 bg-white rounded-toss shadow-toss"
                 aria-label="메뉴 열기"
             >
                 <Menu className="w-6 h-6 text-toss-gray-700" />
@@ -187,9 +187,9 @@ const Sidebar = () => {
                 />
             )}
 
-            {/* Sidebar */}
+            {/* Sidebar (pt-safe/pb-safe: 앱에서 상태바·내비게이션바 영역을 피한다) */}
             <aside
-                className={`fixed top-0 left-0 h-full w-64 bg-[#0d1a2a] border-r border-white/10 z-50 transform transition-transform duration-300 flex flex-col ${isOpen ? 'translate-x-0 shadow-toss-lg' : '-translate-x-full lg:translate-x-0'
+                className={`fixed top-0 left-0 h-full w-64 pt-safe pb-safe bg-[#0d1a2a] border-r border-white/10 z-50 transform transition-transform duration-300 flex flex-col ${isOpen ? 'translate-x-0 shadow-toss-lg' : '-translate-x-full lg:translate-x-0'
                     }`}
             >
                 {/* 로고 영역 */}

@@ -553,8 +553,8 @@ const EventPage = () => {
 
                     {/* 범례 */}
                     <div className="mt-4 pt-4 border-t border-toss-gray-100">
-                        <div className="flex items-center justify-between">
-                            <div className="flex flex-wrap gap-3 text-xs">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex flex-wrap gap-3 text-xs min-w-0">
                                 <div className="flex items-center gap-1">
                                     <div className="w-2 h-2 rounded-full bg-red-500"></div>
                                     <span className="text-toss-gray-600">공휴일</span>
@@ -573,7 +573,7 @@ const EventPage = () => {
                                         setEditingTypeKey(null)
                                         setIsTypeModalOpen(true)
                                     }}
-                                    className="flex items-center gap-1 text-xs text-toss-gray-500 hover:text-toss-blue transition-colors"
+                                    className="flex-shrink-0 whitespace-nowrap flex items-center gap-1 text-xs text-toss-gray-500 hover:text-toss-blue transition-colors"
                                 >
                                     <Settings size={14} />
                                     유형 관리
@@ -993,7 +993,7 @@ const EventPage = () => {
             {/* Alert Modal */}
             {alertModal.isOpen && (
                 <div
-                    className="fixed inset-0 bg-black/50 flex items-center justify-center p-4"
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center p-safe-4"
                     style={{ zIndex: 10000 }}
                     onClick={() => setAlertModal({ ...alertModal, isOpen: false })}
                 >

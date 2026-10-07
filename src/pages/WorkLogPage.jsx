@@ -256,14 +256,14 @@ const ImageGallery = ({ urls }) => {
                 >
                     {/* 닫기 버튼 */}
                     <button
-                        className="absolute top-4 right-4 z-10 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                        className="absolute top-safe-4 right-safe-4 z-10 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
                         onClick={closeModal}
                     >
                         <X size={24} />
                     </button>
 
                     {/* 이미지 카운터 */}
-                    <div className="absolute top-4 left-4 z-10 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full text-white text-sm font-medium">
+                    <div className="absolute top-safe-4 left-safe-4 z-10 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full text-white text-sm font-medium">
                         {selectedIndex + 1} / {imageUrls.length}
                     </div>
 
@@ -2294,7 +2294,7 @@ const WorkLogPage = () => {
             {/* Alert Modal */}
             {alertModal.isOpen && (
                 <div
-                    className="fixed inset-0 bg-black/50 flex items-center justify-center p-4"
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center p-safe-4"
                     style={{ zIndex: 10000 }}
                     onClick={() => setAlertModal({ ...alertModal, isOpen: false })}
                 >
@@ -2336,7 +2336,7 @@ const WorkLogPage = () => {
             {/* Confirm Modal (삭제 확인) */}
             {confirmModal.isOpen && (
                 <div
-                    className="fixed inset-0 bg-black/50 flex items-center justify-center p-4"
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center p-safe-4"
                     style={{ zIndex: 10000 }}
                     onClick={() => setConfirmModal({ isOpen: false, worklog: null })}
                 >

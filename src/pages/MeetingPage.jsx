@@ -152,12 +152,12 @@ const MeetingImageGallery = ({ files }) => {
             {/* 이미지 확대 모달 - Portal처럼 동작하도록 z-index 높임 */}
             {selectedImage && (
                 <div
-                    className="fixed inset-0 bg-black/80 flex items-center justify-center p-4"
+                    className="fixed inset-0 bg-black/80 flex items-center justify-center p-safe-4"
                     style={{ zIndex: 9999 }}
                     onClick={() => setSelectedImage(null)}
                 >
                     <button
-                        className="absolute top-4 right-4 text-white hover:text-gray-300"
+                        className="absolute top-safe-4 right-safe-4 text-white hover:text-gray-300"
                         style={{ zIndex: 10000 }}
                         onClick={() => setSelectedImage(null)}
                     >

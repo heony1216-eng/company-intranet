@@ -8,6 +8,7 @@ import { type SkyState } from '../../hooks/useWeather'
 import { useWeatherContext } from '../../hooks/WeatherContext'
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useMediaQuery } from '../../hooks/useMediaQuery'
 
 type SearchType = 'notice' | 'meeting' | 'event' | 'rescue' | 'admission' | 'contact' | 'ledger'
 
@@ -55,6 +56,8 @@ const Header = () => {
     const { profile, signOut, isAdmin } = useAuth()
     const navigate = useNavigate()
     const { data: weather, loading: weatherLoading, refresh: refreshWeather } = useWeatherContext()
+    // 모바일(Tailwind sm 미만)에서는 검색칸이 좁아 안내 문구를 짧게 쓴다
+    const isMobile = useMediaQuery('(max-width: 639px)')
 
     // 날씨 상태 → 아이콘
     const WeatherIcon = ({ sky }: { sky: SkyState }) => {
@@ -182,12 +185,13 @@ const Header = () => {
         d ? new Date(d).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) : ''
 
     return (
-        <header className="bg-white border-b border-toss-gray-100 sticky top-0 z-30">
-            <div className="flex items-center gap-4 px-4 lg:px-8 h-[73px]">
-                <div className="lg:hidden w-10" /> {/* 모바일 메뉴 버튼 자리 */}
+        // pt-safe: 앱(APK)에서 상태바(시계·배터리) 높이만큼 내려서 겹치지 않게 한다
+        <header className="bg-white border-b border-toss-gray-100 sticky top-0 z-30 pt-safe">
+            <div className="flex items-center gap-3 sm:gap-4 px-4 lg:px-8 h-[73px]">
+                <div className="lg:hidden w-10 flex-shrink-0" /> {/* 모바일 메뉴 버튼 자리 */}
 
                 {/* 통합 검색 */}
-                <div ref={searchRef} className="flex-1 max-w-xl relative">
+                <div ref={searchRef} className="flex-1 min-w-0 max-w-xl relative">
                     <form onSubmit={handleSearchSubmit}>
                         <div className="relative">
                             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-toss-gray-400" />
@@ -196,15 +200,15 @@ const Header = () => {
                                 value={query}
                                 onChange={(e) => { setQuery(e.target.value); setSearchOpen(true) }}
                                 onFocus={() => setSearchOpen(true)}
-                                placeholder="공지·회의록·일정·구조·입소·연락처·수발신 통합검색"
+                                placeholder={isMobile ? '통합검색' : '공지·회의록·일정·구조·입소·연락처·수발신 통합검색'}
                                 className="w-full pl-11 pr-4 py-2.5 bg-toss-gray-100 border-0 rounded-full text-sm text-toss-gray-900 placeholder-toss-gray-400 focus:ring-2 focus:ring-toss-blue focus:bg-white transition-all"
                             />
                         </div>
                     </form>
 
-                    {/* 검색 결과 드롭다운 */}
+                    {/* 검색 결과 드롭다운 (모바일: 헤더 바로 아래 화면 폭 전체, sm 이상: 검색칸 아래) */}
                     {searchOpen && query.trim() && (
-                        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-toss-lg shadow-toss-lg border border-toss-gray-100 py-2 max-h-[400px] overflow-y-auto z-50">
+                        <div className="fixed left-3 right-3 top-[calc(var(--sat)+81px)] max-h-[calc(100dvh-var(--sat)-var(--sab)-96px)] sm:absolute sm:left-0 sm:right-0 sm:top-full sm:mt-2 sm:max-h-[400px] bg-white rounded-toss-lg shadow-toss-lg border border-toss-gray-100 py-2 overflow-y-auto z-50">
                             {searching ? (
                                 <p className="px-4 py-6 text-center text-sm text-toss-gray-400">검색 중...</p>
                             ) : results.length > 0 ? (
@@ -252,9 +256,9 @@ const Header = () => {
                             )}
                         </button>
 
-                        {/* 알림 드롭다운 */}
+                        {/* 알림 드롭다운 (모바일: 헤더 바로 아래 화면 폭 전체 — 320px 고정이면 왼쪽이 잘림) */}
                         {notiOpen && (
-                            <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-toss-lg shadow-toss-lg border border-toss-gray-100 py-2 z-50">
+                            <div className="fixed left-3 right-3 top-[calc(var(--sat)+81px)] sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80 bg-white rounded-toss-lg shadow-toss-lg border border-toss-gray-100 py-2 z-50">
                                 <div className="px-4 py-2 border-b border-toss-gray-100">
                                     <p className="font-bold text-sm text-toss-gray-900">알림 · 최근 공지</p>
                                 </div>
@@ -314,8 +318,8 @@ const Header = () => {
 
                     <div className="w-px h-6 bg-toss-gray-200 mx-1 hidden sm:block" />
 
-                    {/* 사용자 프로필 */}
-                    <div className="flex items-center gap-3 pl-1">
+                    {/* 사용자 프로필 (모바일은 이름이 안 보여 아이콘만 남으므로 숨기고 검색칸을 넓힌다) */}
+                    <div className="hidden sm:flex items-center gap-3 pl-1">
                         <div className="w-10 h-10 bg-toss-blue/10 rounded-full flex items-center justify-center flex-shrink-0">
                             <User size={20} className="text-toss-blue" />
                         </div>

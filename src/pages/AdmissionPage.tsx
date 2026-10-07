@@ -544,10 +544,10 @@ export default function AdmissionPage() {
         )}
       </Card>
 
-      {/* 입소 목록 (현재 입소 중) */}
+      {/* 입소 목록 (현재 입소 중) — 모바일은 제목 아래로 버튼을 내린다 */}
       <Card padding="p-0">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-toss-gray-100">
-          <h3 className="font-bold text-toss-gray-900">입소 목록 <span className="text-sm font-normal text-blue-600 ml-1">({activeCount}명)</span></h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-toss-gray-100">
+          <h3 className="font-bold text-toss-gray-900 whitespace-nowrap">입소 목록 <span className="text-sm font-normal text-blue-600 ml-1">({activeCount}명)</span></h3>
           <div className="flex items-center gap-2 flex-wrap">
             <Button variant="secondary" size="sm" onClick={handleTemplateDownload}>
               <FileSpreadsheet size={16} className="mr-1" />
@@ -970,7 +970,7 @@ export default function AdmissionPage() {
                     type="date"
                     value={formData.discharge_date}
                     onChange={(e) => setFormData({ ...formData, discharge_date: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-toss-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-toss-blue/50 focus:border-toss-blue"
+                    className="flex-1 min-w-0 px-3 py-2 border border-toss-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-toss-blue/50 focus:border-toss-blue"
                   />
                 )}
               </div>

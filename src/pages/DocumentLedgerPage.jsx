@@ -798,7 +798,7 @@ const DocumentLedgerPage = () => {
                           value={newRowData.receiver_org}
                           onChange={(e) => handleNewRowChange('receiver_org', e.target.value)}
                           placeholder="기관"
-                          className="flex-1 px-2 py-1.5 text-sm bg-blue-50 border-0 rounded-lg focus:ring-2 focus:ring-blue-400"
+                          className="flex-1 min-w-0 px-2 py-1.5 text-sm bg-blue-50 border-0 rounded-lg focus:ring-2 focus:ring-blue-400"
                         />
                         <input
                           type="text"
@@ -817,7 +817,7 @@ const DocumentLedgerPage = () => {
                           value={newRowData.sender_org}
                           onChange={(e) => handleNewRowChange('sender_org', e.target.value)}
                           placeholder="기관"
-                          className="flex-1 px-2 py-1.5 text-sm bg-green-50 border-0 rounded-lg focus:ring-2 focus:ring-green-400"
+                          className="flex-1 min-w-0 px-2 py-1.5 text-sm bg-green-50 border-0 rounded-lg focus:ring-2 focus:ring-green-400"
                         />
                         <input
                           type="text"

@@ -130,7 +130,7 @@ const ImageGallery = ({ images = [], className = '' }) => {
                     {/* 닫기 버튼 */}
                     <button
                         onClick={closeModal}
-                        className="absolute top-4 right-4 z-10 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                        className="absolute top-safe-4 right-safe-4 z-10 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
                     >
                         <X size={24} />
                     </button>
@@ -140,13 +140,13 @@ const ImageGallery = ({ images = [], className = '' }) => {
                         <>
                             <button
                                 onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
-                                className="absolute left-4 z-10 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                                className="absolute left-safe-4 z-10 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
                             >
                                 <ChevronLeft size={28} />
                             </button>
                             <button
                                 onClick={(e) => { e.stopPropagation(); goToNext(); }}
-                                className="absolute right-4 z-10 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                                className="absolute right-safe-4 z-10 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
                             >
                                 <ChevronRight size={28} />
                             </button>
@@ -154,7 +154,7 @@ const ImageGallery = ({ images = [], className = '' }) => {
                     )}
 
                     {/* 이미지 카운터 */}
-                    <div className="absolute top-4 left-4 z-10 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full text-white text-sm font-medium">
+                    <div className="absolute top-safe-4 left-safe-4 z-10 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full text-white text-sm font-medium">
                         {selectedIndex + 1} / {images.length}
                     </div>
 

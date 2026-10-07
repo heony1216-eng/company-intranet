@@ -85,7 +85,7 @@ export const Input = ({
 export const Card = ({
     children,
     className = '',
-    padding = 'p-6',
+    padding = 'card-padding', // 모바일 p-4, sm 이상 p-6 (index.css)
     ...props
 }) => {
     return (
@@ -107,33 +107,37 @@ export const Modal = ({
 }) => {
     if (!isOpen) return null
 
+    // 너비만 크기별로 다르고, 높이는 바깥 여백(안전 영역 포함) 안으로 제한한다
     const sizeClasses = {
-        default: 'max-w-2xl max-h-[90vh]',
-        large: 'max-w-4xl max-h-[95vh]',
-        xl: 'max-w-6xl max-h-[95vh]',
-        full: 'max-w-[95vw] max-h-[95vh]',
-        a4: 'max-w-[900px] max-h-[95vh]'
+        default: 'max-w-2xl',
+        large: 'max-w-4xl',
+        xl: 'max-w-6xl',
+        full: 'max-w-[95vw]',
+        a4: 'max-w-[900px]'
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        // p-safe-3/4: 화면 가장자리와 상태바·내비게이션바에서 띄운다 (모바일은 여백을 줄여 입력칸 폭 확보)
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-safe-3 sm:p-safe-4">
             <div
                 className="absolute inset-0 bg-black/50 backdrop-blur-sm"
                 onClick={onClose}
             />
-            <div className={`relative bg-white rounded-toss-lg shadow-toss-lg w-full mx-4 overflow-auto ${sizeClasses[size] || sizeClasses.default}`}>
-                <div className="flex items-center justify-between p-6 border-b border-toss-gray-100">
-                    <h2 className="text-xl font-bold text-toss-gray-900">{title}</h2>
+            <div className={`relative bg-white rounded-toss-lg shadow-toss-lg w-full max-h-full overflow-auto ${sizeClasses[size] || sizeClasses.default}`}>
+                {/* 제목줄은 긴 내용을 스크롤해도 위에 남아 닫기 버튼을 누를 수 있게 한다 */}
+                <div className="sticky top-0 z-10 bg-white flex items-center justify-between gap-3 px-4 py-3.5 sm:p-6 border-b border-toss-gray-100">
+                    <h2 className="min-w-0 text-lg sm:text-xl font-bold text-toss-gray-900">{title}</h2>
                     <button
                         onClick={onClose}
-                        className="text-toss-gray-500 hover:text-toss-gray-700"
+                        className="flex-shrink-0 p-1 -m-1 text-toss-gray-500 hover:text-toss-gray-700"
+                        aria-label="닫기"
                     >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
-                <div className="p-6">
+                <div className="p-4 sm:p-6">
                     {children}
                 </div>
             </div>

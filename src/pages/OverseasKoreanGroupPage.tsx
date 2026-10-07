@@ -227,9 +227,9 @@ export default function OverseasKoreanGroupPage() {
 
       {/* 상세 모달 */}
       {selectedRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setSelectedRecord(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-safe-4 bg-black/50" onClick={() => setSelectedRecord(null)}>
           <div
-            className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6">
