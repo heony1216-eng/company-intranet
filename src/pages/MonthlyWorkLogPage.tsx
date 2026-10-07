@@ -8,6 +8,7 @@ import { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, T
 import { saveAs } from 'file-saver'
 import { generateMonthlyWorklogPdf } from '../utils/worklogPdf'
 import { printReport } from '../utils/printReport'
+import TaskDetailView from '../components/worklog/TaskDetailView'
 import {
     WeeklyTask,
     TaskDetail,
@@ -911,52 +912,8 @@ const MonthlyWorkLogPage = () => {
     }
 
     // === 상세 보기 업무 테이블 렌더링 ===
-    const renderTaskDetailTable = (morningWork: string) => {
-        const tasks = parseWeeklyTasks(morningWork)
-
-        return (
-            <div className="bg-toss-gray-50 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-toss-gray-200">
-                        <tr>
-                            <th className="px-3 py-2 text-center font-semibold text-toss-gray-700 whitespace-nowrap w-10">No</th>
-                            <th className="px-3 py-2 text-left font-semibold text-toss-gray-700 whitespace-nowrap">제목</th>
-                            <th className="px-3 py-2 text-left font-semibold text-toss-gray-700">업무내용</th>
-                            <th className="px-3 py-2 text-center font-semibold text-toss-gray-700 whitespace-nowrap w-16">진척률</th>
-                            <th className="px-3 py-2 text-left font-semibold text-toss-gray-700 whitespace-nowrap">비고</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-toss-gray-100">
-                        {tasks.map((task, idx) =>
-                            task.details.map((detail, dIdx) => (
-                                <tr key={`${idx}-${dIdx}`}>
-                                    {dIdx === 0 && (
-                                        <>
-                                            <td className="px-3 py-2 text-center text-toss-gray-500" rowSpan={task.details.length}>{idx + 1}</td>
-                                            <td className="px-3 py-2 text-toss-gray-900 font-medium whitespace-nowrap" rowSpan={task.details.length}>{task.title || '-'}</td>
-                                        </>
-                                    )}
-                                    <td className="px-3 py-2 text-toss-gray-900 whitespace-pre-wrap">{detail.content}</td>
-                                    <td className="px-3 py-2 text-center">
-                                        {detail.progress ? (
-                                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                Number(detail.progress) >= 100 ? 'bg-green-100 text-green-700' :
-                                                Number(detail.progress) >= 50 ? 'bg-blue-100 text-blue-700' :
-                                                'bg-yellow-100 text-yellow-700'
-                                            }`}>
-                                                {detail.progress}%
-                                            </span>
-                                        ) : '-'}
-                                    </td>
-                                    <td className="px-3 py-2 text-toss-gray-600">{detail.remark || '-'}</td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        )
-    }
+    // 업무 목록: sm 이상은 표, 모바일은 업무별 카드 (좁은 폭에서 5열 표가 글자를 쪼개던 문제)
+    const renderTaskDetailTable = (morningWork: string) => <TaskDetailView tasks={parseWeeklyTasks(morningWork)} />
 
     return (
         <div className="space-y-6">
